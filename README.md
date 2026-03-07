@@ -1,86 +1,67 @@
 # Ladder Script
 
-**Typed Structured Transaction Conditions for Bitcoin**
-
-Ladder Script is a declarative transaction condition system for Bitcoin that replaces opcode-based scripting with a typed block model inspired by industrial Programmable Logic Controllers (PLC). Every byte is typed, every condition is a named block with validated fields, and evaluation follows deterministic ladder logic: AND within rungs, OR across rungs, first match wins.
-
-Transaction version 3 (`RUNG_TX`) carries structured conditions in outputs (prefixed `0xc1`) and typed witnesses, enabling signatures, timelocks, hash locks, covenants, recursive state machines, and post-quantum cryptography — all without new opcodes.
-
-## Repository Structure
+A typed transaction format for Bitcoin, derived from industrial PLC ladder logic.
 
 ```
-src/rung/                C++ reference implementation (20 files, ~5K lines)
-  evaluator.cpp/h        Block evaluation engine (consensus)
-  serialize.cpp/h        Wire format v2 serialization
-  conditions.cpp/h       Output condition parsing (0xc1 prefix)
-  sighash.cpp/h          LadderSighash tagged hash
-  rpc.cpp                RPC commands (createrungtx, signrungtx, etc.)
-  adaptor.cpp/h          Adaptor signature math
-  pq_verify.cpp/h        Post-quantum signature verification
-  aggregate.cpp/h        Aggregate attestation (fail-closed)
-  types.cpp/h            Block type, data type, and enum definitions
-  policy.cpp/h           Mempool policy validation
-
-patches/                 Surgical diffs against Bitcoin Core v30
-  bitcoin-core-v30-ladder-script.patch
-
-tests/
-  unit/rung_tests.cpp              185+ unit tests for evaluator logic
-  unit/rung_deserialize_fuzz.cpp   Fuzz target for wire format parser
-  functional/rung_basic.py         All 39 block types end-to-end
-  functional/rung_p2p.py           P2P relay tests
-  functional/rung_signet.py        Live signet test suite
-  functional/rung_pq_block.py      FALCON-512 stress test
-
-docs/                    Documentation package
-  WHITEPAPER.md          Vision, motivation, architecture
-  BIP-XXXX.md            Formal Bitcoin Improvement Proposal
-  SPECIFICATION.md       Complete technical specification
-  BLOCK_LIBRARY.md       All 39 block types with fields and evaluation logic
-  IMPLEMENTATION_NOTES.md  Spec deviations and rationale
-  EXAMPLES.md            Worked examples with JSON wire format
-  INTEGRATION.md         Bitcoin integration guide
-  SOFT_FORK_GUIDE.md     Activation strategy and timeline
-  FAQ.md, GLOSSARY.md, SUMMARY.md, SCENARIOS.md
-
-tools/ladder-engine/     Visual editor and simulator
-  index.html             Single-page React app with signet mode
-
-proxy/                   FastAPI signet proxy
-  ladder_proxy.py        Wraps ghost-core RPC for browser access
-  requirements.txt       Python dependencies
-  ladder-proxy.service   Systemd unit file
-  deploy.sh              Deployment script
+  RUNG 0: ──[ SIG: Alice ]──[ CSV: 144 ]──────────────( UNLOCK )──
+  RUNG 1: ──[ MULTISIG: 2-of-3 ]──────────────────────( UNLOCK )──
+  RUNG 2: ──[ /CSV: 144 ]──[ SIG: Bob ]───────────────( UNLOCK )──   ← breach remedy
 ```
 
-## Quick Start
+Bitcoin Script is a stack machine where every element is an opaque byte array. A public key, a hash, a timelock, and a JPEG are indistinguishable at the protocol level. Each new capability requires a new opcode, a soft fork, and years of coordination.
 
-1. Open `tools/ladder-engine/index.html` in a browser
-2. Click **EXAMPLES** and load a scenario (e.g., "Atomic Swap HTLC")
-3. Switch to **SIMULATE** mode and click rung labels to step through evaluation
-4. Click the **RPC** tab to see the `createrungtx` wire-format JSON
+Ladder Script replaces this with **typed function blocks** organised into **rungs**. Every byte has a declared type. Every condition is a named block with validated fields. Evaluation is deterministic: AND within rungs, OR across rungs, first satisfied rung wins. Untyped data is a parse error — not policy, not non-standard, a *parse error*.
 
-## Block Type Families
+The format is a single soft fork that subsumes OP_CTV, OP_VAULT, OP_CAT, and every pending covenant proposal as individual block types within a unified system.
 
-| Family | Blocks | Purpose |
-|--------|--------|---------|
-| Signature | SIG, MULTISIG, ADAPTOR_SIG | Identity verification |
-| Timelock | CSV, CSV_TIME, CLTV, CLTV_TIME | Temporal constraints |
-| Hash | HASH_PREIMAGE, HASH160_PREIMAGE, TAGGED_HASH | Knowledge proofs |
-| Covenant | CTV, VAULT_LOCK, AMOUNT_LOCK | Output constraints |
-| Recursion | RECURSE_SAME, RECURSE_MODIFIED, RECURSE_UNTIL, RECURSE_COUNT, RECURSE_SPLIT, RECURSE_DECAY | Self-referential conditions |
-| Anchor | ANCHOR, ANCHOR_CHANNEL, ANCHOR_POOL, ANCHOR_RESERVE, ANCHOR_SEAL, ANCHOR_ORACLE | Typed metadata |
-| PLC | HYSTERESIS_FEE/VALUE, TIMER_CONTINUOUS/OFF_DELAY, LATCH_SET/RESET, COUNTER_DOWN/PRESET/UP, COMPARE, SEQUENCER, ONE_SHOT, RATE_LIMIT, COSIGN | State machines |
+## What makes it different
 
-## Post-Quantum Support
+**Contact inversion.** Any block can be inverted. `[/CSV: 144]` means "spend BEFORE 144 blocks" — a primitive Bitcoin has never had. This enables breach remedies, dead man's switches, governance vetoes, and time-bounded escrows natively.
 
-Ladder Script natively supports FALCON-512/1024, Dilithium3, and SPHINCS+ via the SCHEME field. The PUBKEY_COMMIT block reduces PQ key storage from 897 bytes to 32 bytes per UTXO. The COSIGN anchor pattern enables a single perpetual PQ UTXO to protect unlimited children via co-spending.
+**Spam is structural.** Nine data types, enforced at the deserialiser before any cryptographic operation. There is no push-data opcode. There is no arbitrary witness. If it doesn't parse as a typed field, it doesn't enter the mempool.
+
+**Post-quantum ready.** FALCON-512 signatures work today. The PUBKEY_COMMIT block reduces PQ key storage from 897 bytes to 32 bytes per UTXO. The COSIGN pattern lets a single PQ anchor protect unlimited child UTXOs.
+
+**Human readable.** A CFO can audit a ladder diagram. A PLC engineer can read it immediately. No stack simulation required.
+
+## 39 Block Types
+
+| Category | Blocks |
+|----------|--------|
+| Signature | SIG, MULTISIG, ADAPTOR_SIG |
+| Timelock | CSV, CSV_TIME, CLTV, CLTV_TIME |
+| Hash | HASH_PREIMAGE, HASH160_PREIMAGE, TAGGED_HASH |
+| Covenant | CTV, VAULT_LOCK, AMOUNT_LOCK |
+| Recursion | RECURSE_SAME, RECURSE_MODIFIED, RECURSE_UNTIL, RECURSE_COUNT, RECURSE_SPLIT, RECURSE_DECAY |
+| Anchor | ANCHOR, ANCHOR_CHANNEL, ANCHOR_POOL, ANCHOR_RESERVE, ANCHOR_SEAL, ANCHOR_ORACLE |
+| PLC | HYSTERESIS_FEE, HYSTERESIS_VALUE, TIMER_CONTINUOUS, TIMER_OFF_DELAY, LATCH_SET, LATCH_RESET, COUNTER_DOWN, COUNTER_PRESET, COUNTER_UP, COMPARE, SEQUENCER, ONE_SHOT, RATE_LIMIT, COSIGN |
+
+## Try it
+
+Open `tools/ladder-engine/index.html` in a browser. Load an example, switch to SIMULATE, step through evaluation. The RPC tab shows the wire-format JSON.
+
+Or use the hosted version at [bitcoinghost.org/labs/ladder-engine.html](https://bitcoinghost.org/labs/ladder-engine.html).
+
+## Repository
+
+```
+src/rung/          C++ reference implementation (20 files)
+tests/             Unit tests, fuzz target, 4 functional test suites
+patches/           Diff for applying to Bitcoin Core v30
+docs/              Whitepaper, BIP draft, specification, block library, examples
+tools/             Visual builder and simulator
+proxy/             FastAPI signet proxy for live testing
+```
+
+## Documentation
+
+- [Whitepaper](docs/WHITEPAPER.md) — design rationale and architecture
+- [Specification](docs/SPECIFICATION.md) — wire format, evaluation rules, data types
+- [Block Library](docs/BLOCK_LIBRARY.md) — all 39 blocks with fields and semantics
+- [BIP Draft](docs/BIP-XXXX.md) — formal Bitcoin Improvement Proposal
+- [Examples](docs/EXAMPLES.md) — 18 worked scenarios with JSON
+- [Implementation Notes](docs/IMPLEMENTATION_NOTES.md) — spec deviations and why
 
 ## License
 
 MIT
-
-## Links
-
-- [Bitcoin Ghost](https://github.com/bitcoin-ghost)
-- [ghost-core](https://github.com/bitcoin-ghost/ghost) (parent Bitcoin Core fork)
