@@ -7640,7 +7640,7 @@ ${ladderRows.map(r => `
           </div>
         )}
         {(() => {
-          const unassigned = rungs.filter(r => r.output.txOutputId === null || r.output.txOutputId === undefined).length;
+          const unassigned = rungs.filter(r => r.output.type !== 'relay' && (r.output.txOutputId === null || r.output.txOutputId === undefined)).length;
           const outRefBlocks = rungs.reduce((c, r) => c + r.blocks.filter(b => b.type === 'OUTPUT_REF').length, 0);
           return (
             <>
