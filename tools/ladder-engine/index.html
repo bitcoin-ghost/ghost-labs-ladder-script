@@ -675,6 +675,18 @@ body {
   z-index: 3;
   text-shadow: 0 0 4px var(--bg-primary);
 }
+/* Warning badge for unprogrammed blocks */
+.block-warn {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  font-size: 10px;
+  color: var(--amber);
+  line-height: 1;
+  z-index: 3;
+  text-shadow: 0 0 4px var(--bg-primary);
+  pointer-events: none;
+}
 .input-contact-note {
   position: absolute;
   bottom: -12px;
@@ -3049,6 +3061,11 @@ function ContactView({ block, rungId, selected, simMode, simResult, scanClass, o
     return pqBadge + valStr;
   }, [block.values, def]);
 
+  const hasEmptyRequired = useMemo(() => {
+    if (!def.fields || def.fields.length === 0) return false;
+    return def.fields.some(f => !f.optional && (!block.values[f.name] || block.values[f.name] === ''));
+  }, [block.values, def]);
+
   const handleClick = useCallback((e) => {
     if (simMode && !scanClass && e.altKey) {
       e.stopPropagation();
@@ -3108,6 +3125,7 @@ function ContactView({ block, rungId, selected, simMode, simResult, scanClass, o
       </div>
       <span className="contact-bracket-right" style={{ color: isEnergized && !isForced ? undefined : isForced ? undefined : def.familyColor + '80' }}>├─</span>
       {!simMode && <div className="contact-delete" onClick={(e) => { e.stopPropagation(); onDelete(); }}>✕</div>}
+      {!simMode && hasEmptyRequired && <span className="block-warn" title="Block has empty required fields">⚠</span>}
       {block.name && !editingNote && <span className="contact-note">{block.name}</span>}
       {editingNote && (
         <input
@@ -7641,10 +7659,18 @@ ${ladderRows.map(r => `
         )}
         {(() => {
           const unassigned = rungs.filter(r => r.output.type !== 'relay' && (r.output.txOutputId === null || r.output.txOutputId === undefined)).length;
+          const noInputs = rungs.filter(r => (!r.txInputIds || r.txInputIds.length === 0) && (!r.outputRefs || r.outputRefs.length === 0)).length;
+          const emptyBlocks = rungs.reduce((c, r) => c + r.blocks.filter(b => {
+            const bd = ALL_BLOCK_DEFS[b.type];
+            if (!bd || !bd.fields || bd.fields.length === 0) return false;
+            return bd.fields.some(f => !f.optional && (!b.values[f.name] || b.values[f.name] === ''));
+          }).length, 0);
           const outRefBlocks = rungs.reduce((c, r) => c + r.blocks.filter(b => b.type === 'OUTPUT_REF').length, 0);
           return (
             <>
               {unassigned > 0 && <div className="status-item" style={{ color: 'var(--red)' }}>{unassigned} RUNG(S) NOT ASSIGNED TO OUTPUT</div>}
+              {noInputs > 0 && <div className="status-item" style={{ color: 'var(--amber)' }}>{noInputs} RUNG(S) NO INPUT ASSIGNED</div>}
+              {emptyBlocks > 0 && <div className="status-item" style={{ color: 'var(--amber)' }}>⚠ {emptyBlocks} BLOCK(S) UNPROGRAMMED</div>}
               {outRefBlocks > 0 && <div className="status-item" style={{ color: 'var(--amber)' }}>{outRefBlocks} OUT_REF BLOCK(S) — USE INPUT REFS INSTEAD</div>}
             </>
           );
