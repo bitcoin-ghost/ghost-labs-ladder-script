@@ -28,6 +28,8 @@ Bitcoin Script was designed as a minimal stack-based language for expressing spe
 
 Ladder Script addresses these limitations by replacing opcode sequences with a typed, structured format where every field has a declared type with enforced size constraints, conditions compose through explicit AND/OR rung logic, and new block types can be added to numbered families without consuming opcode space.
 
+**Computational model.** The Ladder Script evaluation model is derived from IEC 61131-3 Ladder Diagram (LD), the international standard for programmable logic controller programming languages. IEC 61131-3 has been the governing standard for industrial automation since 1993, with implementations deployed in safety-critical systems including power generation, rail signaling, and process control. The standard's key properties — bounded execution time, deterministic evaluation order, typed data, no side effects between rungs, and formal verifiability — map directly to the requirements of Bitcoin consensus code. Block types in the Signature, Timelock, Hash, Covenant, and Anchor families correspond to IEC 61131-3 contacts (input conditions). The PLC family (timers, counters, latches, comparators, sequencers) implements standard IEC 61131-3 function blocks. Coils correspond to IEC 61131-3 output coils with extended semantics (UNLOCK, UNLOCK_TO, COVENANT). The AND-within-rung, OR-across-rungs, first-match evaluation follows the standard LD scan cycle model.
+
 ## Specification
 
 ### Transaction Format
@@ -327,7 +329,7 @@ The following RPCs are provided for wallet and application integration:
 
 **Coil separation.** Separating input conditions (rungs) from output semantics (coil) provides a clean interface between "who can spend" and "where it can go." This makes covenant logic (UNLOCK_TO, COVENANT coil types) orthogonal to signature and timelock logic.
 
-**PLC block types.** The Programmable Logic Controller family (hysteresis, timers, latches, counters, comparators, sequencers) is borrowed from industrial automation where these primitives have decades of proven reliability. They enable stateful transaction logic (e.g., rate-limited withdrawals, multi-step approval processes, time-delayed state machines) without requiring a general-purpose virtual machine.
+**PLC block types.** The Programmable Logic Controller family (hysteresis, timers, latches, counters, comparators, sequencers) implements standard function blocks defined in IEC 61131-3 (International Electrotechnical Commission, "Programmable controllers — Part 3: Programming languages"). These primitives have decades of proven reliability in safety-critical industrial systems. TIMER_CONTINUOUS and TIMER_OFF_DELAY correspond to IEC TON/TOF timer function blocks. COUNTER_UP and COUNTER_DOWN correspond to IEC CTU/CTD counters. LATCH_SET and LATCH_RESET correspond to IEC SR/RS bistable function blocks. COMPARE corresponds to IEC comparison functions (EQ, NE, GT, LT, GE, LE). They enable stateful transaction logic (e.g., rate-limited withdrawals, multi-step approval processes, time-delayed state machines) without requiring a general-purpose virtual machine.
 
 **Conditions hash in sighash.** Including the SHA-256 hash of the serialized locking conditions in the sighash computation prevents signature reuse across different ladder outputs that happen to use the same key. This is analogous to BIP-341's tapleaf hash commitment.
 

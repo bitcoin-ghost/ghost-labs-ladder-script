@@ -1022,6 +1022,83 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
     case RungBlockType::CLTV_TIME:
         // No witness fields needed — NUMERIC comes from conditions
         break;
+    case RungBlockType::TIMELOCKED_SIG: {
+        // Compound SIG + CSV: sign like SIG, CSV timelock comes from conditions
+        std::string wif = block_spec["privkey"].get_str();
+        CKey privkey = DecodeSecret(wif);
+        if (!privkey.IsValid()) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
+        }
+        uint256 sighash;
+        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
+        }
+        CPubKey pubkey = privkey.GetPubKey();
+        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
+        unsigned char sig_buf[64];
+        uint256 aux_rand = GetRandHash();
+        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
+        }
+        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        break;
+    }
+    case RungBlockType::HASH_SIG: {
+        // Compound HASH_PREIMAGE + SIG: preimage + sign
+        std::string preimage_hex = block_spec["preimage"].get_str();
+        auto preimage_data = ParseHex(preimage_hex);
+        if (preimage_data.empty()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "HASH_SIG requires non-empty preimage hex");
+        }
+        block.fields.push_back({RungDataType::PREIMAGE, preimage_data});
+
+        std::string wif = block_spec["privkey"].get_str();
+        CKey privkey = DecodeSecret(wif);
+        if (!privkey.IsValid()) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
+        }
+        uint256 sighash;
+        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
+        }
+        CPubKey pubkey = privkey.GetPubKey();
+        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
+        unsigned char sig_buf[64];
+        uint256 aux_rand = GetRandHash();
+        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
+        }
+        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        break;
+    }
+    case RungBlockType::HTLC: {
+        // Compound HASH_PREIMAGE + CSV + SIG: preimage + sign, CSV from conditions
+        std::string preimage_hex = block_spec["preimage"].get_str();
+        auto preimage_data = ParseHex(preimage_hex);
+        if (preimage_data.empty()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "HTLC requires non-empty preimage hex");
+        }
+        block.fields.push_back({RungDataType::PREIMAGE, preimage_data});
+
+        std::string wif = block_spec["privkey"].get_str();
+        CKey privkey = DecodeSecret(wif);
+        if (!privkey.IsValid()) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
+        }
+        uint256 sighash;
+        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
+        }
+        CPubKey pubkey = privkey.GetPubKey();
+        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
+        unsigned char sig_buf[64];
+        uint256 aux_rand = GetRandHash();
+        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
+        }
+        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        break;
+    }
     default:
         // Covenant/governance/recursion/PLC blocks — no witness fields needed
         break;

@@ -93,6 +93,80 @@
     .coil.energized .coil-body { background: #3a3018; border-color: var(--amber-dim); box-shadow: inset 0 0 12px var(--amber-glow); }
     .coil-type { font-size: 9px; font-weight: 600; color: var(--gray-300); }
     .coil.energized .coil-type { color: var(--amber); }
+
+    /* Signet Badge */
+    .signet-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--font-mono); color: var(--green); background: rgba(0, 255, 136, 0.08); border: 1px solid rgba(0, 255, 136, 0.2); padding: 4px 12px; border-radius: 100px; margin-bottom: 24px; }
+    .signet-badge .dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: signet-pulse 2s infinite; }
+    @keyframes signet-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); } }
+
+    /* Engine Preview */
+    .engine-preview { background: #111; border: 1px solid #2a2a2a; border-radius: 12px; overflow: hidden; margin: 32px 0; position: relative; }
+    .engine-preview-header { display: flex; align-items: center; padding: 10px 16px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; gap: 8px; }
+    .engine-preview-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .engine-preview-dot.r { background: #ff5f56; }
+    .engine-preview-dot.y { background: #ffbd2e; }
+    .engine-preview-dot.g { background: #27c93f; }
+    .engine-preview-title { font-size: 11px; color: var(--gray-400); font-family: var(--font-mono); margin-left: 8px; }
+    .engine-preview-body { display: grid; grid-template-columns: 1fr 1fr; min-height: 280px; }
+    .engine-preview-ladder { padding: 20px; border-right: 1px solid #2a2a2a; position: relative; }
+    .engine-preview-json { padding: 20px; font-family: var(--font-engine); font-size: 11px; line-height: 1.6; color: var(--gray-400); position: relative; overflow: hidden; }
+    .engine-preview-label { font-size: 9px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gray-500); margin-bottom: 12px; }
+    .ep-rung { display: flex; align-items: center; margin-bottom: 10px; opacity: 0; }
+    .engine-preview.playing .ep-rung { animation: ep-rung-in 0.4s ease forwards; }
+    .engine-preview.playing .ep-rung:nth-child(2) { animation-delay: 1s; }
+    .engine-preview.playing .ep-rung:nth-child(3) { animation-delay: 3s; }
+    .engine-preview.playing .ep-rung:nth-child(4) { animation-delay: 5s; }
+    @keyframes ep-rung-in { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+    .ep-rail { width: 2px; height: 32px; background: #3a3a3a; flex-shrink: 0; }
+    .ep-rail.on { background: var(--amber); box-shadow: 0 0 4px var(--amber-glow); }
+    .ep-wire { height: 1px; flex: 1; min-width: 8px; background: #3a3a3a; }
+    .ep-wire.on { background: var(--amber); }
+    .ep-block { display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 10px; background: #222; border: 1px solid #3a3a3a; border-radius: 2px; font-family: var(--font-engine); font-size: 9px; font-weight: 600; color: var(--gray-300); white-space: nowrap; flex-shrink: 0; }
+    .ep-block.on { background: #3a3018; border-color: var(--amber-dim); color: var(--amber); box-shadow: inset 0 0 8px var(--amber-glow); }
+    .ep-coil { display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; font-family: var(--font-engine); font-size: 9px; color: #555; flex-shrink: 0; }
+    .ep-coil.on { color: var(--amber); }
+
+    /* JSON typing animation — only plays when .playing */
+    .ep-json-line { opacity: 0; white-space: pre; }
+    .engine-preview.playing .ep-json-line { animation: ep-json-in 0.3s ease forwards; }
+    .engine-preview.playing .ep-json-line:nth-child(1) { animation-delay: 0.2s; }
+    .engine-preview.playing .ep-json-line:nth-child(2) { animation-delay: 0.5s; }
+    .engine-preview.playing .ep-json-line:nth-child(3) { animation-delay: 1.2s; }
+    .engine-preview.playing .ep-json-line:nth-child(4) { animation-delay: 1.5s; }
+    .engine-preview.playing .ep-json-line:nth-child(5) { animation-delay: 1.8s; }
+    .engine-preview.playing .ep-json-line:nth-child(6) { animation-delay: 2.2s; }
+    .engine-preview.playing .ep-json-line:nth-child(7) { animation-delay: 3.2s; }
+    .engine-preview.playing .ep-json-line:nth-child(8) { animation-delay: 3.5s; }
+    .engine-preview.playing .ep-json-line:nth-child(9) { animation-delay: 3.8s; }
+    .engine-preview.playing .ep-json-line:nth-child(10) { animation-delay: 4.2s; }
+    .engine-preview.playing .ep-json-line:nth-child(11) { animation-delay: 5.2s; }
+    .engine-preview.playing .ep-json-line:nth-child(12) { animation-delay: 5.5s; }
+    .engine-preview.playing .ep-json-line:nth-child(13) { animation-delay: 5.8s; }
+    .engine-preview.playing .ep-json-line:nth-child(14) { animation-delay: 6.2s; }
+    .engine-preview.playing .ep-json-line:nth-child(15) { animation-delay: 6.5s; }
+    .engine-preview.playing .ep-json-line:nth-child(16) { animation-delay: 7.0s; }
+    .engine-preview.playing .ep-json-line:nth-child(17) { animation-delay: 7.5s; }
+    .engine-preview.playing .ep-json-line:nth-child(18) { animation-delay: 8.0s; }
+    @keyframes ep-json-in { from { opacity: 0; } to { opacity: 1; } }
+    .ej-key { color: #98c379; }
+    .ej-str { color: #e5c07b; }
+    .ej-num { color: #d19a66; }
+    .ej-brace { color: var(--gray-400); }
+    .ej-bracket { color: var(--gray-500); }
+
+    /* Energize rungs sequentially — only when .playing */
+    .engine-preview.playing .ep-rung:nth-child(2) .ep-rail, .engine-preview.playing .ep-rung:nth-child(2) .ep-wire, .engine-preview.playing .ep-rung:nth-child(2) .ep-block, .engine-preview.playing .ep-rung:nth-child(2) .ep-coil { animation: ep-energize 0.5s ease 2s forwards; }
+    .engine-preview.playing .ep-rung:nth-child(3) .ep-rail, .engine-preview.playing .ep-rung:nth-child(3) .ep-wire, .engine-preview.playing .ep-rung:nth-child(3) .ep-block, .engine-preview.playing .ep-rung:nth-child(3) .ep-coil { animation: ep-energize 0.5s ease 4s forwards; }
+    .engine-preview.playing .ep-rung:nth-child(4) .ep-rail, .engine-preview.playing .ep-rung:nth-child(4) .ep-wire, .engine-preview.playing .ep-rung:nth-child(4) .ep-block, .engine-preview.playing .ep-rung:nth-child(4) .ep-coil { animation: ep-energize 0.5s ease 6s forwards; }
+    @keyframes ep-energize {
+      from { border-color: #3a3a3a; color: var(--gray-300); background: #222; }
+      to { border-color: var(--amber-dim); color: var(--amber); background: #3a3018; }
+    }
+
+    .engine-preview-replay { position: absolute; bottom: 12px; right: 12px; font-size: 10px; font-family: var(--font-mono); color: var(--gray-500); background: #1a1a1a; border: 1px solid #2a2a2a; padding: 4px 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s; z-index: 2; }
+    .engine-preview-replay:hover { color: var(--gray-300); border-color: var(--gray-600); }
+
+    @media (max-width: 640px) { .engine-preview-body { grid-template-columns: 1fr; } .engine-preview-ladder { border-right: none; border-bottom: 1px solid #2a2a2a; } }
     .rung-logic { font-size: 10px; color: var(--gray-500); font-family: var(--font-engine); margin: 0 4px; flex-shrink: 0; }
 
     /* JSON Panel */
@@ -229,9 +303,12 @@
     <div class="container">
       <h1 class="page-title"><span>Ladder Script</span></h1>
       <p class="page-subtitle">Typed structured transaction conditions for Bitcoin. A declarative block model replacing opcode-based Script.</p>
+      <div class="signet-badge"><div class="dot"></div>Active — Signet Testing</div>
       <div class="hero-ctas">
         <a href="ladder-engine.html" class="btn btn-primary">Open Builder</a>
         <a href="docs/#BIP-XXXX" class="btn btn-secondary">Read the BIP</a>
+        <a href="docs/#SUMMARY" class="btn btn-secondary">Documentation</a>
+        <a href="docs/#BLOCKS" class="btn btn-secondary">Block Reference</a>
         <a href="https://github.com/bitcoin-ghost/ghost/tree/feature/ladder-script/ghost-core" class="btn btn-ghost" target="_blank">
           <svg style="width:16px;height:16px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           View on GitHub
@@ -897,9 +974,107 @@
         <p>The Ladder Script Builder is a visual tool for constructing ladder transactions. Drag blocks onto rungs, configure typed fields, and see the resulting wire format in real time.</p>
       </div>
 
+      <div class="engine-preview" id="engine-preview">
+        <div class="engine-preview-header">
+          <div class="engine-preview-dot r"></div>
+          <div class="engine-preview-dot y"></div>
+          <div class="engine-preview-dot g"></div>
+          <span class="engine-preview-title">ladder-engine — 2-of-3 Multisig Vault</span>
+        </div>
+        <div class="engine-preview-body">
+          <div class="engine-preview-ladder">
+            <div class="engine-preview-label">Ladder Diagram</div>
+            <!-- Rung 0: label row -->
+            <div class="ep-rung" style="opacity:1;animation:none;">
+              <span style="font-size:8px;color:#555;font-family:var(--font-engine);letter-spacing:1px;">RUNG 0 — AUTH</span>
+            </div>
+            <!-- Rung 1: SIG block -->
+            <div class="ep-rung">
+              <div class="ep-rail"></div>
+              <div class="ep-wire"></div>
+              <div class="ep-block">SIG</div>
+              <div class="ep-wire"></div>
+              <div class="ep-block">MULTISIG</div>
+              <div class="ep-wire"></div>
+              <div class="ep-coil">( )</div>
+              <div class="ep-rail"></div>
+            </div>
+            <!-- Rung 2: TIMELOCK -->
+            <div class="ep-rung">
+              <div class="ep-rail"></div>
+              <div class="ep-wire"></div>
+              <div class="ep-block">TIMELOCK_ABS</div>
+              <div class="ep-wire"></div>
+              <div class="ep-block">SIG</div>
+              <div class="ep-wire"></div>
+              <div class="ep-coil">( )</div>
+              <div class="ep-rail"></div>
+            </div>
+            <!-- Rung 3: FEE guard -->
+            <div class="ep-rung">
+              <div class="ep-rail"></div>
+              <div class="ep-wire"></div>
+              <div class="ep-block">HYSTERESIS_FEE</div>
+              <div class="ep-wire"></div>
+              <div class="ep-coil">( )</div>
+              <div class="ep-rail"></div>
+            </div>
+          </div>
+          <div class="engine-preview-json">
+            <div class="engine-preview-label">Wire Format (JSON)</div>
+            <div class="ep-json-line"><span class="ej-brace">{</span></div>
+            <div class="ep-json-line">  <span class="ej-key">"version"</span>: <span class="ej-num">4</span>,</div>
+            <div class="ep-json-line">  <span class="ej-key">"rungs"</span>: <span class="ej-bracket">[</span></div>
+            <div class="ep-json-line">    <span class="ej-brace">{</span> <span class="ej-key">"blocks"</span>: <span class="ej-bracket">[</span></div>
+            <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"SIG"</span>, <span class="ej-key">"code"</span>: <span class="ej-str">"0x0001"</span> <span class="ej-brace">}</span>,</div>
+            <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"MULTISIG"</span>, <span class="ej-key">"m"</span>: <span class="ej-num">2</span>, <span class="ej-key">"n"</span>: <span class="ej-num">3</span> <span class="ej-brace">}</span></div>
+            <div class="ep-json-line">    <span class="ej-bracket">]</span> <span class="ej-brace">}</span>,</div>
+            <div class="ep-json-line">    <span class="ej-brace">{</span> <span class="ej-key">"blocks"</span>: <span class="ej-bracket">[</span></div>
+            <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"TIMELOCK_ABS"</span>, <span class="ej-key">"height"</span>: <span class="ej-num">52560</span> <span class="ej-brace">}</span>,</div>
+            <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"SIG"</span>, <span class="ej-key">"code"</span>: <span class="ej-str">"0x0001"</span> <span class="ej-brace">}</span></div>
+            <div class="ep-json-line">    <span class="ej-bracket">]</span> <span class="ej-brace">}</span>,</div>
+            <div class="ep-json-line">    <span class="ej-brace">{</span> <span class="ej-key">"blocks"</span>: <span class="ej-bracket">[</span></div>
+            <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"HYSTERESIS_FEE"</span>,</div>
+            <div class="ep-json-line">        <span class="ej-key">"low"</span>: <span class="ej-num">5</span>, <span class="ej-key">"high"</span>: <span class="ej-num">50</span> <span class="ej-brace">}</span></div>
+            <div class="ep-json-line">    <span class="ej-bracket">]</span> <span class="ej-brace">}</span></div>
+            <div class="ep-json-line">  <span class="ej-bracket">]</span>,</div>
+            <div class="ep-json-line">  <span class="ej-key">"wire_bytes"</span>: <span class="ej-num">142</span></div>
+            <div class="ep-json-line"><span class="ej-brace">}</span></div>
+          </div>
+        </div>
+        <button class="engine-preview-replay" onclick="replayPreview()">↻ Replay</button>
+      </div>
+
       <div style="text-align: center; margin-top: 32px;">
         <a href="ladder-engine.html" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Launch Builder</a>
       </div>
+
+      <script>
+      (function() {
+        const preview = document.getElementById('engine-preview');
+        // Auto-play when scrolled into view
+        const observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              preview.classList.add('playing');
+              observer.unobserve(preview);
+            }
+          });
+        }, { threshold: 0.3 });
+        observer.observe(preview);
+
+        // Replay: remove .playing, force reflow, re-add
+        window.replayPreview = function() {
+          preview.classList.remove('playing');
+          // Reset all animated elements by cloning inner content
+          const body = preview.querySelector('.engine-preview-body');
+          const clone = body.cloneNode(true);
+          body.parentNode.replaceChild(clone, body);
+          void preview.offsetWidth; // force reflow
+          preview.classList.add('playing');
+        };
+      })();
+      </script>
     </div>
   </section>
 

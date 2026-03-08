@@ -501,7 +501,13 @@ BOOST_AUTO_TEST_CASE(deserialize_rejects_trailing_bytes)
     ladder.rungs.push_back(rung);
 
     auto bytes = SerializeLadderWitness(ladder);
-    bytes.push_back(0x00); // extra trailing byte
+    // Append bytes that survive optional relay/rung_relay_refs parsing:
+    // 0x00 = n_relays(0), 0x01 = n_rung_reqs(1) matching 1 rung,
+    // 0x00 = rung[0] has 0 relay_refs, then 0xFF = genuine trailing garbage
+    bytes.push_back(0x00); // n_relays = 0
+    bytes.push_back(0x01); // n_rung_reqs = 1 (matches ladder.rungs.size())
+    bytes.push_back(0x00); // rung[0] relay_refs count = 0
+    bytes.push_back(0xFF); // trailing garbage
 
     LadderWitness decoded;
     std::string error;
