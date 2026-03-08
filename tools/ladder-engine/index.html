@@ -3806,7 +3806,7 @@ function RungView({ rung, rungIndex, rungCount, selectedBlock, selectedCoil, sel
   );
 }
 
-function LadderView({ rungs, selectedBlock, selectedCoil, selectedInput, mode, simState, onSelectBlock, onSelectCoil, onSelectInput, onDeleteBlock, onDeleteRung, onDropBlock, onAddRung, onAddRungWithBlock, onRungLabelChange, onReorderBlock, onMoveRung, onMoveBlockCrossRung, txOutputs, txInputs, fullscreen, onToggleFullscreen, scanPhase, scanStep, scanResults, scanSpeed, onScanStart, onScanPause, onScanResume, onScanStepFwd, onScanStepBack, onScanReset, onScanSpeedChange, scanIdx, scanTotal, spentRungs, forcedBlocks, onForceBlock, onExecuteRung, onResetSim, onStartScanFrom, simActiveRungId, simActiveStep, simStepResults, onStepBlock, tips, onNameChange, onExpandBlock, onBlockContextMenu, renamingBlockId, onClearRenaming, onClear, onInputContextMenu, onRungChange, renamingInputId, onClearRenamingInput, onDeselect, onOutputContextMenu }) {
+function LadderView({ rungs, selectedBlock, selectedCoil, selectedInput, mode, simState, onSelectBlock, onSelectCoil, onSelectInput, onDeleteBlock, onDeleteRung, onDropBlock, onAddRung, onAddRungWithBlock, onRungLabelChange, onReorderBlock, onMoveRung, onMoveBlockCrossRung, txOutputs, txInputs, fullscreen, onToggleFullscreen, scanPhase, scanStep, scanResults, scanSpeed, onScanStart, onScanPause, onScanResume, onScanStepFwd, onScanStepBack, onScanReset, onScanSpeedChange, scanIdx, scanTotal, spentRungs, forcedBlocks, onForceBlock, onExecuteRung, onResetSim, onStartScanFrom, simActiveRungId, simActiveStep, simStepResults, onStepBlock, tips, onNameChange, onExpandBlock, onBlockContextMenu, renamingBlockId, onClearRenaming, onClear, onInputContextMenu, onRungChange, renamingInputId, onClearRenamingInput, onDeselect, onOutputContextMenu, onJustifyLeft }) {
   const simMode = mode === 'simulate' || mode === 'watch';
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -3914,6 +3914,7 @@ function LadderView({ rungs, selectedBlock, selectedCoil, selectedInput, mode, s
           <span className="zoom-level" onClick={resetView} style={{ cursor: 'pointer' }} title="Click to reset zoom">{Math.round(zoom * 100)}%</span>
           <button className="zoom-btn" onClick={() => setZoom(z => Math.round(Math.min(3, z + 0.1) * 10) / 10)} title="Zoom in">+</button>
           <button className="zoom-btn" onClick={resetView} title="Reset view — zoom 100% and re-centre">⌂</button>
+          {!simMode && <button className="zoom-btn" onClick={onJustifyLeft} title="Justify left — pack all blocks to the left">⫷</button>}
         </div>
         <div style={{ flex: 1 }} />
         {!simMode && <button className="ladder-toolbar-btn" onClick={onAddRung}>+ RUNG</button>}
@@ -7302,6 +7303,10 @@ ${ladderRows.map(r => `
           onClearRenamingInput={() => setRenamingInputId(null)}
           onDeselect={handleDeselect}
           onOutputContextMenu={handleOutputContextMenu}
+          onJustifyLeft={() => setRungs(prev => prev.map(r => ({
+            ...r,
+            blocks: r.blocks.map((b, i) => ({ ...b, slot: i }))
+          })))}
         />
 
         <div className="right-panel">
