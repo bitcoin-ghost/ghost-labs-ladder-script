@@ -338,24 +338,24 @@
         ]
       },
       {
-        name: 'Covenant Family', range: '0x0400', cls: 'covenant',
+        name: 'Covenant Family', range: '0x0300', cls: 'covenant',
         intro: 'Covenant blocks enforce constraints on how a UTXO can be spent by inspecting the spending transaction itself.',
         blocks: [
-          { code: '0x0401', name: 'CTV', file: 'ctv', desc: 'CheckTemplateVerify (BIP-119). Verifies spending transaction matches a committed template hash.' },
-          { code: '0x0402', name: 'VAULT_LOCK', file: 'vault-lock', desc: 'Two-path vault with recovery key (immediate) and hot key (CSV-delayed).' },
-          { code: '0x0403', name: 'AMOUNT_LOCK', file: 'amount-lock', desc: 'Output amount range check. Verifies min_sats \u2264 output_amount \u2264 max_sats.' },
+          { code: '0x0301', name: 'CTV', file: 'ctv', desc: 'CheckTemplateVerify (BIP-119). Verifies spending transaction matches a committed template hash.' },
+          { code: '0x0302', name: 'VAULT_LOCK', file: 'vault-lock', desc: 'Two-path vault with recovery key (immediate) and hot key (CSV-delayed).' },
+          { code: '0x0303', name: 'AMOUNT_LOCK', file: 'amount-lock', desc: 'Output amount range check. Verifies min_sats \u2264 output_amount \u2264 max_sats.' },
         ]
       },
       {
-        name: 'Recursion Family', range: '0x0300', cls: 'recursion',
+        name: 'Recursion Family', range: '0x0400', cls: 'recursion',
         intro: 'Recursion blocks create self-referencing covenants \u2014 outputs that enforce spending back into the same (or modified) covenant structure.',
         blocks: [
-          { code: '0x0301', name: 'RECURSE_SAME', file: 'recurse-same', desc: 'Enforces that an output recreates the identical covenant verbatim.' },
-          { code: '0x0302', name: 'RECURSE_MODIFIED', file: 'recurse-modified', desc: 'Recursive covenant with allowed field mutations between iterations.' },
-          { code: '0x0303', name: 'RECURSE_UNTIL', file: 'recurse-until', desc: 'Conditional recursion \u2014 continues until a termination condition is met.' },
-          { code: '0x0304', name: 'RECURSE_COUNT', file: 'recurse-count', desc: 'Count-limited recursion. Decrements each spend, terminates at zero.' },
-          { code: '0x0305', name: 'RECURSE_SPLIT', file: 'recurse-split', desc: 'Recursive split \u2014 one input fans out into multiple output covenants.' },
-          { code: '0x0306', name: 'RECURSE_DECAY', file: 'recurse-decay', desc: 'Value-decaying recursion. Each spend reduces output value by a committed factor.' },
+          { code: '0x0401', name: 'RECURSE_SAME', file: 'recurse-same', desc: 'Enforces that an output recreates the identical covenant verbatim.' },
+          { code: '0x0402', name: 'RECURSE_MODIFIED', file: 'recurse-modified', desc: 'Recursive covenant with allowed field mutations between iterations.' },
+          { code: '0x0403', name: 'RECURSE_UNTIL', file: 'recurse-until', desc: 'Conditional recursion \u2014 continues until a termination condition is met.' },
+          { code: '0x0404', name: 'RECURSE_COUNT', file: 'recurse-count', desc: 'Count-limited recursion. Decrements each spend, terminates at zero.' },
+          { code: '0x0405', name: 'RECURSE_SPLIT', file: 'recurse-split', desc: 'Recursive split \u2014 one input fans out into multiple output covenants.' },
+          { code: '0x0406', name: 'RECURSE_DECAY', file: 'recurse-decay', desc: 'Value-decaying recursion. Each spend reduces output value by a committed factor.' },
         ]
       },
       {
@@ -376,18 +376,18 @@
         blocks: [
           { code: '0x0601', name: 'HYSTERESIS_FEE', file: 'hysteresis-fee', desc: 'Fee-rate hysteresis controller. Allows spending when fee rate crosses a threshold with deadband.' },
           { code: '0x0602', name: 'HYSTERESIS_VALUE', file: 'hysteresis-value', desc: 'Value-based hysteresis controller with high/low thresholds.' },
-          { code: '0x0603', name: 'TIMER_CONTINUOUS', file: 'timer-continuous', desc: 'Continuous on-delay timer. Spending allowed after preset duration elapses.' },
-          { code: '0x0604', name: 'TIMER_OFF_DELAY', file: 'timer-off-delay', desc: 'Off-delay timer. Allows spending during a window after a trigger event.' },
-          { code: '0x0605', name: 'LATCH_SET', file: 'latch-set', desc: 'Set-dominant latch. Once set, remains set permanently.' },
-          { code: '0x0606', name: 'LATCH_RESET', file: 'latch-reset', desc: 'Reset-dominant latch. Default set; trigger resets permanently.' },
-          { code: '0x0607', name: 'COUNTER_DOWN', file: 'counter-down', desc: 'Down counter. Starts at preset, decrements each spend. Triggers at zero.' },
-          { code: '0x0608', name: 'COUNTER_PRESET', file: 'counter-preset', desc: 'Preset counter. Counts up to target value, resets on trigger.' },
-          { code: '0x0609', name: 'COUNTER_UP', file: 'counter-up', desc: 'Up counter. Increments each recursive spend with no upper bound.' },
-          { code: '0x060A', name: 'COMPARE', file: 'compare', desc: 'Numeric comparator with configurable operator (EQ, NE, LT, LE, GT, GE).' },
-          { code: '0x060B', name: 'SEQUENCER', file: 'sequencer', desc: 'Step sequencer. Advances through committed states, one per spend.' },
-          { code: '0x060C', name: 'ONE_SHOT', file: 'one-shot', desc: 'Single-pulse trigger. Allows exactly one spend, then permanently disables.' },
-          { code: '0x060D', name: 'RATE_LIMIT', file: 'rate-limit', desc: 'Spend rate limiter. Maximum spends within a block-height window.' },
-          { code: '0x060E', name: 'COSIGN', file: 'cosign', desc: 'Co-signing gate. Requires additional signature from a committed co-signer.' },
+          { code: '0x0611', name: 'TIMER_CONTINUOUS', file: 'timer-continuous', desc: 'Continuous on-delay timer. Spending allowed after preset duration elapses.' },
+          { code: '0x0612', name: 'TIMER_OFF_DELAY', file: 'timer-off-delay', desc: 'Off-delay timer. Allows spending during a window after a trigger event.' },
+          { code: '0x0621', name: 'LATCH_SET', file: 'latch-set', desc: 'Set-dominant latch. Once set, remains set permanently.' },
+          { code: '0x0622', name: 'LATCH_RESET', file: 'latch-reset', desc: 'Reset-dominant latch. Default set; trigger resets permanently.' },
+          { code: '0x0631', name: 'COUNTER_DOWN', file: 'counter-down', desc: 'Down counter. Starts at preset, decrements each spend. Triggers at zero.' },
+          { code: '0x0632', name: 'COUNTER_PRESET', file: 'counter-preset', desc: 'Preset counter. Counts up to target value, resets on trigger.' },
+          { code: '0x0633', name: 'COUNTER_UP', file: 'counter-up', desc: 'Up counter. Increments each recursive spend with no upper bound.' },
+          { code: '0x0641', name: 'COMPARE', file: 'compare', desc: 'Numeric comparator with configurable operator (EQ, NE, LT, LE, GT, GE).' },
+          { code: '0x0651', name: 'SEQUENCER', file: 'sequencer', desc: 'Step sequencer. Advances through committed states, one per spend.' },
+          { code: '0x0661', name: 'ONE_SHOT', file: 'one-shot', desc: 'Single-pulse trigger. Allows exactly one spend, then permanently disables.' },
+          { code: '0x0671', name: 'RATE_LIMIT', file: 'rate-limit', desc: 'Spend rate limiter. Maximum spends within a block-height window.' },
+          { code: '0x0681', name: 'COSIGN', file: 'cosign', desc: 'Co-spend contact. Requires another input with matching scriptPubKey hash.' },
         ]
       },
       {

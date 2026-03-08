@@ -69,13 +69,13 @@ Block layout: [NUMERIC threshold] [PUBKEY key_1] ... [PUBKEY key_N] [SIGNATURE s
 
 ---
 
-## 5. SIGNATURE Max Size: 7856 Bytes (PQ-Ready)
+## 5. SIGNATURE Max Size: 50,000 Bytes (PQ-Ready)
 
-**Spec says:** max 144 bytes
+**Spec says:** max 50,000 bytes
 
-**Implementation:** max 7856 bytes (`FieldMaxSize` in types.h)
+**Implementation:** max 50,000 bytes (`FieldMaxSize` in types.h)
 
-**Rationale:** The spec's 144-byte limit only accommodates classical signatures. The implementation pre-allocates for the largest post-quantum scheme (SPHINCS+-SHA2-256f at 7856 bytes). This is a size validation bound, not a policy limit — policy can restrict to classical sizes before post-quantum activation.
+**Rationale:** The spec's limit accommodates the largest post-quantum scheme (SPHINCS+-SHA2-256f at 49,216 bytes). This is a size validation bound, not a policy limit — policy can restrict to classical sizes before post-quantum activation.
 
 ---
 
@@ -192,7 +192,7 @@ RungConditions in scriptPubKey:
 | Max rungs per ladder | 16 |
 | Max blocks per rung | 8 |
 | Max fields per block | 16 |
-| Max ladder witness size | 10,000 bytes |
+| Max ladder witness size | 100,000 bytes |
 | Max coil address size | 520 bytes |
 
 ---

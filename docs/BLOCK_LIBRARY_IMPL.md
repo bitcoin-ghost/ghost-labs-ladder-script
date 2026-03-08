@@ -31,7 +31,7 @@ Every parameter in every block must be one of the following enumerated types. No
 | `HASH256` | `0x03` | 32B exact | SHA-256 hash | State commitments, contract roots, anchors |
 | `HASH160` | `0x04` | 20B exact | HASH160 | Legacy compatibility |
 | `PREIMAGE` | `0x05` | 1–252B | Raw preimage, max 252 bytes | Hash preimage reveal. Max 2 preimage blocks per witness (policy). |
-| `SIGNATURE` | `0x06` | 1–144B | Schnorr=64B, ECDSA/DER≈73B | INLINE attestation signatures only |
+| `SIGNATURE` | `0x06` | 1–50,000B | Schnorr=64B, ECDSA/DER≈73B, PQ up to 49,216B | INLINE attestation signatures only |
 | `SPEND_INDEX` | `0x07` | 4B exact | uint32 spend index | AGGREGATE attestation reference |
 | `NUMERIC` | `0x08` | 1–4B | uint32 value | Timelocks, thresholds, counts, rates |
 | `SCHEME` | `0x09` | 1B exact | Enum value from RungScheme | Signature algorithm selector |
@@ -98,7 +98,7 @@ Verifies an adaptor signature — a signature that becomes valid when combined w
 | `FALCON512` | `0x10` | 666 bytes | NIST PQC standard. Post-quantum secure. AGGREGATE mode reduces tx cost to ~80 vB. |
 | `FALCON1024` | `0x11` | 1280 bytes | Post-quantum. Higher security level. 256-bit post-quantum security. |
 | `DILITHIUM3` | `0x12` | 3293 bytes | NIST PQC standard. Better batch verification properties than FALCON. |
-| `SPHINCS_SHA` | `0x13` | 7856 bytes | Post-quantum. Hash-based. Most conservative PQ assumption. Very large sigs — AGGREGATE essential. |
+| `SPHINCS_SHA` | `0x13` | 49,216 bytes | Post-quantum. Hash-based. Most conservative PQ assumption. Very large sigs — AGGREGATE essential. |
 
 ---
 
@@ -718,6 +718,16 @@ All block type enum values. Unrecognised blocks return `UNSATISFIED` — forward
 | `0x0651` | `SEQUENCER` | PLC | Ordered multi-stage execution |
 | `0x0661` | `ONE_SHOT` | PLC | Single-activation monoflop |
 | `0x0671` | `RATE_LIMIT` | PLC | Per-block spending rate limiter |
+| `0x0681` | `COSIGN` | PLC | Co-spend contact (cross-input scriptPubKey hash) |
+| `0x0701` | `TIMELOCKED_SIG` | Compound | SIG + CSV combined |
+| `0x0702` | `HTLC` | Compound | Hash + Timelock + Sig (Lightning HTLC) |
+| `0x0703` | `HASH_SIG` | Compound | HASH_PREIMAGE + SIG combined |
+| `0x0801` | `EPOCH_GATE` | Governance | Periodic spending window |
+| `0x0802` | `WEIGHT_LIMIT` | Governance | Maximum transaction weight |
+| `0x0803` | `INPUT_COUNT` | Governance | Input count bounds (min/max) |
+| `0x0804` | `OUTPUT_COUNT` | Governance | Output count bounds (min/max) |
+| `0x0805` | `RELATIVE_VALUE` | Governance | Output/input value ratio enforcement |
+| `0x0806` | `ACCUMULATOR` | Governance | Merkle set membership proof |
 
 **Total: 48 block types across 9 families.**
 

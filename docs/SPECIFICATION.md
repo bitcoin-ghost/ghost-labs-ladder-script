@@ -998,4 +998,11 @@ Verify an adaptor pre-signature. Checks that `s'*G == R + e*P` where `e = H(R+T 
 0x0631  COUNTER_DOWN
 0x0632  COUNTER_PRESET
 0x0633  COUNTER_UP
+
+0x0701  TIMELOCKED_SIG      0x0801  EPOCH_GATE
+0x0702  HTLC                0x0802  WEIGHT_LIMIT
+0x0703  HASH_SIG            0x0803  INPUT_COUNT
+                            0x0804  OUTPUT_COUNT
+                            0x0805  RELATIVE_VALUE
+                            0x0806  ACCUMULATOR
 ```

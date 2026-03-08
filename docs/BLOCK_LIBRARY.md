@@ -2368,8 +2368,8 @@ these constraints are not expressible in Bitcoin Script.
 
 | Name | Data Type | Size | Required | Description |
 |------|-----------|------|----------|-------------|
-| NUMERIC[0] | NUMERIC | 1-8 B | Yes (condition) | Epoch size in blocks |
-| NUMERIC[1] | NUMERIC | 1-8 B | Yes (condition) | Window size (must be ≤ epoch_size) |
+| NUMERIC[0] | NUMERIC | 1-4 B | Yes (condition) | Epoch size in blocks |
+| NUMERIC[1] | NUMERIC | 1-4 B | Yes (condition) | Window size (must be ≤ epoch_size) |
 
 **Evaluation:** `block_height % epoch_size < window_size` → SATISFIED
 
@@ -2383,7 +2383,7 @@ these constraints are not expressible in Bitcoin Script.
 
 | Name | Data Type | Size | Required | Description |
 |------|-----------|------|----------|-------------|
-| NUMERIC | NUMERIC | 1-8 B | Yes (condition) | Maximum allowed weight units |
+| NUMERIC | NUMERIC | 1-4 B | Yes (condition) | Maximum allowed weight units |
 
 **Evaluation:** `GetTransactionWeight(tx) <= max_weight` → SATISFIED
 
@@ -2397,8 +2397,8 @@ these constraints are not expressible in Bitcoin Script.
 
 | Name | Data Type | Size | Required | Description |
 |------|-----------|------|----------|-------------|
-| NUMERIC[0] | NUMERIC | 1-8 B | Yes (condition) | Minimum inputs |
-| NUMERIC[1] | NUMERIC | 1-8 B | Yes (condition) | Maximum inputs |
+| NUMERIC[0] | NUMERIC | 1-4 B | Yes (condition) | Minimum inputs |
+| NUMERIC[1] | NUMERIC | 1-4 B | Yes (condition) | Maximum inputs |
 
 **Evaluation:** `min <= tx.vin.size() <= max` → SATISFIED
 
@@ -2412,8 +2412,8 @@ these constraints are not expressible in Bitcoin Script.
 
 | Name | Data Type | Size | Required | Description |
 |------|-----------|------|----------|-------------|
-| NUMERIC[0] | NUMERIC | 1-8 B | Yes (condition) | Minimum outputs |
-| NUMERIC[1] | NUMERIC | 1-8 B | Yes (condition) | Maximum outputs |
+| NUMERIC[0] | NUMERIC | 1-4 B | Yes (condition) | Minimum outputs |
+| NUMERIC[1] | NUMERIC | 1-4 B | Yes (condition) | Maximum outputs |
 
 **Evaluation:** `min <= tx.vout.size() <= max` → SATISFIED
 
@@ -2428,8 +2428,8 @@ input value. Uses integer ratio (no floating point). Overflow-safe via `__int128
 
 | Name | Data Type | Size | Required | Description |
 |------|-----------|------|----------|-------------|
-| NUMERIC[0] | NUMERIC | 1-8 B | Yes (condition) | Numerator (≥ 0) |
-| NUMERIC[1] | NUMERIC | 1-8 B | Yes (condition) | Denominator (> 0) |
+| NUMERIC[0] | NUMERIC | 1-4 B | Yes (condition) | Numerator (≥ 0) |
+| NUMERIC[1] | NUMERIC | 1-4 B | Yes (condition) | Denominator (> 0) |
 
 **Evaluation:** `output_amount * denominator >= input_amount * numerator` → SATISFIED
 

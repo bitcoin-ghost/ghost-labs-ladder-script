@@ -61,7 +61,7 @@ proxy/             FastAPI signet proxy for live testing
 - [Specification](docs/SPECIFICATION.md) — wire format, evaluation rules, data types
 - [Block Library](docs/BLOCK_LIBRARY.md) — all 48 blocks with fields and semantics
 - [BIP Draft](docs/BIP-XXXX.md) — formal Bitcoin Improvement Proposal
-- [Examples](docs/EXAMPLES.md) — 18 worked scenarios with JSON
+- [Examples](docs/EXAMPLES.md) — 8 worked scenarios with JSON
 - [Implementation Notes](docs/IMPLEMENTATION_NOTES.md) — spec deviations and why
 
 ## Links
@@ -79,7 +79,7 @@ proxy/             FastAPI signet proxy for live testing
 | PQ signature verification | `src/rung/pq_verify.cpp` |
 | Adaptor signature support | `src/rung/adaptor.cpp` |
 | Policy validation | `src/rung/policy.cpp` |
-| Unit tests | `tests/unit/rung_tests.cpp` |
+| Unit tests | `src/test/rung_tests.cpp` |
 
 ## License
 
