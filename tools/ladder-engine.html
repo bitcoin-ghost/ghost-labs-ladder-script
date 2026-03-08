@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ladder Engine | Ghost Labs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --black: #050505; --gray-900: #141414; --gray-800: #1a1a1a; --gray-700: #242424;
+      --gray-600: #333333; --gray-500: #4a4a4a; --gray-400: #666666; --gray-300: #888888;
+      --gray-100: #cccccc; --white: #f0f0f0;
+      --orange: #f7931a; --orange-light: #ffb347;
+    }
+    html, body { height: 100%; overflow: hidden; font-family: 'Outfit', system-ui, sans-serif; background: var(--black); color: var(--gray-100); }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 10px 0;
+      background: rgba(5, 5, 5, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--gray-800);
+      height: 48px;
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 100%;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--white); }
+    .logo-icon { width: 28px; height: 28px; border-radius: 6px; overflow: hidden; }
+    .logo-icon img { width: 100%; height: 100%; object-fit: contain; }
+    .logo-text { font-weight: 700; font-size: 16px; }
+    .logo-text span { color: var(--orange); }
+    .nav-links { display: flex; align-items: center; gap: 4px; }
+    .nav-links a {
+      color: var(--gray-300); text-decoration: none; padding: 6px 14px;
+      font-size: 13px; font-weight: 500; border-radius: 6px; transition: all 0.2s;
+    }
+    .nav-links a:hover { color: var(--white); background: var(--gray-800); }
+    .nav-links a.active { color: var(--orange); }
+    .nav-dropdown { position: relative; }
+    .nav-dropdown-menu {
+      position: absolute; top: 100%; left: 0; background: var(--gray-900);
+      border: 1px solid var(--gray-800); border-radius: 8px; padding: 6px;
+      min-width: 150px; opacity: 0; visibility: hidden; transform: translateY(-6px); transition: all 0.2s;
+    }
+    .nav-dropdown:hover .nav-dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+    .nav-dropdown-menu a { display: block; padding: 8px 14px; color: var(--gray-300); text-decoration: none; font-size: 13px; border-radius: 6px; }
+    .nav-dropdown-menu a:hover { background: var(--gray-800); color: var(--white); }
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px;
+      font-family: 'Outfit', system-ui, sans-serif; font-size: 13px; font-weight: 600;
+      border-radius: 6px; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer;
+    }
+    .btn-primary { background: var(--orange); color: var(--black); }
+    .btn-primary:hover { background: var(--orange-light); }
+    .btn-ghost { background: transparent; color: var(--gray-300); padding: 6px 10px; }
+    .btn-ghost:hover { color: var(--white); }
+
+    .engine-frame {
+      position: fixed;
+      top: 48px; left: 0; right: 0; bottom: 0;
+      border: none;
+      width: 100%;
+      height: calc(100vh - 48px);
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-inner">
+      <a href="../index.html" class="logo">
+        <div class="logo-icon"><img src="../logo.png" alt="Bitcoin Ghost"></div>
+        <div class="logo-text">Bitcoin<span>Ghost</span></div>
+      </a>
+      <div class="nav-links">
+        <a href="../index.html">Home</a>
+        <a href="../network.html">Network</a>
+        <div class="nav-dropdown">
+          <a href="../pool.html">Pool</a>
+          <div class="nav-dropdown-menu">
+            <a href="../pool.html">Connect</a>
+            <a href="../pool-stats.html">Statistics</a>
+            <a href="../node-finder.html">Node Finder</a>
+          </div>
+        </div>
+        <a href="../how-it-works.html">How It Works</a>
+        <a href="../economics.html">Economics</a>
+        <a href="../ghost-labs.html" class="active">Labs</a>
+        <a href="../docs/index.html">Docs</a>
+      </div>
+      <div class="nav-right">
+        <a href="https://github.com/bitcoin-ghost" class="btn btn-ghost" target="_blank">
+          <svg style="width:18px;height:18px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+        <a href="../get-started.html" class="btn btn-primary">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <iframe src="ladder-engine/index.html" class="engine-frame" title="Ladder Script Engine"></iframe>
+</body>
+</html>
