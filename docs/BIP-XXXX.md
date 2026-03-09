@@ -118,18 +118,18 @@ The micro-header lookup table maps 128 slot indices to block type values. All 52
 | 0x05 | CLTV | 0x17 | RECURSE_UNTIL | 0x29 | RATE_LIMIT |
 | 0x06 | CLTV_TIME | 0x18 | RECURSE_COUNT | 0x2A | COSIGN |
 | 0x07 | HASH_PREIMAGE | 0x19 | RECURSE_SPLIT | 0x2B | EPOCH_GATE |
-| 0x08 | HASH160_PREIMAGE | 0x1A | RECURSE_DECAY | 0x2C | RELAY_GATE |
-| 0x09 | TAGGED_HASH | 0x1B | HYSTERESIS_FEE | 0x2D | TAPROOT_COMMIT |
-| 0x0A | CTV | 0x1C | HYSTERESIS_VALUE | 0x2E | MERKLE_VERIFY |
-| 0x0B | VAULT_LOCK | 0x1D | TIMER_CONTINUOUS | 0x2F | DELEGATION |
-| 0x0C | AMOUNT_LOCK | 0x1E | TIMER_OFF_DELAY | 0x30 | GUARDIAN_ROTATE |
-| 0x0D | ANCHOR | 0x1F | LATCH_SET | 0x31 | QUORUM_VOTE |
-| 0x0E | ANCHOR_CHANNEL | 0x20 | LATCH_RESET | 0x32 | VETO |
-| 0x0F | ANCHOR_POOL | 0x21 | COUNTER_DOWN | | |
-| 0x10 | ACCUMULATOR | 0x22 | DEAD_MAN | | |
-| 0x11 | ANCHOR_OPERATOR | 0x23 | COUNTER_GATE | | |
+| 0x08 | HASH160_PREIMAGE | 0x1A | RECURSE_DECAY | 0x2C | HASH_SIG |
+| 0x09 | TAGGED_HASH | 0x1B | HYSTERESIS_FEE | 0x2D | PTLC |
+| 0x0A | CTV | 0x1C | HYSTERESIS_VALUE | 0x2E | CLTV_SIG |
+| 0x0B | VAULT_LOCK | 0x1D | TIMER_CONTINUOUS | 0x2F | TIMELOCKED_MULTISIG |
+| 0x0C | AMOUNT_LOCK | 0x1E | TIMER_OFF_DELAY | 0x30 | WEIGHT_LIMIT |
+| 0x0D | ANCHOR | 0x1F | LATCH_SET | 0x31 | INPUT_COUNT |
+| 0x0E | ANCHOR_CHANNEL | 0x20 | LATCH_RESET | 0x32 | OUTPUT_COUNT |
+| 0x0F | ANCHOR_POOL | 0x21 | COUNTER_DOWN | 0x33 | RELATIVE_VALUE |
+| 0x10 | ACCUMULATOR | 0x22 | HTLC | | |
+| 0x11 | MUSIG_THRESHOLD | 0x23 | TIMELOCKED_SIG | | |
 
-Slot `0x33` is assigned to MUSIG_THRESHOLD. Slots `0x34`–`0x7F` are reserved for future block types. Unknown micro-header slots are rejected during deserialization.
+Slots `0x34`–`0x7F` are reserved for future block types. Unknown micro-header slots are rejected during deserialization.
 
 A micro-header is used when all three conditions are met:
 1. The block type has an assigned micro-header slot.
@@ -272,12 +272,12 @@ Every field in a Ladder Script witness or conditions structure has one of the fo
 | `0x03` | HASH256 | 32 | 32 | Both | SHA-256 hash digest |
 | `0x04` | HASH160 | 20 | 20 | Both | RIPEMD160(SHA256()) hash digest |
 | `0x05` | PREIMAGE | 1 | 252 | Witness only | Hash preimage (forbidden in conditions) |
-| `0x06` | SIGNATURE | 1 | 5,000 | Witness only | Signature (Schnorr 64-65B, ECDSA 8-72B, PQ up to ~3,300B) |
+| `0x06` | SIGNATURE | 1 | 50,000 | Witness only | Signature (Schnorr 64-65B, ECDSA 8-72B, PQ up to ~3,300B) |
 | `0x07` | SPEND_INDEX | 4 | 4 | Both | Index reference (uint32 LE) for aggregate attestation |
 | `0x08` | NUMERIC | 1 | 4 | Both | Unsigned 32-bit integer. Encoded on wire as CompactSize(value); stored internally as 4-byte LE. |
 | `0x09` | SCHEME | 1 | 1 | Both | Signature scheme selector byte |
 
-The SIGNATURE maximum of 5,000 bytes accommodates Dilithium3 signatures (3,293 bytes) with headroom. The PUBKEY maximum of 2,048 bytes accommodates FALCON-1024 public keys (1,793 bytes).
+The SIGNATURE maximum of 50,000 bytes accommodates all post-quantum signature schemes including SPHINCS_SHA (~7,856 bytes) and Dilithium3 (3,293 bytes) with headroom. The PUBKEY maximum of 2,048 bytes accommodates FALCON-1024 public keys (1,793 bytes).
 
 Data type validity is checked by `IsKnownDataType()`. Unknown data type codes cause deserialization failure.
 
@@ -519,7 +519,7 @@ The following RPCs are provided for wallet and application integration:
 
 **Strict unknown type handling.** Unknown block types return UNSATISFIED (rung fails, falls through to next rung) when not inverted, and ERROR when inverted. This prevents the inverted-unknown footgun where an attacker could bypass conditions using unknown block types in negated position. New block types activate simultaneously via soft fork — there is no need for forward-compatible unknown type evaluation.
 
-**Post-quantum signature support.** The PUBKEY maximum of 2,048 bytes and SIGNATURE maximum of 5,000 bytes were chosen to accommodate all NIST post-quantum finalist schemes. The PUBKEY_COMMIT mechanism enables a commit-reveal migration path: users can lock funds to a 32-byte hash of their PQ public key today, revealing the full key only at spend time.
+**Post-quantum signature support.** The PUBKEY maximum of 2,048 bytes and SIGNATURE maximum of 50,000 bytes were chosen to accommodate all NIST post-quantum finalist schemes including SPHINCS_SHA. The PUBKEY_COMMIT mechanism enables a commit-reveal migration path: users can lock funds to a 32-byte hash of their PQ public key today, revealing the full key only at spend time.
 
 **Coil separation.** Separating input conditions (rungs) from output semantics (coil) provides a clean interface between "who can spend" and "where it can go." This makes covenant logic (UNLOCK_TO, COVENANT coil types) orthogonal to signature and timelock logic.
 

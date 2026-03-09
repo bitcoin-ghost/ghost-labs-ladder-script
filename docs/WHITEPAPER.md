@@ -112,7 +112,7 @@ Ladder Script transactions use **transaction version 4** (`RUNG_TX_VERSION = 4`)
 
 ### 3.2 Wire Format
 
-The witness wire format (v2) is:
+The witness wire format (v3) is:
 
 ```
 [n_rungs: varint]
@@ -174,7 +174,7 @@ The AGGREGATE mode uses an `AggregateProof` structure containing pubkey commitme
 
 ## 4. Block Type System
 
-Ladder Script defines 40 block types across seven families. Each family occupies a dedicated range in the uint16_t block type space.
+Ladder Script defines 52 block types across nine families. Each family occupies a dedicated range in the uint16_t block type space.
 
 ### 4.1 Signature Family (0x0001--0x00FF)
 
@@ -276,13 +276,45 @@ Typed metadata blocks for layer-2 protocols and external systems.
 
 Anchor blocks always evaluate to SATISFIED. They serve as typed, validated metadata carriers that are committed to in the conditions hash and therefore in the sighash. This ensures that anchor data is authenticated by the transaction's signatures without requiring additional verification logic.
 
+### 4.8 Compound Family (0x0700--0x07FF)
+
+Multi-condition blocks that combine signature, timelock, and hash checks into a single block with a single header. Compound blocks save 8--16 wire bytes compared to using separate blocks.
+
+**TIMELOCKED_SIG (0x0701):** Signature plus relative timelock in a single block. Replaces SIG + CSV.
+
+**HTLC (0x0702):** Hash time-locked contract. Combines HASH_PREIMAGE + CSV + SIG for atomic swaps.
+
+**HASH_SIG (0x0703):** Hash preimage reveal with signature. Combines HASH_PREIMAGE + SIG.
+
+**PTLC (0x0704):** Point time-locked contract. Combines ADAPTOR_SIG + CSV for payment channels.
+
+**CLTV_SIG (0x0705):** Signature plus absolute timelock. Replaces SIG + CLTV.
+
+**TIMELOCKED_MULTISIG (0x0706):** M-of-N multisig plus relative timelock. Replaces MULTISIG + CSV.
+
+### 4.9 Governance Family (0x0800--0x08FF)
+
+Transaction-level constraint blocks that enforce structural properties of the spending transaction.
+
+**EPOCH_GATE (0x0801):** Spending window gate. Restricts transactions to periodic windows defined by block height modular arithmetic.
+
+**WEIGHT_LIMIT (0x0802):** Maximum transaction weight in weight units.
+
+**INPUT_COUNT (0x0803):** Minimum and maximum number of inputs.
+
+**OUTPUT_COUNT (0x0804):** Minimum and maximum number of outputs.
+
+**RELATIVE_VALUE (0x0805):** Anti-siphon protection. Output value must be at least a specified ratio of the input value.
+
+**ACCUMULATOR (0x0806):** Merkle set membership proof. Verifies that a value is in a pre-committed allowlist via a Merkle proof.
+
 ---
 
 ## 5. Post-Quantum Cryptography
 
 ### 5.1 Scheme-Based Routing
 
-Ladder Script's SCHEME data type enables transparent routing to post-quantum signature verification without any changes to the block type system. A SIG block containing a SCHEME field set to FALCON512 (0x10), FALCON1024 (0x11), or DILITHIUM3 (0x12) is automatically routed to the post-quantum verifier.
+Ladder Script's SCHEME data type enables transparent routing to post-quantum signature verification without any changes to the block type system. A SIG block containing a SCHEME field set to FALCON512 (0x10), FALCON1024 (0x11), DILITHIUM3 (0x12), or SPHINCS_SHA (0x13) is automatically routed to the post-quantum verifier.
 
 Supported schemes:
 
@@ -293,8 +325,9 @@ Supported schemes:
 | FALCON-512 | 0x10 | ~666 B | 897 B |
 | FALCON-1024 | 0x11 | ~1,280 B | 1,793 B |
 | Dilithium3 | 0x12 | 3,293 B | 1,952 B |
+| SPHINCS_SHA | 0x13 | ~7,856 B | 32 B |
 
-The PUBKEY data type supports sizes up to 2,048 bytes, and the SIGNATURE data type supports sizes up to 5,000 bytes, accommodating all supported post-quantum signature schemes.
+The PUBKEY data type supports sizes up to 2,048 bytes, and the SIGNATURE data type supports sizes up to 50,000 bytes, accommodating all supported post-quantum signature schemes.
 
 ### 5.2 PUBKEY_COMMIT: Compact UTXO Commitments
 
@@ -375,7 +408,7 @@ Because every field must conform to a data type that has semantic meaning in the
 
 ### 8.1 vs OP_CTV (BIP-119)
 
-OP_CTV adds a single opcode for template-based covenants. Ladder Script includes CTV functionality as one block type (0x0301) among 40+. The CTV block evaluator computes the identical BIP-119 template hash and verifies it against the committed value. Ladder Script subsumes OP_CTV while providing the additional infrastructure (typed fields, named blocks, structured extensibility) that OP_CTV does not address.
+OP_CTV adds a single opcode for template-based covenants. Ladder Script includes CTV functionality as one block type (0x0301) among 52. The CTV block evaluator computes the identical BIP-119 template hash and verifies it against the committed value. Ladder Script subsumes OP_CTV while providing the additional infrastructure (typed fields, named blocks, structured extensibility) that OP_CTV does not address.
 
 ### 8.2 vs OP_CAT
 
@@ -440,7 +473,7 @@ The `MergeConditionsAndWitness` function performs strict structural validation b
 
 Ladder Script replaces Bitcoin's untyped, imperative scripting model with a typed, declarative block system that draws on decades of industrial control system design. By requiring every byte to be typed, every condition to be named, and every evaluation to be deterministic, Ladder Script eliminates the classes of ambiguity and complexity that have constrained Bitcoin's programmability.
 
-The 40 block types across seven families -- signature, timelock, hash, covenant, recursion, anchor, and PLC -- provide a comprehensive vocabulary for transaction authorization. Post-quantum cryptography is supported natively through the SCHEME routing mechanism and PUBKEY_COMMIT compact representations. Spam resistance is structural rather than policy-dependent.
+The 52 block types across nine families -- signature, timelock, hash, covenant, recursion, anchor, PLC, compound, and governance -- provide a comprehensive vocabulary for transaction authorization. Post-quantum cryptography is supported natively through the SCHEME routing mechanism and PUBKEY_COMMIT compact representations. Spam resistance is structural rather than policy-dependent.
 
 All block types activate simultaneously as a single deployment. Forward compatibility ensures that transactions using future block types are structurally valid even to nodes that do not yet implement those types.
 

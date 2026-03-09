@@ -42,7 +42,7 @@ Schnorr (BIP-340), ECDSA, and post-quantum schemes via the SCHEME field.
 | PUBKEY | PUBKEY (0x01) | 1-2048 B | Yes | Signing public key (32B x-only, 33B compressed, or PQ) |
 | PUBKEY_COMMIT | PUBKEY_COMMIT (0x02) | 32 B | No | SHA-256 commitment to the public key. When present, PUBKEY must hash to this value. |
 | SCHEME | SCHEME (0x09) | 1 B | No | Signature algorithm selector (SCHNORR=0x01, ECDSA=0x02, FALCON512=0x10, FALCON1024=0x11, DILITHIUM3=0x12). If absent, determined by signature size. |
-| SIGNATURE | SIGNATURE (0x06) | 1-5000 B | Yes (witness) | The signature. Schnorr: 64-65 B. ECDSA: 8-72 B. PQ: up to ~3300 B. |
+| SIGNATURE | SIGNATURE (0x06) | 1-50000 B | Yes (witness) | The signature. Schnorr: 64-65 B. ECDSA: 8-72 B. PQ: up to ~3300 B. |
 
 **Evaluation logic:**
 
@@ -360,7 +360,7 @@ Lightning HTLC timeout paths.
 
 ---
 
-### 5. CSV_TIME (0x0102)
+### 6. CSV_TIME (0x0102)
 
 **Family:** Timelock
 
@@ -412,7 +412,7 @@ BIP68 time flag is bit 22. The value encodes a time-based relative lock.
 
 ---
 
-### 6. CLTV (0x0103)
+### 7. CLTV (0x0103)
 
 **Family:** Timelock
 
@@ -463,7 +463,7 @@ with SIG for "key OR timelock" patterns.
 
 ---
 
-### 7. CLTV_TIME (0x0104)
+### 8. CLTV_TIME (0x0104)
 
 **Family:** Timelock
 
@@ -515,7 +515,7 @@ LOCKTIME_THRESHOLD). Values below that threshold are block heights.
 
 ## Hash Family
 
-### 8. HASH_PREIMAGE (0x0201)
+### 9. HASH_PREIMAGE (0x0201)
 
 **Family:** Hash
 
@@ -567,7 +567,7 @@ alternative rung. Payment channel routing secrets.
 
 ---
 
-### 9. HASH160_PREIMAGE (0x0202)
+### 10. HASH160_PREIMAGE (0x0202)
 
 **Family:** Hash
 
@@ -618,7 +618,7 @@ commitment (20 bytes vs 32 bytes) for space-constrained conditions.
 
 ---
 
-### 10. TAGGED_HASH (0x0203)
+### 11. TAGGED_HASH (0x0203)
 
 **Family:** Hash
 
@@ -678,7 +678,7 @@ schemes using BIP-340 tagged hash convention.
 
 ## Covenant Family
 
-### 11. CTV (0x0301)
+### 12. CTV (0x0301)
 
 **Family:** Covenant
 
@@ -732,7 +732,7 @@ templates.
 
 ---
 
-### 12. VAULT_LOCK (0x0302)
+### 13. VAULT_LOCK (0x0302)
 
 **Family:** Covenant
 
@@ -802,7 +802,7 @@ monitoring. Pairs with CTV for vault re-encumbrance.
 
 ---
 
-### 13. AMOUNT_LOCK (0x0303)
+### 14. AMOUNT_LOCK (0x0303)
 
 **Family:** Covenant
 
@@ -865,7 +865,7 @@ All anchor blocks are structural metadata blocks. Their evaluation checks field
 presence and validity but does not verify spending conditions in the traditional sense.
 When fields are valid, evaluation returns SATISFIED.
 
-### 14. ANCHOR (0x0501)
+### 15. ANCHOR (0x0501)
 
 **Family:** Anchor
 
@@ -904,7 +904,7 @@ return SATISFIED
 
 ---
 
-### 15. ANCHOR_CHANNEL (0x0502)
+### 16. ANCHOR_CHANNEL (0x0502)
 
 **Family:** Anchor
 
@@ -949,7 +949,7 @@ ERROR if fewer than 2 pubkeys.
 
 ---
 
-### 16. ANCHOR_POOL (0x0503)
+### 17. ANCHOR_POOL (0x0503)
 
 **Family:** Anchor
 
@@ -991,7 +991,7 @@ return SATISFIED
 
 ---
 
-### 17. ANCHOR_RESERVE (0x0504)
+### 18. ANCHOR_RESERVE (0x0504)
 
 **Family:** Anchor
 
@@ -1040,7 +1040,7 @@ ERROR if missing fields.
 
 ---
 
-### 18. ANCHOR_SEAL (0x0505)
+### 19. ANCHOR_SEAL (0x0505)
 
 **Family:** Anchor
 
@@ -1081,7 +1081,7 @@ return SATISFIED
 
 ---
 
-### 19. ANCHOR_ORACLE (0x0506)
+### 20. ANCHOR_ORACLE (0x0506)
 
 **Family:** Anchor
 
@@ -1130,7 +1130,7 @@ outputs must carry forward the same (or specifically mutated) rung conditions as
 input. This creates covenant chains where UTXOs are re-encumbered across multiple
 spends.
 
-### 20. RECURSE_SAME (0x0401)
+### 21. RECURSE_SAME (0x0401)
 
 **Family:** Recursion
 
@@ -1189,7 +1189,7 @@ for key-gated recursive vaults.
 
 ---
 
-### 21. RECURSE_MODIFIED (0x0402)
+### 22. RECURSE_MODIFIED (0x0402)
 
 **Family:** Recursion
 
@@ -1274,7 +1274,7 @@ TIMER_CONTINUOUS). Any PLC block that needs tracked state changes.
 
 ---
 
-### 22. RECURSE_UNTIL (0x0403)
+### 23. RECURSE_UNTIL (0x0403)
 
 **Family:** Recursion
 
@@ -1341,7 +1341,7 @@ Governance periods with fixed end dates.
 
 ---
 
-### 23. RECURSE_COUNT (0x0404)
+### 24. RECURSE_COUNT (0x0404)
 
 **Family:** Recursion
 
@@ -1405,7 +1405,7 @@ limited withdrawal (spend once per block, N times total).
 
 ---
 
-### 24. RECURSE_SPLIT (0x0405)
+### 25. RECURSE_SPLIT (0x0405)
 
 **Family:** Recursion
 
@@ -1471,7 +1471,7 @@ UTXO expansion.
 
 ---
 
-### 25. RECURSE_DECAY (0x0406)
+### 26. RECURSE_DECAY (0x0406)
 
 **Family:** Recursion
 
@@ -1531,7 +1531,7 @@ The PLC (Programmable Logic Controller) family models on-chain spending conditio
 using industrial automation primitives. PLC blocks typically track state via NUMERIC
 fields that are modified across covenant spends using RECURSE_MODIFIED.
 
-### 26. HYSTERESIS_FEE (0x0601)
+### 27. HYSTERESIS_FEE (0x0601)
 
 **Family:** PLC
 
@@ -1596,7 +1596,7 @@ environments. Rate-limiting high-fee spending.
 
 ---
 
-### 27. HYSTERESIS_VALUE (0x0602)
+### 28. HYSTERESIS_VALUE (0x0602)
 
 **Family:** PLC
 
@@ -1652,7 +1652,7 @@ Only spendable when UTXO value is between 1,000 and 100,000 sats.
 
 ---
 
-### 28. TIMER_CONTINUOUS (0x0611)
+### 29. TIMER_CONTINUOUS (0x0611)
 
 **Family:** PLC
 
@@ -1712,7 +1712,7 @@ create spend-counted timers.
 
 ---
 
-### 29. TIMER_OFF_DELAY (0x0612)
+### 30. TIMER_OFF_DELAY (0x0612)
 
 **Family:** PLC
 
@@ -1764,7 +1764,7 @@ covenant spends.
 
 ---
 
-### 30. LATCH_SET (0x0621)
+### 31. LATCH_SET (0x0621)
 
 **Family:** PLC
 
@@ -1819,7 +1819,7 @@ spending paths.
 
 ---
 
-### 31. LATCH_RESET (0x0622)
+### 32. LATCH_RESET (0x0622)
 
 **Family:** PLC
 
@@ -1878,7 +1878,7 @@ RECURSE_MODIFIED (delta=-1) to enforce 1-to-0 transition.
 
 ---
 
-### 32. COUNTER_DOWN (0x0631)
+### 33. COUNTER_DOWN (0x0631)
 
 **Family:** PLC
 
@@ -1930,7 +1930,7 @@ RECURSE_COUNT but operates as a PLC contact for complex ladder logic.
 
 ---
 
-### 33. COUNTER_PRESET (0x0632)
+### 34. COUNTER_PRESET (0x0632)
 
 **Family:** PLC
 
@@ -1985,7 +1985,7 @@ return UNSATISFIED
 
 ---
 
-### 34. COUNTER_UP (0x0633)
+### 35. COUNTER_UP (0x0633)
 
 **Family:** PLC
 
@@ -2043,7 +2043,7 @@ with a PUBKEY requirement for spending authorization.
 
 ---
 
-### 35. COMPARE (0x0641)
+### 36. COMPARE (0x0641)
 
 **Family:** PLC
 
@@ -2112,7 +2112,7 @@ size. Pairs with AMOUNT_LOCK for comprehensive value constraints.
 
 ---
 
-### 36. SEQUENCER (0x0651)
+### 37. SEQUENCER (0x0651)
 
 **Family:** PLC
 
@@ -2167,7 +2167,7 @@ State machine step tracking.
 
 ---
 
-### 37. ONE_SHOT (0x0661)
+### 38. ONE_SHOT (0x0661)
 
 **Family:** PLC
 
@@ -2219,7 +2219,7 @@ time claim tickets.
 
 ---
 
-### 38. RATE_LIMIT (0x0671)
+### 39. RATE_LIMIT (0x0671)
 
 **Family:** PLC
 
@@ -2280,7 +2280,7 @@ protection on hot wallets.
 
 ---
 
-### 39. COSIGN (0x0681)
+### 40. COSIGN (0x0681)
 
 **Family:** PLC
 
@@ -2342,7 +2342,7 @@ single block. They are semantically equivalent to placing the individual blocks 
 same rung, but save wire bytes and simplify common patterns like HTLCs and timelocked
 signatures.
 
-### 40. TIMELOCKED_SIG (0x0701)
+### 41. TIMELOCKED_SIG (0x0701)
 
 **Family:** Compound
 
@@ -2397,7 +2397,7 @@ waiting periods. Staged withdrawal from vaults.
 
 ---
 
-### 41. HTLC (0x0702)
+### 42. HTLC (0x0702)
 
 **Family:** Compound
 
@@ -2457,7 +2457,7 @@ Conditional payments with timeout refund.
 
 ---
 
-### 42. HASH_SIG (0x0703)
+### 43. HASH_SIG (0x0703)
 
 **Family:** Compound
 
@@ -2510,7 +2510,7 @@ return SATISFIED
 
 ---
 
-### 43. PTLC (0x0704)
+### 44. PTLC (0x0704)
 
 **Family:** Compound
 
@@ -2567,7 +2567,7 @@ revelation (superior privacy to HTLCs). Adaptor signature constructions.
 
 ---
 
-### 44. CLTV_SIG (0x0705)
+### 45. CLTV_SIG (0x0705)
 
 **Family:** Compound
 
@@ -2619,7 +2619,7 @@ return SATISFIED
 
 ---
 
-### 45. TIMELOCKED_MULTISIG (0x0706)
+### 46. TIMELOCKED_MULTISIG (0x0706)
 
 **Family:** Compound
 
@@ -2684,7 +2684,7 @@ Governance blocks enforce transaction-level constraints that are independent of
 cryptographic signatures. They restrict the structure, timing, or economic properties
 of the spending transaction itself.
 
-### 46. EPOCH_GATE (0x0801)
+### 47. EPOCH_GATE (0x0801)
 
 **Family:** Governance
 
@@ -2734,7 +2734,7 @@ schedules. Rate-limited governance operations.
 
 ---
 
-### 47. WEIGHT_LIMIT (0x0802)
+### 48. WEIGHT_LIMIT (0x0802)
 
 **Family:** Governance
 
@@ -2781,7 +2781,7 @@ automated spending paths.
 
 ---
 
-### 48. INPUT_COUNT (0x0803)
+### 49. INPUT_COUNT (0x0803)
 
 **Family:** Governance
 
@@ -2832,7 +2832,7 @@ return UNSATISFIED
 
 ---
 
-### 49. OUTPUT_COUNT (0x0804)
+### 50. OUTPUT_COUNT (0x0804)
 
 **Family:** Governance
 
@@ -2883,7 +2883,7 @@ return UNSATISFIED
 
 ---
 
-### 50. RELATIVE_VALUE (0x0805)
+### 51. RELATIVE_VALUE (0x0805)
 
 **Family:** Governance
 
@@ -2935,7 +2935,7 @@ recursive covenants. DCA covenant minimum re-encumbrance.
 
 ---
 
-### 51. ACCUMULATOR (0x0806)
+### 52. ACCUMULATOR (0x0806)
 
 **Family:** Governance
 

@@ -6,9 +6,9 @@ Ladder Script introduces transaction version 4 (`RUNG_TX`) to Bitcoin, replacing
 
 **What changes:**
 - Transaction version 4 gains consensus meaning (currently non-standard, treated as anyone-can-spend).
-- Outputs with scriptPubKey prefix `0xc1` are recognized as ladder conditions and evaluated by the ladder evaluator.
+- Outputs with scriptPubKey prefix `0xc1` (inline conditions) or `0xc2` (MLSC Merkle root) are recognized as ladder conditions and evaluated by the ladder evaluator.
 - Witness validation for v4 inputs uses the ladder sighash (`TaggedHash("LadderSighash")`) instead of the Script interpreter.
-- Post-quantum signature schemes (FALCON-512/1024, Dilithium3) become available through the SCHEME field.
+- Post-quantum signature schemes (FALCON-512/1024, Dilithium3, SPHINCS_SHA) become available through the SCHEME field.
 - All block types are standard.
 
 **What does not change:**
@@ -41,7 +41,7 @@ DEFINED  -->  STARTED  -->  LOCKED_IN  -->  ACTIVE
 
 All block types are activated as a single deployment:
 
-- Signature, Timelock, and Hash (0x0001-0x02FF): SIG, MULTISIG, ADAPTOR_SIG, CSV, CSV_TIME, CLTV, CLTV_TIME, HASH_PREIMAGE, HASH160_PREIMAGE, and TAGGED_HASH.
+- Signature, Timelock, and Hash (0x0001-0x02FF): SIG, MULTISIG, ADAPTOR_SIG, MUSIG_THRESHOLD, CSV, CSV_TIME, CLTV, CLTV_TIME, HASH_PREIMAGE, HASH160_PREIMAGE, and TAGGED_HASH.
 - Covenant and Anchor (0x0300-0x05FF): CTV, VAULT_LOCK, AMOUNT_LOCK, ANCHOR, ANCHOR_CHANNEL, ANCHOR_POOL, ANCHOR_RESERVE, ANCHOR_SEAL, and ANCHOR_ORACLE.
 - Recursion and PLC (0x0400-0x06FF): RECURSE_SAME, RECURSE_MODIFIED, RECURSE_UNTIL, RECURSE_COUNT, RECURSE_SPLIT, RECURSE_DECAY, and all PLC block types (HYSTERESIS through COSIGN).
 
@@ -49,7 +49,7 @@ All block types are activated as a single deployment:
 
 ### Signature, Timelock, and Hash (0x0001-0x02FF)
 
-**Block type range:** 0x0001-0x02FF (10 block types)
+**Block type range:** 0x0001-0x02FF (11 block types)
 
 **Scope:** The core ladder framework providing feature parity with existing Script capabilities. Every spending pattern expressible in P2PKH, P2SH, P2WPKH, P2WSH, and P2TR can be expressed as a ladder.
 
@@ -117,6 +117,49 @@ All block types are activated as a single deployment:
 - State machines for complex business logic (LATCH_SET + LATCH_RESET chains).
 - Fee-governed outputs that constrain transaction fee rates (HYSTERESIS_FEE).
 - Time-decaying parameters for graduated release schedules (RECURSE_DECAY).
+
+### Compound (0x0700-0x07FF)
+
+**Block type range:** 0x0700-0x07FF (6 block types)
+
+**Scope:** Multi-condition blocks that combine signature, timelock, and hash checks into a single block with a single header, saving wire bytes.
+
+**Block types:**
+- TIMELOCKED_SIG (0x0701) -- SIG + CSV combined.
+- HTLC (0x0702) -- HASH_PREIMAGE + CSV + SIG for atomic swaps.
+- HASH_SIG (0x0703) -- HASH_PREIMAGE + SIG combined.
+- PTLC (0x0704) -- ADAPTOR_SIG + CSV for payment channels.
+- CLTV_SIG (0x0705) -- SIG + CLTV combined.
+- TIMELOCKED_MULTISIG (0x0706) -- MULTISIG + CSV combined.
+
+**Risk profile:** Low. These are syntactic sugar over well-understood primitive block combinations. Each compound evaluator delegates to the same verification routines as the corresponding separate blocks.
+
+**What this enables:**
+- Atomic swaps with 8-16 bytes less wire overhead per HTLC.
+- Payment channel constructions with compact PTLC blocks.
+- Time-delayed multisig vaults without separate CSV blocks.
+
+### Governance (0x0800-0x08FF)
+
+**Block type range:** 0x0800-0x08FF (6 block types)
+
+**Scope:** Transaction-level structural constraints that enforce spending windows, weight limits, I/O fanout bounds, value ratios, and set membership.
+
+**Block types:**
+- EPOCH_GATE (0x0801) -- Spending window gate based on block height modular arithmetic.
+- WEIGHT_LIMIT (0x0802) -- Maximum transaction weight.
+- INPUT_COUNT (0x0803) -- Min/max number of inputs.
+- OUTPUT_COUNT (0x0804) -- Min/max number of outputs.
+- RELATIVE_VALUE (0x0805) -- Anti-siphon output value ratio.
+- ACCUMULATOR (0x0806) -- Merkle set membership proof.
+
+**Risk profile:** Moderate. These blocks inspect transaction structure (weight, input/output counts, value ratios) which introduces new introspection surface. ACCUMULATOR introduces Merkle proof verification in the evaluator.
+
+**What this enables:**
+- Treasury governance with periodic spending windows (EPOCH_GATE).
+- Transaction structure enforcement for protocol compliance (weight, I/O counts).
+- Allowlist-based spending via Merkle accumulators.
+- Anti-siphon protection for covenant chains (RELATIVE_VALUE).
 
 ## 4. Node Upgrade Path
 

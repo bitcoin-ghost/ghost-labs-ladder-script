@@ -371,7 +371,7 @@ single spending condition. Represented by the `RungBlock` struct containing:
 ### RungBlockType
 
 An enum (`uint16_t`) identifying the type of a block. Encoded as 2 bytes (little-endian)
-in the wire format. 39 block types are defined across 7 families. The numeric ranges
+in the wire format. 52 block types are defined across 9 families. The numeric ranges
 partition the type space by family:
 
 | Range | Family |
@@ -383,6 +383,8 @@ partition the type space by family:
 | 0x0400-0x04FF | Recursion |
 | 0x0500-0x05FF | Anchor/L2 |
 | 0x0600-0x06FF | PLC |
+| 0x0700-0x07FF | Compound |
+| 0x0800-0x08FF | Governance |
 
 ### RungConditions
 
@@ -447,6 +449,7 @@ The signature algorithm used for verification, represented by the `RungScheme` e
 | 0x10 | FALCON512 | Post-quantum |
 | 0x11 | FALCON1024 | Post-quantum |
 | 0x12 | DILITHIUM3 | Post-quantum |
+| 0x13 | SPHINCS_SHA | Post-quantum |
 
 Classical schemes (codes < 0x10) are verified via the standard signature checker. Post-
 quantum schemes (codes >= 0x10) are routed through `VerifyPQSignature()`. The scheme

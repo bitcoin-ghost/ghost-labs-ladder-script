@@ -140,7 +140,7 @@ byte to determine which deserialization path to use.
 | Max fields per block | 16 | Deserialization |
 | Max ladder witness size | 10,000 bytes | Deserialization |
 | Max PUBKEY size | 2,048 bytes | Field validation |
-| Max SIGNATURE size | 5,000 bytes | Field validation |
+| Max SIGNATURE size | 50,000 bytes | Field validation |
 | Max PREIMAGE size | 252 bytes | Field validation |
 | HASH256 size | Exactly 32 bytes | Field validation |
 | HASH160 size | Exactly 20 bytes | Field validation |
@@ -246,7 +246,7 @@ multi-mutation format.
 
 ### 17. Which PQ algorithms are supported?
 
-Ladder Script supports three post-quantum signature schemes, identified by the
+Ladder Script supports four post-quantum signature schemes, identified by the
 SCHEME data type:
 
 | Scheme | Byte | Public Key Size | Signature Size |
@@ -254,6 +254,7 @@ SCHEME data type:
 | FALCON-512 | 0x10 | 897 bytes | ~690 bytes |
 | FALCON-1024 | 0x11 | 1,793 bytes | ~1,330 bytes |
 | Dilithium3 | 0x12 | 1,952 bytes | 3,293 bytes |
+| SPHINCS_SHA | 0x13 | 32 bytes | ~7,856 bytes |
 
 Classical schemes are also supported: Schnorr (0x01) and ECDSA (0x02).
 

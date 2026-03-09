@@ -329,6 +329,7 @@ Block types are encoded as `uint16_t` little-endian. They are organized into ran
 | `0x0001` | SIG | PUBKEY, SIGNATURE | PUBKEY_COMMIT, SCHEME |
 | `0x0002` | MULTISIG | NUMERIC (threshold M), N x PUBKEY, M x SIGNATURE | SCHEME |
 | `0x0003` | ADAPTOR_SIG | 2 x PUBKEY (signing_key, adaptor_point), SIGNATURE | -- |
+| `0x0004` | MUSIG_THRESHOLD | PUBKEY_COMMIT (aggregate key hash), 2 x NUMERIC (M, N), PUBKEY, SIGNATURE | -- |
 
 ### 6.2 Timelock Family (0x0100--0x01FF)
 
@@ -482,7 +483,22 @@ Block types are encoded as `uint16_t` little-endian. They are organized into ran
 3. The adapted signature (64--65 bytes) is verified against the signing_key using `CheckSchnorrSignature()`.
 4. Return SATISFIED on successful verification, UNSATISFIED otherwise.
 
-### 7.5 CSV (0x0101)
+### 7.5 MUSIG_THRESHOLD (0x0004)
+
+**Condition fields:** PUBKEY_COMMIT (aggregate key hash), 2 x NUMERIC (threshold M, group size N)
+**Witness fields:** PUBKEY (aggregate key), SIGNATURE (aggregate Schnorr signature)
+
+**Evaluation:**
+
+1. Read PUBKEY_COMMIT. If missing or not 32 bytes, return ERROR.
+2. Read NUMERIC fields for M and N. These are policy/display only and not enforced during evaluation (the aggregate key already encodes the threshold).
+3. Resolve PUBKEY from witness. Verify `SHA256(PUBKEY) == PUBKEY_COMMIT`. If mismatch, return UNSATISFIED.
+4. Verify the aggregate SIGNATURE against the aggregate PUBKEY using `CheckSchnorrSignature()`. Schnorr-only; no PQ path.
+5. Return SATISFIED on successful verification, UNSATISFIED otherwise.
+
+Note: The threshold signing ceremony (MuSig2 or FROST) occurs entirely off-chain. On-chain, the spend is indistinguishable from a single-sig SIG block (~131 bytes total regardless of M or N).
+
+### 7.6 CSV (0x0101)
 
 **Required fields:** NUMERIC (sequence value)
 
@@ -494,11 +510,11 @@ Block types are encoded as `uint16_t` little-endian. They are organized into ran
 
 **Context:** Uses `BaseSignatureChecker::CheckSequence()`, which compares against the input's `nSequence` field per BIP-68 block-height-based relative timelocks.
 
-### 7.6 CSV_TIME (0x0102)
+### 7.7 CSV_TIME (0x0102)
 
 Identical logic to CSV. The distinction is semantic: the NUMERIC value should encode a time-based relative lock (BIP-68 with the type flag set). `CheckSequence()` handles both interpretations.
 
-### 7.7 CLTV (0x0103)
+### 7.8 CLTV (0x0103)
 
 **Required fields:** NUMERIC (locktime value)
 
@@ -509,11 +525,11 @@ Identical logic to CSV. The distinction is semantic: the NUMERIC value should en
 
 **Context:** Uses `BaseSignatureChecker::CheckLockTime()`, which compares against `tx.nLockTime` per BIP-65 absolute block-height timelocks.
 
-### 7.8 CLTV_TIME (0x0104)
+### 7.9 CLTV_TIME (0x0104)
 
 Identical logic to CLTV. The distinction is semantic: the NUMERIC value should encode a median-time-past threshold.
 
-### 7.9 HASH_PREIMAGE (0x0201)
+### 7.10 HASH_PREIMAGE (0x0201)
 
 **Required fields:** HASH256, PREIMAGE
 
@@ -524,7 +540,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 3. Compute `SHA256(PREIMAGE.data)` and compare to `HASH256.data`.
 4. Return SATISFIED on match, UNSATISFIED otherwise.
 
-### 7.10 HASH160_PREIMAGE (0x0202)
+### 7.11 HASH160_PREIMAGE (0x0202)
 
 **Required fields:** HASH160, PREIMAGE
 
@@ -535,7 +551,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 3. Compute `RIPEMD160(SHA256(PREIMAGE.data))` and compare to `HASH160.data`.
 4. Return SATISFIED on match, UNSATISFIED otherwise.
 
-### 7.11 TAGGED_HASH (0x0203)
+### 7.12 TAGGED_HASH (0x0203)
 
 **Required fields:** 2 x HASH256 (tag_hash at index 0, expected_hash at index 1), PREIMAGE
 
@@ -546,7 +562,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 3. Compute `SHA256(tag_hash || tag_hash || PREIMAGE.data)`. Note: the tag_hash field IS `SHA256(tag)` already, so this produces the BIP-340 tagged hash.
 4. Compare the result to expected_hash. Return SATISFIED on match.
 
-### 7.12 CTV (0x0301)
+### 7.13 CTV (0x0301)
 
 **Required fields:** HASH256 (template hash)
 **Context requirements:** `RungEvalContext.tx`, `RungEvalContext.input_index`
@@ -570,7 +586,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
    ```
 4. Compare computed hash to the template hash. Return SATISFIED on match.
 
-### 7.13 VAULT_LOCK (0x0302)
+### 7.14 VAULT_LOCK (0x0302)
 
 **Condition fields:** 2 x PUBKEY_COMMIT (recovery_key at index 0, hot_key at index 1), NUMERIC (hot_delay)
 **Witness fields:** PUBKEY (the key being used), SIGNATURE
@@ -584,7 +600,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 5. **Recovery path:** If the matched PUBKEY_COMMIT is at index 0 (recovery_key), return SATISFIED immediately (cold sweep, no delay).
 6. **Hot path:** If the matched PUBKEY_COMMIT is at index 1 (hot_key), call `CheckSequence(hot_delay)`. If the delay is met, return SATISFIED. If not, return UNSATISFIED.
 
-### 7.14 AMOUNT_LOCK (0x0303)
+### 7.15 AMOUNT_LOCK (0x0303)
 
 **Required fields:** 2 x NUMERIC (min_sats at index 0, max_sats at index 1)
 **Context requirements:** `RungEvalContext.output_amount`
@@ -596,7 +612,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 3. If `min_sats <= output_amount <= max_sats`, return SATISFIED.
 4. Otherwise, return UNSATISFIED.
 
-### 7.15 ANCHOR (0x0501)
+### 7.16 ANCHOR (0x0501)
 
 **Required fields:** At least one typed field of any type.
 
@@ -605,7 +621,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 1. If the block has no fields, return ERROR.
 2. Return SATISFIED. (Generic anchor -- structural validation only.)
 
-### 7.16 ANCHOR_CHANNEL (0x0502)
+### 7.17 ANCHOR_CHANNEL (0x0502)
 
 **Required fields:** 2 x PUBKEY (local_key, remote_key)
 **Optional fields:** NUMERIC (commitment_number)
@@ -616,7 +632,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 2. If NUMERIC is present and its value is <= 0, return UNSATISFIED.
 3. Return SATISFIED.
 
-### 7.17 ANCHOR_POOL (0x0503)
+### 7.18 ANCHOR_POOL (0x0503)
 
 **Required fields:** HASH256 (vtxo_tree_root)
 **Optional fields:** NUMERIC (participant_count)
@@ -627,7 +643,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 2. If NUMERIC is present and its value is <= 0, return UNSATISFIED.
 3. Return SATISFIED.
 
-### 7.18 ANCHOR_RESERVE (0x0504)
+### 7.19 ANCHOR_RESERVE (0x0504)
 
 **Required fields:** 2 x NUMERIC (threshold_n, threshold_m), HASH256 (guardian_set_hash)
 
@@ -637,7 +653,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 2. Read threshold_n and threshold_m. If either is negative or threshold_n > threshold_m, return UNSATISFIED.
 3. Return SATISFIED.
 
-### 7.19 ANCHOR_SEAL (0x0505)
+### 7.20 ANCHOR_SEAL (0x0505)
 
 **Required fields:** 2 x HASH256 (asset_id, state_transition)
 
@@ -646,7 +662,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 1. If fewer than 2 HASH256 fields, return ERROR.
 2. Return SATISFIED.
 
-### 7.20 ANCHOR_ORACLE (0x0506)
+### 7.21 ANCHOR_ORACLE (0x0506)
 
 **Required fields:** PUBKEY (oracle_key)
 **Optional fields:** NUMERIC (outcome_count)
@@ -657,7 +673,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
 2. If NUMERIC is present and its value is <= 0, return UNSATISFIED.
 3. Return SATISFIED.
 
-### 7.21 RECURSE_SAME (0x0401)
+### 7.22 RECURSE_SAME (0x0401)
 
 **Required fields:** NUMERIC (max_depth)
 **Context requirements:** `RungEvalContext.input_conditions`, `RungEvalContext.spending_output`
@@ -672,7 +688,7 @@ Identical logic to CLTV. The distinction is semantic: the NUMERIC value should e
    - Compare output conditions to input conditions. If not identical, return UNSATISFIED.
 4. Return SATISFIED.
 
-### 7.22 RECURSE_MODIFIED (0x0402)
+### 7.23 RECURSE_MODIFIED (0x0402)
 
 **Required fields:** >= 4 x NUMERIC
 **Context requirements:** `RungEvalContext.input_conditions`, `RungEvalContext.spending_output`
@@ -702,7 +718,7 @@ FOR EACH mutation (4 NUMERICs per mutation starting at index 2):
 3. Verify the spending output's conditions match the input conditions except at mutated targets, where `output_value == input_value + delta`. Only NUMERIC fields may be mutated.
 4. Non-mutated fields must be identical.
 
-### 7.23 RECURSE_UNTIL (0x0403)
+### 7.24 RECURSE_UNTIL (0x0403)
 
 **Required fields:** NUMERIC (until_height)
 **Context requirements:** `RungEvalContext.block_height`, `RungEvalContext.tx`, `RungEvalContext.input_conditions`, `RungEvalContext.spending_output`
@@ -714,7 +730,7 @@ FOR EACH mutation (4 NUMERICs per mutation starting at index 2):
 3. If effective_height >= until_height, return SATISFIED (covenant terminates).
 4. Otherwise (before termination): verify the spending output carries identical conditions to the input. Return UNSATISFIED if conditions do not match.
 
-### 7.24 RECURSE_COUNT (0x0404)
+### 7.25 RECURSE_COUNT (0x0404)
 
 **Required fields:** NUMERIC (count)
 **Context requirements:** `RungEvalContext.input_conditions`, `RungEvalContext.spending_output`
@@ -726,7 +742,7 @@ FOR EACH mutation (4 NUMERICs per mutation starting at index 2):
 3. If count > 0: verify the spending output contains a RECURSE_COUNT block with count == (input count - 1).
 4. Return UNSATISFIED if the decremented count is not found.
 
-### 7.25 RECURSE_SPLIT (0x0405)
+### 7.26 RECURSE_SPLIT (0x0405)
 
 **Required fields:** 2 x NUMERIC (max_splits, min_split_sats)
 **Context requirements:** `RungEvalContext.tx`, `RungEvalContext.input_conditions`, `RungEvalContext.input_amount`
@@ -740,7 +756,7 @@ FOR EACH mutation (4 NUMERICs per mutation starting at index 2):
 3. Verify value conservation: `sum(output values) <= input_amount`.
 4. If output_amount > 0 but < min_split_sats (no full context), return UNSATISFIED.
 
-### 7.26 RECURSE_DECAY (0x0406)
+### 7.27 RECURSE_DECAY (0x0406)
 
 **Required fields:** >= 4 x NUMERIC (same format as RECURSE_MODIFIED)
 **Context requirements:** `RungEvalContext.input_conditions`, `RungEvalContext.spending_output`
@@ -749,7 +765,7 @@ FOR EACH mutation (4 NUMERICs per mutation starting at index 2):
 
 Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negates all deltas**. This means the output value is `input_value - delta`, implementing a decaying parameter.
 
-### 7.27 HYSTERESIS_FEE (0x0601)
+### 7.28 HYSTERESIS_FEE (0x0601)
 
 **Required fields:** 2 x NUMERIC (high_sat_vb at index 0, low_sat_vb at index 1)
 **Context requirements:** `RungEvalContext.tx`, `RungEvalContext.spent_outputs`
@@ -762,7 +778,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 4. Compute fee_rate: `fee / GetVirtualTransactionSize(tx)`. If vsize <= 0, return ERROR.
 5. If `low <= fee_rate <= high`, return SATISFIED.
 
-### 7.28 HYSTERESIS_VALUE (0x0602)
+### 7.29 HYSTERESIS_VALUE (0x0602)
 
 **Required fields:** 2 x NUMERIC (high_sats at index 0, low_sats at index 1)
 **Context requirements:** `RungEvalContext.input_amount`
@@ -772,7 +788,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 1. Read high and low bounds. If either is negative or low > high, return UNSATISFIED.
 2. If `low <= input_amount <= high`, return SATISFIED.
 
-### 7.29 TIMER_CONTINUOUS (0x0611)
+### 7.30 TIMER_CONTINUOUS (0x0611)
 
 **Required fields:** 2 x NUMERIC (accumulated at index 0, target at index 1)
 
@@ -783,7 +799,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 3. If `accumulated >= target`, return SATISFIED (timer elapsed).
 4. Otherwise, return UNSATISFIED. (Pair with RECURSE_MODIFIED to increment accumulated each covenant spend.)
 
-### 7.30 TIMER_OFF_DELAY (0x0612)
+### 7.31 TIMER_OFF_DELAY (0x0612)
 
 **Required fields:** NUMERIC (remaining)
 
@@ -794,7 +810,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 3. If `remaining == 0`, return UNSATISFIED (delay expired).
 4. Pair with RECURSE_MODIFIED to decrement remaining each covenant spend.
 
-### 7.31 LATCH_SET (0x0621)
+### 7.32 LATCH_SET (0x0621)
 
 **Required fields:** PUBKEY (setter_key)
 **Optional fields:** NUMERIC (state)
@@ -807,7 +823,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 4. If `state != 0` (already set), return UNSATISFIED.
 5. Pair with RECURSE_MODIFIED to enforce state transition 0 -> 1 in the output.
 
-### 7.32 LATCH_RESET (0x0622)
+### 7.33 LATCH_RESET (0x0622)
 
 **Required fields:** PUBKEY (resetter_key), 2 x NUMERIC (state, delay_blocks)
 
@@ -819,7 +835,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 4. If `state == 0` (already unset), return UNSATISFIED.
 5. Pair with RECURSE_MODIFIED to enforce state transition 1 -> 0 in the output.
 
-### 7.33 COUNTER_DOWN (0x0631)
+### 7.34 COUNTER_DOWN (0x0631)
 
 **Required fields:** PUBKEY (event_signer), NUMERIC (count)
 
@@ -831,7 +847,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 4. If `count == 0`, return UNSATISFIED (countdown done).
 5. Pair with RECURSE_MODIFIED to decrement each spend.
 
-### 7.34 COUNTER_PRESET (0x0632)
+### 7.35 COUNTER_PRESET (0x0632)
 
 **Required fields:** 2 x NUMERIC (current at index 0, preset at index 1)
 
@@ -842,7 +858,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 3. If `current < preset`, return SATISFIED (still accumulating).
 4. If `current >= preset`, return UNSATISFIED (threshold reached).
 
-### 7.35 COUNTER_UP (0x0633)
+### 7.36 COUNTER_UP (0x0633)
 
 **Required fields:** PUBKEY (event_signer), 2 x NUMERIC (current at index 0, target at index 1)
 
@@ -853,7 +869,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 3. If `current < target`, return SATISFIED (still counting).
 4. If `current >= target`, return UNSATISFIED (target reached).
 
-### 7.36 COMPARE (0x0641)
+### 7.37 COMPARE (0x0641)
 
 **Required fields:** 2 x NUMERIC (operator at index 0, value_b at index 1)
 **Optional fields:** 3rd NUMERIC (value_c for IN_RANGE)
@@ -877,7 +893,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 2. Apply the operator. For IN_RANGE, require a third NUMERIC and check range bounds.
 3. Unknown operator codes return ERROR.
 
-### 7.37 SEQUENCER (0x0651)
+### 7.38 SEQUENCER (0x0651)
 
 **Required fields:** 2 x NUMERIC (current_step at index 0, total_steps at index 1)
 
@@ -887,7 +903,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 2. Read current and total. If current < 0, total <= 0, or current >= total, return UNSATISFIED.
 3. If `0 <= current < total`, return SATISFIED.
 
-### 7.38 ONE_SHOT (0x0661)
+### 7.39 ONE_SHOT (0x0661)
 
 **Required fields:** NUMERIC (state), HASH256 (commitment)
 
@@ -897,7 +913,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 2. If `state == 0`, return SATISFIED (can fire).
 3. If `state != 0`, return UNSATISFIED (already fired).
 
-### 7.39 RATE_LIMIT (0x0671)
+### 7.40 RATE_LIMIT (0x0671)
 
 **Required fields:** 3 x NUMERIC (max_per_block, accumulation_cap, refill_blocks)
 **Context requirements:** `RungEvalContext.output_amount`
@@ -909,7 +925,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 3. If `output_amount > max_per_block`, return UNSATISFIED.
 4. Return SATISFIED. (Full accumulation tracking requires UTXO chain state beyond single-transaction evaluation.)
 
-### 7.40 COSIGN (0x0681)
+### 7.41 COSIGN (0x0681)
 
 **Required fields:** HASH256 (conditions_hash -- SHA256 of the required co-spent scriptPubKey)
 **Context requirements:** `RungEvalContext.tx`, `RungEvalContext.spent_outputs`, `RungEvalContext.input_index`
@@ -923,7 +939,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
    - If it matches the conditions_hash, return SATISFIED.
 4. If no match found, return UNSATISFIED.
 
-### 7.41 TIMELOCKED_SIG (0x0701)
+### 7.42 TIMELOCKED_SIG (0x0701)
 
 **Required fields:** PUBKEY, SIGNATURE, NUMERIC (CSV delay)
 **Optional fields:** PUBKEY_COMMIT, SCHEME
@@ -936,7 +952,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 4. Verify `CheckSequence(csv_delay)`. If failed, return UNSATISFIED.
 5. Return SATISFIED.
 
-### 7.42 HTLC (0x0702)
+### 7.43 HTLC (0x0702)
 
 **Required fields:** 2 x PUBKEY, HASH256 (hash_lock), NUMERIC (CSV delay), SIGNATURE, PREIMAGE
 **Optional fields:** PUBKEY_COMMIT
@@ -949,7 +965,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 4. If signature invalid, return UNSATISFIED.
 5. Return SATISFIED.
 
-### 7.43 HASH_SIG (0x0703)
+### 7.44 HASH_SIG (0x0703)
 
 **Required fields:** PUBKEY, HASH256, SIGNATURE, PREIMAGE
 **Optional fields:** PUBKEY_COMMIT, SCHEME
@@ -961,7 +977,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 3. If signature invalid, return UNSATISFIED.
 4. Return SATISFIED.
 
-### 7.44 PTLC (0x0704)
+### 7.45 PTLC (0x0704)
 
 **Required fields:** 2 x PUBKEY (signing_key, adaptor_point), SIGNATURE, NUMERIC (CSV delay)
 **Optional fields:** PUBKEY_COMMIT
@@ -976,7 +992,7 @@ Uses the same mutation parsing and verification as RECURSE_MODIFIED, but **negat
 
 Note: Schnorr only. No ECDSA or PQ support.
 
-### 7.45 CLTV_SIG (0x0705)
+### 7.46 CLTV_SIG (0x0705)
 
 **Required fields:** PUBKEY, SIGNATURE, NUMERIC (CLTV height)
 **Optional fields:** PUBKEY_COMMIT, SCHEME
@@ -988,7 +1004,7 @@ Note: Schnorr only. No ECDSA or PQ support.
 3. Verify `CheckLockTime(cltv_height)`. If not met, return UNSATISFIED.
 4. Return SATISFIED.
 
-### 7.46 TIMELOCKED_MULTISIG (0x0706)
+### 7.47 TIMELOCKED_MULTISIG (0x0706)
 
 **Required fields:** NUMERIC (threshold M), N x PUBKEY, M x SIGNATURE, NUMERIC (CSV delay)
 **Optional fields:** SCHEME
@@ -1002,7 +1018,7 @@ Note: Schnorr only. No ECDSA or PQ support.
 5. Verify CSV timelock. If not met, return UNSATISFIED.
 6. Return SATISFIED.
 
-### 7.47 EPOCH_GATE (0x0801)
+### 7.48 EPOCH_GATE (0x0801)
 
 **Required fields:** 2 x NUMERIC (epoch_size, window_size)
 **Context requirements:** `ctx.block_height`
@@ -1014,7 +1030,7 @@ Note: Schnorr only. No ECDSA or PQ support.
 3. If `position < window_size`, return SATISFIED.
 4. Return UNSATISFIED.
 
-### 7.48 WEIGHT_LIMIT (0x0802)
+### 7.49 WEIGHT_LIMIT (0x0802)
 
 **Required fields:** NUMERIC (max_weight)
 **Context requirements:** `ctx.tx`
@@ -1025,7 +1041,7 @@ Note: Schnorr only. No ECDSA or PQ support.
 2. If `GetTransactionWeight(tx) <= max_weight`, return SATISFIED.
 3. Return UNSATISFIED.
 
-### 7.49 INPUT_COUNT (0x0803)
+### 7.50 INPUT_COUNT (0x0803)
 
 **Required fields:** 2 x NUMERIC (min_inputs, max_inputs)
 **Context requirements:** `ctx.tx`
@@ -1037,7 +1053,7 @@ Note: Schnorr only. No ECDSA or PQ support.
 3. If `tx.vin.size()` within [min, max], return SATISFIED.
 4. Return UNSATISFIED.
 
-### 7.50 OUTPUT_COUNT (0x0804)
+### 7.51 OUTPUT_COUNT (0x0804)
 
 **Required fields:** 2 x NUMERIC (min_outputs, max_outputs)
 **Context requirements:** `ctx.tx`
@@ -1049,7 +1065,7 @@ Note: Schnorr only. No ECDSA or PQ support.
 3. If `tx.vout.size()` within [min, max], return SATISFIED.
 4. Return UNSATISFIED.
 
-### 7.51 RELATIVE_VALUE (0x0805)
+### 7.52 RELATIVE_VALUE (0x0805)
 
 **Required fields:** 2 x NUMERIC (numerator, denominator)
 **Context requirements:** `ctx.input_amount`, `ctx.output_amount`
@@ -1061,7 +1077,7 @@ Note: Schnorr only. No ECDSA or PQ support.
 3. If true, return SATISFIED.
 4. Return UNSATISFIED.
 
-### 7.52 ACCUMULATOR (0x0806)
+### 7.53 ACCUMULATOR (0x0806)
 
 **Required fields:** >= 3 x HASH256 (root at index 0, proof siblings, leaf at last index)
 
@@ -1176,6 +1192,7 @@ The coil type determines how the output can be spent.
 | `0x10` | FALCON512 | 897 bytes | up to 690 bytes | liboqs (`OQS_SIG_alg_falcon_512`) |
 | `0x11` | FALCON1024 | 1793 bytes | up to 1330 bytes | liboqs (`OQS_SIG_alg_falcon_1024`) |
 | `0x12` | DILITHIUM3 | 1952 bytes | 3293 bytes | liboqs (`OQS_SIG_alg_dilithium_3`) |
+| `0x13` | SPHINCS_SHA | 32 bytes | ~7,856 bytes | liboqs (`OQS_SIG_alg_sphincs_sha2_128f_simple`) |
 
 Post-quantum schemes (codes >= `0x10`) are identified by `IsPQScheme()`. PQ support requires the build to be compiled with liboqs (`HAVE_LIBOQS`). `HasPQSupport()` returns whether the runtime has PQ verification capability. Without liboqs, all PQ verification returns false.
 
@@ -1194,7 +1211,7 @@ Post-quantum schemes (codes >= `0x10`) are identified by `IsPQScheme()`. PQ supp
 | Maximum coil address size | 520 bytes | Deserialization |
 | Maximum coil condition rungs | 16 (`MAX_RUNGS`) | Deserialization |
 | Maximum PREIMAGE size | 252 bytes | Data type constraint |
-| Maximum SIGNATURE size | 5,000 bytes | Data type constraint |
+| Maximum SIGNATURE size | 50,000 bytes | Data type constraint |
 | Maximum PUBKEY size | 2,048 bytes | Data type constraint |
 
 ---

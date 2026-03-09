@@ -421,7 +421,7 @@
         </div>
         <div class="json-body">
 <pre><span class="jp">{</span>
-  <span class="jk">"version"</span><span class="jp">:</span> <span class="jn">3</span><span class="jp">,</span>
+  <span class="jk">"version"</span><span class="jp">:</span> <span class="jn">4</span><span class="jp">,</span>
   <span class="jk">"outputs"</span><span class="jp">: [</span>
     <span class="jp">{</span>
       <span class="jk">"amount_sats"</span><span class="jp">:</span> <span class="jn">100000</span><span class="jp">,</span>
@@ -472,7 +472,7 @@
 <span class="jk">HASH256</span>      <span class="jc">// 32 bytes       (SHA-256 digest)</span>
 <span class="jk">HASH160</span>      <span class="jc">// 20 bytes       (RIPEMD160(SHA256))</span>
 <span class="jk">PREIMAGE</span>     <span class="jc">// 1-252 bytes    (witness only)</span>
-<span class="jk">SIGNATURE</span>    <span class="jc">// 1-5,000 bytes  (witness only)</span>
+<span class="jk">SIGNATURE</span>    <span class="jc">// 1-50,000 bytes (witness only)</span>
 <span class="jk">SPEND_INDEX</span>  <span class="jc">// 4 bytes        (uint32 LE)</span>
 <span class="jk">NUMERIC</span>      <span class="jc">// 1-4 bytes      (uint32 LE)</span>
 <span class="jk">SCHEME</span>       <span class="jc">// 1 byte         (sig scheme selector)</span></pre>
@@ -1116,7 +1116,7 @@
             <div class="ep-rung">
               <div class="ep-rail"></div>
               <div class="ep-wire"></div>
-              <div class="ep-block">TIMELOCK_ABS</div>
+              <div class="ep-block">CLTV</div>
               <div class="ep-wire"></div>
               <div class="ep-block">SIG</div>
               <div class="ep-wire"></div>
@@ -1143,7 +1143,7 @@
             <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"MULTISIG"</span>, <span class="ej-key">"m"</span>: <span class="ej-num">2</span>, <span class="ej-key">"n"</span>: <span class="ej-num">3</span> <span class="ej-brace">}</span></div>
             <div class="ep-json-line">    <span class="ej-bracket">]</span> <span class="ej-brace">}</span>,</div>
             <div class="ep-json-line">    <span class="ej-brace">{</span> <span class="ej-key">"blocks"</span>: <span class="ej-bracket">[</span></div>
-            <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"TIMELOCK_ABS"</span>, <span class="ej-key">"height"</span>: <span class="ej-num">52560</span> <span class="ej-brace">}</span>,</div>
+            <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"CLTV"</span>, <span class="ej-key">"height"</span>: <span class="ej-num">52560</span> <span class="ej-brace">}</span>,</div>
             <div class="ep-json-line">      <span class="ej-brace">{</span> <span class="ej-key">"type"</span>: <span class="ej-str">"SIG"</span>, <span class="ej-key">"code"</span>: <span class="ej-str">"0x0001"</span> <span class="ej-brace">}</span></div>
             <div class="ep-json-line">    <span class="ej-bracket">]</span> <span class="ej-brace">}</span>,</div>
             <div class="ep-json-line">    <span class="ej-brace">{</span> <span class="ej-key">"blocks"</span>: <span class="ej-bracket">[</span></div>
@@ -1996,7 +1996,7 @@
 
       <div style="margin-top: 24px; display: flex; gap: 16px; flex-wrap: wrap;">
         <a href="docs/#SUMMARY" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Read the Documentation</a>
-        <a href="docs/#MLSC" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">MLSC Specification</a>
+        <a href="docs/#MERKLE-UTXO-SPEC" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">MLSC Specification</a>
         <a href="docs/#BLOCKS" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Block Reference</a>
         <a href="ladder-engine.html" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Open Builder</a>
       </div>
