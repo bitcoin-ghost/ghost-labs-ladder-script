@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RUNG_TX Anatomy — Ladder Script</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --black: #050505;
+  --darker: #0a0a0a;
+  --gray-900: #111;
+  --gray-800: #1a1a1a;
+  --gray-700: #242424;
+  --gray-600: #333;
+  --gray-500: #4a4a4a;
+  --gray-400: #666;
+  --gray-300: #888;
+  --gray-200: #aaa;
+  --gray-100: #ccc;
+  --white: #f0f0f0;
+  --orange: #f7931a;
+  --orange-light: #ffb347;
+  --amber: #e6a817;
+  --cyan: #00d4ff;
+  --green: #00ff88;
+  --red: #ff4444;
+  --blue: #5b9bd5;
+  --purple: #b55bcd;
+  --teal: #5bc0cd;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--black);
+  color: var(--gray-100);
+  font-family: 'Outfit', system-ui, sans-serif;
+  line-height: 1.5;
+}
+::selection { background: var(--orange); color: var(--black); }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--darker); }
+::-webkit-scrollbar-thumb { background: var(--gray-600); border-radius: 3px; }
+
+/* ─── NAV ─── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 12px 0;
+  background: rgba(5,5,5,0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--gray-800);
+}
+.nav-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 1400px; margin: 0 auto; padding: 0 24px;
+}
+.logo {
+  display: flex; align-items: center; gap: 12px;
+  text-decoration: none; color: var(--white);
+}
+.logo-icon { width: 32px; height: 32px; border-radius: 8px; overflow: hidden; }
+.logo-icon img { width: 100%; height: 100%; object-fit: contain; }
+.logo-text { font-weight: 700; font-size: 18px; font-family: 'Outfit', system-ui, sans-serif; }
+.logo-text span { color: var(--orange); }
+.nav-breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--gray-400); font-family: 'Outfit', system-ui, sans-serif;
+}
+.nav-breadcrumb a { color: var(--gray-400); text-decoration: none; }
+.nav-breadcrumb a:hover { color: var(--white); }
+.nav-breadcrumb .sep { color: var(--gray-600); }
+.nav-breadcrumb .current { color: var(--orange); }
+.nav-right {
+  display: flex; align-items: center; gap: 8px;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 13px; font-weight: 600; border-radius: 8px;
+  text-decoration: none; transition: all 0.2s; border: none; cursor: pointer;
+}
+.btn-secondary { background: var(--gray-800); color: var(--white); }
+.btn-secondary:hover { background: var(--gray-700); }
+nav .badge {
+  font-size: 10px; font-weight: 500;
+  color: var(--green);
+  background: rgba(0,255,136,0.08);
+  border: 1px solid rgba(0,255,136,0.18);
+  padding: 3px 10px; border-radius: 100px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ─── HERO ─── */
+.hero {
+  padding: 100px 28px 48px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--gray-900) 0%, var(--black) 100%);
+  border-bottom: 1px solid var(--gray-800);
+}
+.hero h1 {
+  font-size: 36px; font-weight: 800;
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 10px;
+}
+.hero p { font-size: 14px; color: var(--gray-300); font-weight: 300; }
+
+/* ─── CANVAS ─── */
+.canvas {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 48px 20px 80px;
+}
+
+/* ─── LAYER LABEL ─── */
+.layer-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  margin-bottom: 12px;
+  padding-top: 40px;
+}
+
+/* ─── BOX SYSTEM ─── */
+.box {
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.box-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; font-weight: 600;
+}
+.box-head .dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.box-head .tag {
+  margin-left: auto;
+  font-size: 10px; font-weight: 500;
+  padding: 2px 8px; border-radius: 4px;
+  opacity: 0.75;
+}
+.box-body { padding: 12px 16px; }
+.box-inner { padding: 4px 16px 12px; }
+
+/* ─── FIELD ─── */
+.f {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+}
+.f .fn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500; font-size: 11px;
+  min-width: 130px; flex-shrink: 0;
+}
+.f .ft {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; font-weight: 500;
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  color: var(--gray-200);
+  flex-shrink: 0; white-space: nowrap;
+}
+.f .fd { color: var(--gray-400); font-size: 11px; }
+
+/* ─── LOGIC PILL ─── */
+.pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 2px 10px; border-radius: 3px;
+  display: inline-block;
+}
+.pill-or { background: rgba(247,147,26,0.12); color: var(--orange); border: 1px solid rgba(247,147,26,0.25); }
+.pill-and { background: rgba(0,212,255,0.1); color: var(--cyan); border: 1px solid rgba(0,212,255,0.2); }
+
+/* ─── CONNECTOR ─── */
+.conn {
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px 0; gap: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--gray-500);
+}
+.conn::before, .conn::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gray-600), transparent);
+}
+
+/* ─── COLOR SCHEMES ─── */
+/* orange (tx envelope) */
+.b-orange { border: 2px solid rgba(247,147,26,0.35); background: rgba(247,147,26,0.03); }
+.b-orange > .box-head { background: rgba(247,147,26,0.06); color: var(--orange); }
+.b-orange > .box-head .dot { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
+
+/* amber (conditions / header) */
+.b-amber { border: 1.5px solid rgba(230,168,23,0.25); background: rgba(230,168,23,0.02); }
+.b-amber > .box-head { background: rgba(230,168,23,0.06); color: var(--amber); }
+.b-amber > .box-head .dot { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+/* cyan (blocks / data) */
+.b-cyan { border: 1.5px solid rgba(0,212,255,0.2); background: rgba(0,212,255,0.02); }
+.b-cyan > .box-head { background: rgba(0,212,255,0.05); color: var(--cyan); }
+.b-cyan > .box-head .dot { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+
+/* green (witness) */
+.b-green { border: 1.5px solid rgba(0,255,136,0.18); background: rgba(0,255,136,0.02); }
+.b-green > .box-head { background: rgba(0,255,136,0.04); color: var(--green); }
+.b-green > .box-head .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+/* purple (coil) */
+.b-purple { border: 1.5px solid rgba(181,91,205,0.22); background: rgba(181,91,205,0.02); }
+.b-purple > .box-head { background: rgba(181,91,205,0.05); color: var(--purple); }
+.b-purple > .box-head .dot { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
+
+/* blue (relays / timelock) */
+.b-blue { border: 1.5px solid rgba(91,155,213,0.22); background: rgba(91,155,213,0.02); }
+.b-blue > .box-head { background: rgba(91,155,213,0.05); color: var(--blue); }
+.b-blue > .box-head .dot { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+
+/* teal (hash) */
+.b-teal { border: 1.5px solid rgba(91,192,205,0.22); background: rgba(91,192,205,0.02); }
+.b-teal > .box-head { background: rgba(91,192,205,0.05); color: var(--teal); }
+.b-teal > .box-head .dot { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+
+/* gray (muted) */
+.b-gray { border: 1px solid var(--gray-600); background: var(--gray-900); }
+.b-gray > .box-head { background: rgba(255,255,255,0.02); color: var(--gray-300); }
+.b-gray > .box-head .dot { background: var(--gray-400); }
+
+/* red */
+.b-red { border: 1.5px solid rgba(255,68,68,0.2); background: rgba(255,68,68,0.02); }
+.b-red > .box-head { background: rgba(255,68,68,0.04); color: var(--red); }
+.b-red > .box-head .dot { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+/* ─── FLEX ROW ─── */
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 220px; }
+
+/* ─── NOTE ─── */
+.note {
+  font-size: 11px; color: var(--gray-400);
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  margin-top: 6px;
+}
+
+/* ─── SEPARATOR ─── */
+.sep { height: 1px; background: linear-gradient(90deg, transparent, var(--gray-700), transparent); margin: 14px 0; }
+
+/* ─── ELLIPSIS ─── */
+.dots {
+  text-align: center; color: var(--gray-500);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; padding: 4px 0;
+}
+
+@media (max-width: 600px) {
+  .row { flex-direction: column; }
+  .row > * { min-width: unset; }
+  .f .fn { min-width: 100px; }
+  .hero h1 { font-size: 26px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">
+      <div class="logo-icon"><img src="../logo.png" alt="Bitcoin Ghost"></div>
+      <div class="logo-text">Bitcoin<span>Ghost</span></div>
+    </a>
+    <div class="nav-breadcrumb">
+      <a href="../ghost-labs.html">Labs</a>
+      <span class="sep">/</span>
+      <a href="ladder-script.html">Ladder Script</a>
+      <span class="sep">/</span>
+      <span class="current">TX Anatomy</span>
+    </div>
+    <div class="nav-right">
+      <span class="badge">nVersion = 4</span>
+      <a href="docs/index.html" class="btn btn-secondary">Docs</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>Anatomy of a RUNG_TX</h1>
+  <p>Transaction version 4 — broken down layer by layer</p>
+</div>
+
+<div class="canvas">
+
+
+<!-- ═══════════════════════════════════════════════════════
+     LAYER 1 — FULL TRANSACTION
+     ═══════════════════════════════════════════════════════ -->
+<div class="layer-label" style="color:var(--orange);padding-top:0;">LAYER 1 — TRANSACTION</div>
+
+<div class="box b-orange">
+  <div class="box-head">
+    <span class="dot"></span>
+    RUNG_TX
+    <span class="tag" style="background:rgba(247,147,26,0.12);color:var(--orange);">nVersion 4</span>
+  </div>
+  <div class="box-body">
+
+    <!-- HEADER -->
+    <div class="box b-amber" style="margin-bottom:12px;">
+      <div class="box-head">
+        <span class="dot"></span>
+        Header
+      </div>
+      <div class="box-inner">
+        <div class="f"><span class="fn" style="color:var(--amber);">nVersion</span><span class="ft">int32</span><span class="fd">= 4 — triggers Ladder Script evaluation</span></div>
+        <div class="f"><span class="fn" style="color:var(--amber);">marker + flag</span><span class="ft">2 B</span><span class="fd">0x00 0x01 — SegWit</span></div>
+        <div class="f"><span class="fn" style="color:var(--amber);">nLockTime</span><span class="ft">uint32</span><span class="fd">Absolute locktime (used by CLTV blocks)</span></div>
+      </div>
+    </div>
+
+    <!-- INPUTS -->
+    <div class="box b-gray" style="margin-bottom:12px;">
+      <div class="box-head">
+        <span class="dot"></span>
+        Inputs (vin[])
+        <span class="tag" style="background:rgba(255,255,255,0.05);color:var(--gray-300);">standard</span>
+      </div>
+      <div class="box-inner">
+        <div class="f"><span class="fn" style="color:var(--gray-200);">prevout</span><span class="ft">36 B</span><span class="fd">txid + vout index of UTXO being spent</span></div>
+        <div class="f"><span class="fn" style="color:var(--gray-200);">nSequence</span><span class="ft">uint32</span><span class="fd">Relative locktime (used by CSV blocks)</span></div>
+      </div>
+    </div>
+
+    <!-- CONDITIONS (outputs) -->
+    <div class="box b-cyan" style="margin-bottom:12px;">
+      <div class="box-head">
+        <span class="dot"></span>
+        Conditions (vout[])
+        <span class="tag" style="background:rgba(0,212,255,0.1);color:var(--cyan);">0xC1 / 0xC2</span>
+      </div>
+      <div class="box-inner">
+        <div class="f"><span class="fn" style="color:var(--cyan);">nValue</span><span class="ft">int64</span><span class="fd">Amount in satoshis</span></div>
+        <div class="f"><span class="fn" style="color:var(--cyan);">scriptPubKey</span><span class="ft">var</span><span class="fd">Ladder Script locking conditions</span></div>
+        <div class="note">0xC1 — condition-safe fields inline (PUBKEY_COMMIT, HASH256, NUMERIC, etc.)<br>0xC2 — 32-byte Merkle root only (MLSC)</div>
+      </div>
+    </div>
+
+    <!-- WITNESS -->
+    <div class="box b-green">
+      <div class="box-head">
+        <span class="dot"></span>
+        Witness (per input)
+        <span class="tag" style="background:rgba(0,255,136,0.08);color:var(--green);">segregated</span>
+      </div>
+      <div class="box-inner">
+        <div class="f"><span class="fn" style="color:var(--green);">LadderWitness</span><span class="ft">var</span><span class="fd">Serialized witness — secrets + proofs</span></div>
+        <div class="note">SIGNATURE, PREIMAGE, PUBKEY — revealed at spend time only</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     LAYER 2 — CONDITIONS vs WITNESS
+     ═══════════════════════════════════════════════════════ -->
+<div class="layer-label" style="color:var(--cyan);">LAYER 2 — CONDITIONS + WITNESS</div>
+
+<div class="row">
+
+  <!-- CONDITIONS -->
+  <div class="box b-cyan">
+    <div class="box-head">
+      <span class="dot"></span>
+      Conditions
+      <span class="tag" style="background:rgba(0,212,255,0.1);color:var(--cyan);">locking</span>
+    </div>
+    <div class="box-body">
+
+      <div class="box b-amber" style="margin-bottom:8px;">
+        <div class="box-head" style="padding:7px 12px;">
+          <span class="dot"></span>
+          Rungs[]
+        </div>
+        <div class="box-inner">
+          <div class="f"><span class="fn" style="color:var(--amber);font-size:10px;">PUBKEY_COMMIT</span><span class="ft">32 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--amber);font-size:10px;">HASH256</span><span class="ft">32 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--amber);font-size:10px;">HASH160</span><span class="ft">20 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--amber);font-size:10px;">NUMERIC</span><span class="ft">1–4 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--amber);font-size:10px;">SPEND_INDEX</span><span class="ft">4 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--amber);font-size:10px;">SCHEME</span><span class="ft">1 B</span></div>
+        </div>
+      </div>
+
+      <div class="box b-purple" style="margin-bottom:8px;">
+        <div class="box-head" style="padding:7px 12px;">
+          <span class="dot"></span>
+          Coil
+        </div>
+        <div class="box-inner" style="font-size:11px;color:var(--gray-300);">
+          Output semantics + attestation mode
+        </div>
+      </div>
+
+      <div class="box b-blue">
+        <div class="box-head" style="padding:7px 12px;">
+          <span class="dot"></span>
+          Relays[]
+        </div>
+        <div class="box-inner" style="font-size:11px;color:var(--gray-300);">
+          Shared conditions for cross-input AND
+        </div>
+      </div>
+
+      <div class="note">Condition-safe types only — no secrets on-chain.<br>0xC2: all of this behind a Merkle root.</div>
+    </div>
+  </div>
+
+  <!-- WITNESS -->
+  <div class="box b-green">
+    <div class="box-head">
+      <span class="dot"></span>
+      Witness
+      <span class="tag" style="background:rgba(0,255,136,0.08);color:var(--green);">unlocking</span>
+    </div>
+    <div class="box-body">
+
+      <div class="box b-amber" style="margin-bottom:8px;">
+        <div class="box-head" style="padding:7px 12px;">
+          <span class="dot"></span>
+          Rungs[]
+        </div>
+        <div class="box-inner">
+          <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">PUBKEY</span><span class="ft">1–2,048 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">SIGNATURE</span><span class="ft">1–50 KB</span></div>
+          <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">PREIMAGE</span><span class="ft">1–252 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">SCHEME</span><span class="ft">1 B</span></div>
+        </div>
+      </div>
+
+      <div class="box b-purple" style="margin-bottom:8px;">
+        <div class="box-head" style="padding:7px 12px;">
+          <span class="dot"></span>
+          Coil
+        </div>
+        <div class="box-inner" style="font-size:11px;color:var(--gray-300);">
+          Always fresh (never inherited)
+        </div>
+      </div>
+
+      <div class="box b-blue" style="margin-bottom:8px;">
+        <div class="box-head" style="padding:7px 12px;">
+          <span class="dot"></span>
+          Relays[]
+        </div>
+        <div class="box-inner" style="font-size:11px;color:var(--gray-300);">
+          Witness-side relay data
+        </div>
+      </div>
+
+      <div class="box b-gray">
+        <div class="box-head" style="padding:7px 12px;">
+          <span class="dot"></span>
+          MLSC Proof
+          <span class="tag" style="background:rgba(255,255,255,0.05);color:var(--gray-300);">0xC2 only</span>
+        </div>
+        <div class="box-inner" style="font-size:11px;color:var(--gray-300);">
+          Merkle sibling hashes + revealed rung
+        </div>
+      </div>
+
+      <div class="note">Secrets revealed at spend time.<br>Merged with conditions for evaluation.</div>
+    </div>
+  </div>
+</div>
+
+
+<div class="conn">MERGE AT EVALUATION</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     LAYER 3 — INSIDE A RUNG
+     ═══════════════════════════════════════════════════════ -->
+<div class="layer-label" style="color:var(--amber);">LAYER 3 — RUNG STRUCTURE</div>
+
+<div class="box b-amber">
+  <div class="box-head">
+    <span class="dot"></span>
+    Rungs
+    <span class="pill pill-or" style="margin-left:auto;">OR</span>
+  </div>
+  <div class="box-body">
+
+    <!-- RUNG 0 -->
+    <div class="box b-cyan" style="margin-bottom:10px;">
+      <div class="box-head">
+        <span class="dot"></span>
+        Rung 0
+        <span class="pill pill-and" style="margin-left:auto;">AND</span>
+      </div>
+      <div class="box-body">
+        <div class="row" style="margin-bottom:8px;">
+          <!-- block: SIG -->
+          <div class="box b-amber" style="min-width:180px;">
+            <div class="box-head" style="padding:6px 10px;font-size:11px;">
+              <span class="dot"></span>SIG
+              <span class="tag" style="background:rgba(230,168,23,0.1);color:var(--amber);font-size:9px;">0x00</span>
+            </div>
+            <div class="box-inner">
+              <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">PUBKEY_COMMIT</span><span class="ft">32 B</span></div>
+              <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">PUBKEY</span><span class="ft">32 B</span></div>
+              <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">SIGNATURE</span><span class="ft">64 B</span></div>
+            </div>
+          </div>
+          <!-- block: CSV -->
+          <div class="box b-blue" style="min-width:180px;">
+            <div class="box-head" style="padding:6px 10px;font-size:11px;">
+              <span class="dot"></span>CSV
+              <span class="tag" style="background:rgba(91,155,213,0.1);color:var(--blue);font-size:9px;">0x03</span>
+            </div>
+            <div class="box-inner">
+              <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">NUMERIC</span><span class="ft">varint</span></div>
+              <div class="note">144 blocks (~1 day)</div>
+            </div>
+          </div>
+        </div>
+        <div class="f"><span class="fn" style="color:var(--gray-400);font-size:10px;">relay_refs[]</span><span class="ft">u16[]</span><span class="fd">indices into relay array</span></div>
+      </div>
+    </div>
+
+    <!-- RUNG 1 -->
+    <div class="box b-cyan" style="margin-bottom:6px;opacity:0.65;">
+      <div class="box-head">
+        <span class="dot"></span>
+        Rung 1
+        <span class="pill pill-and" style="margin-left:auto;">AND</span>
+      </div>
+      <div class="box-body">
+        <div class="row">
+          <div class="box b-teal" style="min-width:180px;">
+            <div class="box-head" style="padding:6px 10px;font-size:11px;">
+              <span class="dot"></span>HTLC
+              <span class="tag" style="background:rgba(91,192,205,0.1);color:var(--teal);font-size:9px;">0x22</span>
+            </div>
+            <div class="box-inner">
+              <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">HASH256</span><span class="ft">32 B</span></div>
+              <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">NUMERIC</span><span class="ft">varint</span></div>
+              <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">PREIMAGE</span><span class="ft">var</span></div>
+              <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">SIGNATURE</span><span class="ft">64 B</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dots">&#x22EE; up to 16 rungs</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     LAYER 3b — COIL
+     ═══════════════════════════════════════════════════════ -->
+<div style="margin-top:16px;"></div>
+
+<div class="box b-purple">
+  <div class="box-head">
+    <span class="dot"></span>
+    Coil — Output Semantics
+  </div>
+  <div class="box-body">
+    <div class="f"><span class="fn" style="color:var(--purple);">coil_type</span><span class="ft">uint8</span><span class="fd">UNLOCK · UNLOCK_TO · COVENANT</span></div>
+    <div class="f"><span class="fn" style="color:var(--purple);">attestation</span><span class="ft">uint8</span><span class="fd">INLINE · AGGREGATE · DEFERRED</span></div>
+    <div class="f"><span class="fn" style="color:var(--purple);">scheme</span><span class="ft">uint8</span><span class="fd">SCHNORR · ECDSA · FALCON · DILITHIUM · SPHINCS</span></div>
+    <div class="f"><span class="fn" style="color:var(--purple);">address</span><span class="ft">var</span><span class="fd">Destination scriptPubKey (0 = none)</span></div>
+    <div class="f"><span class="fn" style="color:var(--purple);">conditions[]</span><span class="ft">Rung[]</span><span class="fd">Extra conditions for UNLOCK_TO recipients</span></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     LAYER 3c — RELAYS
+     ═══════════════════════════════════════════════════════ -->
+<div class="box b-blue" style="margin-top:16px;">
+  <div class="box-head">
+    <span class="dot"></span>
+    Relays — Cross-Input Composition
+    <span class="tag" style="background:rgba(91,155,213,0.1);color:var(--blue);">optional</span>
+  </div>
+  <div class="box-body">
+    <div class="f"><span class="fn" style="color:var(--blue);">relay_refs[]</span><span class="ft">u16[]</span><span class="fd">Required co-spend input indices</span></div>
+    <div class="f"><span class="fn" style="color:var(--blue);">blocks[]</span><span class="ft">RungBlock[]</span><span class="fd">Shared condition blocks</span></div>
+    <div class="note">Up to 8 relays, max depth 4 (transitive chain)</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     LAYER 4 — BLOCK ENCODING
+     ═══════════════════════════════════════════════════════ -->
+<div class="layer-label" style="color:var(--green);">LAYER 4 — BLOCK ENCODING</div>
+
+<div class="box b-green">
+  <div class="box-head">
+    <span class="dot"></span>
+    RungBlock
+  </div>
+  <div class="box-body">
+    <div class="f"><span class="fn" style="color:var(--green);">type</span><span class="ft">uint16</span><span class="fd">Block type enum (52 types across 9 families)</span></div>
+    <div class="f"><span class="fn" style="color:var(--green);">fields[]</span><span class="ft">RungField[]</span><span class="fd">Typed parameter fields</span></div>
+    <div class="f"><span class="fn" style="color:var(--red);">inverted</span><span class="ft">bool</span><span class="fd">Flip SATISFIED &#x2194; UNSATISFIED</span></div>
+
+    <div class="sep"></div>
+
+    <!-- micro-header -->
+    <div class="row">
+      <div class="box b-amber" style="min-width:200px;">
+        <div class="box-head" style="padding:6px 10px;font-size:11px;">
+          <span class="dot"></span>Micro-Header
+          <span class="tag" style="background:rgba(230,168,23,0.1);color:var(--amber);font-size:9px;">0x00–0x33</span>
+        </div>
+        <div class="box-inner" style="font-size:11px;color:var(--gray-300);">
+          Single byte maps to block type.<br>
+          Implicit layout: field count + type bytes omitted.
+        </div>
+      </div>
+      <div class="box b-gray" style="min-width:200px;">
+        <div class="box-head" style="padding:6px 10px;font-size:11px;">
+          <span class="dot"></span>Escape
+          <span class="tag" style="background:rgba(255,255,255,0.05);color:var(--gray-300);font-size:9px;">0x80 / 0x81</span>
+        </div>
+        <div class="box-inner" style="font-size:11px;color:var(--gray-300);">
+          0x80 = normal, 0x81 = inverted.<br>
+          Followed by block_type (2B) + explicit fields.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     LAYER 5 — FIELD (RungField)
+     ═══════════════════════════════════════════════════════ -->
+<div class="layer-label" style="color:var(--teal);">LAYER 5 — FIELD</div>
+
+<div class="box b-teal">
+  <div class="box-head">
+    <span class="dot"></span>
+    RungField
+  </div>
+  <div class="box-body">
+    <div class="f"><span class="fn" style="color:var(--teal);">data_type</span><span class="ft">uint8</span><span class="fd">One of 9 typed formats</span></div>
+    <div class="f"><span class="fn" style="color:var(--teal);">data</span><span class="ft">var</span><span class="fd">Type-dependent encoding</span></div>
+
+    <div class="sep"></div>
+
+    <div class="row">
+      <!-- condition types -->
+      <div class="box b-cyan" style="min-width:200px;">
+        <div class="box-head" style="padding:6px 10px;font-size:11px;">
+          <span class="dot"></span>Condition Types
+        </div>
+        <div class="box-inner">
+          <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">PUBKEY_COMMIT</span><span class="ft">0x02</span><span class="fd">32 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">HASH256</span><span class="ft">0x03</span><span class="fd">32 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">HASH160</span><span class="ft">0x04</span><span class="fd">20 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">NUMERIC</span><span class="ft">0x08</span><span class="fd">1–4 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">SPEND_INDEX</span><span class="ft">0x07</span><span class="fd">4 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--cyan);font-size:10px;">SCHEME</span><span class="ft">0x09</span><span class="fd">1 B</span></div>
+        </div>
+      </div>
+      <!-- witness types -->
+      <div class="box b-green" style="min-width:200px;">
+        <div class="box-head" style="padding:6px 10px;font-size:11px;">
+          <span class="dot"></span>Witness Types
+        </div>
+        <div class="box-inner">
+          <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">PUBKEY</span><span class="ft">0x01</span><span class="fd">1–2,048 B</span></div>
+          <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">SIGNATURE</span><span class="ft">0x06</span><span class="fd">1–50 KB</span></div>
+          <div class="f"><span class="fn" style="color:var(--green);font-size:10px;">PREIMAGE</span><span class="ft">0x05</span><span class="fd">1–252 B</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+</div><!-- canvas -->
+
+<footer style="text-align:center;padding:40px 24px 56px;border-top:1px solid var(--gray-800);">
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gray-500);">
+    LADDER SCRIPT &middot; Wire Format v3 &middot; 52 Blocks &middot; 9 Families &middot; 9 Data Types
+  </div>
+</footer>
+
+</body>
+</html>
