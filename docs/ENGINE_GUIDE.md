@@ -29,8 +29,9 @@ This guide documents every feature of the engine. For the block type reference, 
 
 ## 1. Modes
 
-The engine has four modes, selectable via the tabs in the main header. Each mode
-changes what controls are available and how the ladder diagram behaves.
+The engine has four modes, selectable via the tabs in the main header. **Build** and
+**Simulate** are the primary modes; Watch is a passive monitor with limited utility,
+and Signet connects to a live node for transaction deployment.
 
 ### 1.1 Build Mode
 
@@ -56,9 +57,13 @@ rung. The palette is locked (read-only).
 
 ### 1.3 Watch Mode
 
-A live mode with auto-incrementing block height. The engine connects to the signet
-proxy for live block data. The palette is locked. A **LIVE** indicator is displayed in
-the toolbar, along with both the live signet height and the local simulation height.
+> **Note:** Watch mode has limited utility in its current form — all rungs evaluate
+> simultaneously against the live block height rather than stepping through individually.
+> It is primarily a passive monitor.
+
+Watch mode polls the signet proxy for the current block height and updates the
+simulation context automatically. The palette is locked. A **LIVE** indicator is
+displayed when the signet connection is active, along with the live height.
 
 ### 1.4 Signet Mode
 
