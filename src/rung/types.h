@@ -30,6 +30,7 @@ enum class RungBlockType : uint16_t {
     MULTISIG         = 0x0002, //!< M-of-N threshold signature
     ADAPTOR_SIG      = 0x0003, //!< Adaptor signature verification
     MUSIG_THRESHOLD  = 0x0004, //!< MuSig2/FROST aggregate threshold signature
+    KEY_REF_SIG      = 0x0005, //!< Signature using key commitment from a relay block
 
     // Timelock family
     CSV              = 0x0101, //!< Relative timelock — block-height (BIP68 sequence)
@@ -124,6 +125,7 @@ inline bool IsKnownBlockType(uint16_t b)
     case RungBlockType::MULTISIG:
     case RungBlockType::ADAPTOR_SIG:
     case RungBlockType::MUSIG_THRESHOLD:
+    case RungBlockType::KEY_REF_SIG:
     // Timelock
     case RungBlockType::CSV:
     case RungBlockType::CSV_TIME:
@@ -236,6 +238,7 @@ inline std::string BlockTypeName(RungBlockType type)
     case RungBlockType::MULTISIG:         return "MULTISIG";
     case RungBlockType::ADAPTOR_SIG:      return "ADAPTOR_SIG";
     case RungBlockType::MUSIG_THRESHOLD:  return "MUSIG_THRESHOLD";
+    case RungBlockType::KEY_REF_SIG:      return "KEY_REF_SIG";
     case RungBlockType::CSV:              return "CSV";
     case RungBlockType::CSV_TIME:         return "CSV_TIME";
     case RungBlockType::CLTV:             return "CLTV";
@@ -532,10 +535,11 @@ inline constexpr uint16_t MICRO_HEADER_TABLE[MICRO_HEADER_SLOTS] = {
     0x0804, // 0x30: OUTPUT_COUNT
     0x0805, // 0x31: RELATIVE_VALUE
     0x0806, // 0x32: ACCUMULATOR
-    // Slot 51: MUSIG_THRESHOLD
+    // Slot 51-52: Late-added Signature family
     0x0004, // 0x33: MUSIG_THRESHOLD
+    0x0005, // 0x34: KEY_REF_SIG
     // Remaining slots unused
-    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x34-0x3A
+    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x35-0x3A
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x3B-0x3F
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x40-0x47
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x48-0x4F

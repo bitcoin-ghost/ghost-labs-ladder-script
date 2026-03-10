@@ -68,6 +68,8 @@ struct RungEvalContext {
     const CTxOut* spending_output{nullptr}; //!< Output script being created (for recursion covenant checks)
     const RungConditions* input_conditions{nullptr}; //!< Input conditions (for recursion covenant comparison)
     const std::vector<CTxOut>* spent_outputs{nullptr}; //!< All spent outputs in the tx (for COSIGN cross-input checks)
+    const std::vector<Relay>* relays{nullptr};         //!< Relay definitions (for KEY_REF_SIG resolution)
+    const std::vector<uint16_t>* rung_relay_refs{nullptr}; //!< Current rung's relay_refs (KEY_REF_SIG validation)
 };
 
 /** Result of evaluating a single block or rung. */

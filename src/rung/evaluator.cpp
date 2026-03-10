@@ -2166,6 +2166,112 @@ EvalResult EvalAccumulatorBlock(const RungBlock& block)
 }
 
 // ============================================================================
+// KEY_REF_SIG evaluator
+// ============================================================================
+
+/** Evaluate a KEY_REF_SIG block: verify a signature using PUBKEY_COMMIT + SCHEME
+ *  resolved from a relay block.
+ *
+ *  Conditions fields: NUMERIC(relay_index) + NUMERIC(block_index)
+ *  Witness fields:    PUBKEY + SIGNATURE
+ *
+ *  The referenced relay must be in the rung's relay_refs. The target block
+ *  must contain PUBKEY_COMMIT (and optionally SCHEME). The witness PUBKEY is
+ *  verified against the commitment, then the signature is checked. */
+EvalResult EvalKeyRefSigBlock(const RungBlock& block,
+                               const BaseSignatureChecker& checker,
+                               SigVersion sigversion,
+                               ScriptExecutionData& execdata,
+                               const RungEvalContext& ctx)
+{
+    // Extract reference fields (NUMERIC: relay_index, block_index)
+    auto numerics = FindAllFields(block, RungDataType::NUMERIC);
+    if (numerics.size() < 2) return EvalResult::ERROR;
+
+    uint16_t relay_idx = 0;
+    uint16_t block_idx = 0;
+    for (size_t i = 0; i < numerics[0]->data.size(); ++i) {
+        relay_idx |= static_cast<uint16_t>(numerics[0]->data[i]) << (8 * i);
+    }
+    for (size_t i = 0; i < numerics[1]->data.size(); ++i) {
+        block_idx |= static_cast<uint16_t>(numerics[1]->data[i]) << (8 * i);
+    }
+
+    // Validate relay context is available
+    if (!ctx.relays || !ctx.rung_relay_refs) return EvalResult::ERROR;
+
+    // Validate relay_index is in this rung's relay_refs (security: can only reference declared relays)
+    bool relay_declared = false;
+    for (uint16_t ref : *ctx.rung_relay_refs) {
+        if (ref == relay_idx) { relay_declared = true; break; }
+    }
+    if (!relay_declared) return EvalResult::ERROR;
+
+    // Resolve target relay and block
+    if (relay_idx >= ctx.relays->size()) return EvalResult::ERROR;
+    const Relay& target_relay = (*ctx.relays)[relay_idx];
+    if (block_idx >= target_relay.blocks.size()) return EvalResult::ERROR;
+    const RungBlock& target_block = target_relay.blocks[block_idx];
+
+    // Extract PUBKEY_COMMIT from target block
+    const RungField* target_commit = FindField(target_block, RungDataType::PUBKEY_COMMIT);
+    if (!target_commit || target_commit->data.size() != 32) return EvalResult::ERROR;
+
+    // Extract SCHEME from target block (optional — defaults to Schnorr)
+    RungScheme scheme = RungScheme::SCHNORR;
+    const RungField* target_scheme = FindField(target_block, RungDataType::SCHEME);
+    if (target_scheme && !target_scheme->data.empty()) {
+        scheme = static_cast<RungScheme>(target_scheme->data[0]);
+    }
+
+    // Extract witness PUBKEY + SIGNATURE from this block
+    const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
+    const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
+    if (!pubkey_field || !sig_field) return EvalResult::ERROR;
+
+    // Verify PUBKEY matches the target's PUBKEY_COMMIT
+    unsigned char hash[CSHA256::OUTPUT_SIZE];
+    CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(hash);
+    if (memcmp(hash, target_commit->data.data(), 32) != 0) {
+        return EvalResult::UNSATISFIED;
+    }
+
+    // Verify signature using the resolved scheme
+    if (IsPQScheme(scheme)) {
+        return EvalPQSig(scheme, *sig_field, *pubkey_field, checker);
+    }
+
+    std::span<const unsigned char> sig_span{sig_field->data.data(), sig_field->data.size()};
+    std::span<const unsigned char> pubkey_span{pubkey_field->data.data(), pubkey_field->data.size()};
+
+    // Schnorr
+    if (sig_field->data.size() >= 64 && sig_field->data.size() <= 65) {
+        std::vector<unsigned char> xonly;
+        if (pubkey_field->data.size() == 33) {
+            xonly.assign(pubkey_field->data.begin() + 1, pubkey_field->data.end());
+            pubkey_span = std::span<const unsigned char>{xonly.data(), xonly.size()};
+        }
+        if (checker.CheckSchnorrSignature(sig_span, pubkey_span, sigversion, execdata, nullptr)) {
+            return EvalResult::SATISFIED;
+        }
+        return EvalResult::UNSATISFIED;
+    }
+
+    // ECDSA
+    if (sig_field->data.size() >= 8 && sig_field->data.size() <= 72) {
+        std::vector<unsigned char> sig_vec(sig_field->data.begin(), sig_field->data.end());
+        std::vector<unsigned char> pubkey_vec(pubkey_field->data.begin(), pubkey_field->data.end());
+        CScript empty_script;
+        if (checker.CheckECDSASignature(sig_vec, pubkey_vec, empty_script, sigversion)) {
+            return EvalResult::SATISFIED;
+        }
+        return EvalResult::UNSATISFIED;
+    }
+
+    return EvalResult::ERROR;
+}
+
+// ============================================================================
 // Block dispatch
 // ============================================================================
 
@@ -2189,6 +2295,9 @@ EvalResult EvalBlock(const RungBlock& block,
         break;
     case RungBlockType::MUSIG_THRESHOLD:
         raw = EvalMusigThresholdBlock(block, checker, sigversion, execdata);
+        break;
+    case RungBlockType::KEY_REF_SIG:
+        raw = EvalKeyRefSigBlock(block, checker, sigversion, execdata, ctx);
         break;
     // Timelock
     case RungBlockType::CSV:
@@ -2381,9 +2490,14 @@ bool EvalRelays(const std::vector<Relay>& relays,
             return false;
         }
 
+        // Set relay context so KEY_REF_SIG blocks in relays can resolve references
+        RungEvalContext relay_ctx = ctx;
+        relay_ctx.relays = &relays;
+        relay_ctx.rung_relay_refs = relay.relay_refs.empty() ? nullptr : &relay.relay_refs;
+
         EvalResult relay_result = EvalResult::SATISFIED;
         for (const auto& block : relay.blocks) {
-            EvalResult result = EvalBlock(block, checker, sigversion, execdata, ctx);
+            EvalResult result = EvalBlock(block, checker, sigversion, execdata, relay_ctx);
             if (result != EvalResult::SATISFIED) {
                 relay_result = result;
                 break;
@@ -2462,8 +2576,13 @@ bool EvalLadder(const LadderWitness& ladder,
 
     // First satisfied rung wins (OR logic across rungs)
     const std::vector<EvalResult>* relay_ptr = relay_results.empty() ? nullptr : &relay_results;
+    RungEvalContext rung_ctx = ctx;
+    if (!ladder.relays.empty()) {
+        rung_ctx.relays = &ladder.relays;
+    }
     for (const auto& rung : ladder.rungs) {
-        EvalResult result = EvalRung(rung, checker, sigversion, execdata, ctx, relay_ptr);
+        rung_ctx.rung_relay_refs = rung.relay_refs.empty() ? nullptr : &rung.relay_refs;
+        EvalResult result = EvalRung(rung, checker, sigversion, execdata, rung_ctx, relay_ptr);
         if (result == EvalResult::SATISFIED) {
             return true;
         }

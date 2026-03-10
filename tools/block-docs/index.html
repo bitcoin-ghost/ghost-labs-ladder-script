@@ -137,6 +137,13 @@
       <div class="block-card-desc">MuSig2/FROST aggregate threshold signature. M-of-N signers produce a single aggregate Schnorr signature. On-chain footprint identical to single-sig regardless of group size.</div>
       <div class="block-card-badge badge-anchor">Signature</div>
     </a>
+
+    <a href="key-ref-sig.html" class="block-card">
+      <div class="block-card-code">0x0005</div>
+      <div class="block-card-name">KEY_REF_SIG</div>
+      <div class="block-card-desc">Signature using a key commitment from a relay block. Enables cross-rung key sharing without duplicating pubkey commitments, saving ~30 bytes per reference.</div>
+      <div class="block-card-badge badge-anchor">Signature</div>
+    </a>
   </div>
 </div>
 

@@ -60,7 +60,7 @@ The first element of the segregated witness stack for each v4 input is a seriali
 
 **Evaluation entry point:**
 
-The function `VerifyRungTx` is called for each input of a v4 transaction. For `0xC1` inputs, it deserializes conditions from the spent output's `scriptPubKey` and the witness from the spending input. For `0xC2` inputs, it deserializes the revealed conditions and Merkle proof from the witness, verifies the proof against the UTXO root, then evaluates the ladder. All 52 block evaluators are identical for both output formats.
+The function `VerifyRungTx` is called for each input of a v4 transaction. For `0xC1` inputs, it deserializes conditions from the spent output's `scriptPubKey` and the witness from the spending input. For `0xC2` inputs, it deserializes the revealed conditions and Merkle proof from the witness, verifies the proof against the UTXO root, then evaluates the ladder. All 53 block evaluators are identical for both output formats.
 
 ### Wire Format (v3)
 
@@ -106,30 +106,30 @@ Each block begins with a single byte that determines the encoding mode:
 | `0x80` | Escape | Followed by `type(uint16_t LE)`; inverted = false |
 | `0x81` | Escape + inverted | Followed by `type(uint16_t LE)`; inverted = true |
 
-The micro-header lookup table maps 128 slot indices to block type values. All 52 current block types have assigned slots:
+The micro-header lookup table maps 128 slot indices to block type values. All 53 current block types have assigned slots:
 
 | Slot | Block Type | Slot | Block Type | Slot | Block Type |
 |------|------------|------|------------|------|------------|
-| 0x00 | SIG | 0x12 | ANCHOR_RESERVE | 0x24 | COUNTER_PRESET |
-| 0x01 | MULTISIG | 0x13 | ANCHOR_SEAL | 0x25 | COUNTER_UP |
-| 0x02 | ADAPTOR_SIG | 0x14 | ANCHOR_ORACLE | 0x26 | COMPARE |
-| 0x03 | CSV | 0x15 | RECURSE_SAME | 0x27 | SEQUENCER |
-| 0x04 | CSV_TIME | 0x16 | RECURSE_MODIFIED | 0x28 | ONE_SHOT |
-| 0x05 | CLTV | 0x17 | RECURSE_UNTIL | 0x29 | RATE_LIMIT |
-| 0x06 | CLTV_TIME | 0x18 | RECURSE_COUNT | 0x2A | COSIGN |
-| 0x07 | HASH_PREIMAGE | 0x19 | RECURSE_SPLIT | 0x2B | EPOCH_GATE |
-| 0x08 | HASH160_PREIMAGE | 0x1A | RECURSE_DECAY | 0x2C | HASH_SIG |
-| 0x09 | TAGGED_HASH | 0x1B | HYSTERESIS_FEE | 0x2D | PTLC |
-| 0x0A | CTV | 0x1C | HYSTERESIS_VALUE | 0x2E | CLTV_SIG |
-| 0x0B | VAULT_LOCK | 0x1D | TIMER_CONTINUOUS | 0x2F | TIMELOCKED_MULTISIG |
-| 0x0C | AMOUNT_LOCK | 0x1E | TIMER_OFF_DELAY | 0x30 | WEIGHT_LIMIT |
-| 0x0D | ANCHOR | 0x1F | LATCH_SET | 0x31 | INPUT_COUNT |
-| 0x0E | ANCHOR_CHANNEL | 0x20 | LATCH_RESET | 0x32 | OUTPUT_COUNT |
-| 0x0F | ANCHOR_POOL | 0x21 | COUNTER_DOWN | 0x33 | RELATIVE_VALUE |
-| 0x10 | ACCUMULATOR | 0x22 | HTLC | | |
-| 0x11 | MUSIG_THRESHOLD | 0x23 | TIMELOCKED_SIG | | |
+| 0x00 | SIG | 0x12 | ACCUMULATOR | 0x24 | TIMELOCKED_SIG |
+| 0x01 | MULTISIG | 0x13 | ANCHOR_RESERVE | 0x25 | COUNTER_PRESET |
+| 0x02 | ADAPTOR_SIG | 0x14 | ANCHOR_SEAL | 0x26 | COUNTER_UP |
+| 0x03 | MUSIG_THRESHOLD | 0x15 | ANCHOR_ORACLE | 0x27 | COMPARE |
+| 0x04 | KEY_REF_SIG | 0x16 | RECURSE_SAME | 0x28 | SEQUENCER |
+| 0x05 | CSV | 0x17 | RECURSE_MODIFIED | 0x29 | ONE_SHOT |
+| 0x06 | CSV_TIME | 0x18 | RECURSE_UNTIL | 0x2A | RATE_LIMIT |
+| 0x07 | CLTV | 0x19 | RECURSE_COUNT | 0x2B | COSIGN |
+| 0x08 | CLTV_TIME | 0x1A | RECURSE_SPLIT | 0x2C | EPOCH_GATE |
+| 0x09 | HASH_PREIMAGE | 0x1B | RECURSE_DECAY | 0x2D | HASH_SIG |
+| 0x0A | HASH160_PREIMAGE | 0x1C | HYSTERESIS_FEE | 0x2E | PTLC |
+| 0x0B | TAGGED_HASH | 0x1D | HYSTERESIS_VALUE | 0x2F | CLTV_SIG |
+| 0x0C | CTV | 0x1E | TIMER_CONTINUOUS | 0x30 | TIMELOCKED_MULTISIG |
+| 0x0D | VAULT_LOCK | 0x1F | TIMER_OFF_DELAY | 0x31 | WEIGHT_LIMIT |
+| 0x0E | AMOUNT_LOCK | 0x20 | LATCH_SET | 0x32 | INPUT_COUNT |
+| 0x0F | ANCHOR | 0x21 | LATCH_RESET | 0x33 | OUTPUT_COUNT |
+| 0x10 | ANCHOR_CHANNEL | 0x22 | COUNTER_DOWN | 0x34 | RELATIVE_VALUE |
+| 0x11 | ANCHOR_POOL | 0x23 | HTLC | | |
 
-Slots `0x34`–`0x7F` are reserved for future block types. Unknown micro-header slots are rejected during deserialization.
+Slots `0x35`–`0x7F` are reserved for future block types. Unknown micro-header slots are rejected during deserialization.
 
 A micro-header is used when all three conditions are met:
 1. The block type has an assigned micro-header slot.
@@ -311,6 +311,7 @@ These block types cover the fundamental spending conditions equivalent to existi
 | `0x0002` | MULTISIG | NUMERIC(threshold) + N*(PUBKEY + SIGNATURE) | M-of-N threshold signature. First NUMERIC field is the threshold M. Exactly M valid signatures required from the N provided public keys. |
 | `0x0003` | ADAPTOR_SIG | PUBKEY(signer) + PUBKEY(adaptor point) + SIGNATURE | Adaptor signature verification. The second PUBKEY is the adaptor point T. Verification checks that the signature is valid under the combined challenge H(R+T \|\| P \|\| m). Enables atomic swaps and payment channel protocols. |
 | `0x0004` | MUSIG_THRESHOLD | PUBKEY_COMMIT + NUMERIC(M) + NUMERIC(N) + PUBKEY + SIGNATURE | MuSig2/FROST aggregate threshold signature. On-chain: single aggregate key + single Schnorr signature (~131B total, constant regardless of M/N). M and N are policy/display only. Schnorr-only (no PQ path). |
+| `0x0005` | KEY_REF_SIG | Conditions: NUMERIC(relay_index) + NUMERIC(block_index). Witness: PUBKEY + SIGNATURE | Resolve PUBKEY_COMMIT + SCHEME from relay[relay_index].blocks[block_index]. Verify witness PUBKEY matches commitment (SHA256). Verify SIGNATURE against resolved scheme. |
 
 **Timelock Family (0x0100-0x01FF):**
 
@@ -567,7 +568,7 @@ The reference implementation is located in the `src/rung/` directory:
 | `types.h` / `types.cpp` | Core type definitions: `RungBlockType`, `RungDataType`, `RungCoilType`, `RungAttestationMode`, `RungScheme`, and all struct definitions. |
 | `conditions.h` / `conditions.cpp` | Conditions (locking side): `RungConditions`, serialization to/from `CScript` with `0xc1` prefix, condition data type validation, template inheritance resolution. |
 | `serialize.h` / `serialize.cpp` | Wire format v3 serialization/deserialization with micro-headers, implicit fields, varint NUMERIC, and context-aware encoding. Policy limit constants. |
-| `evaluator.h` / `evaluator.cpp` | Block evaluators for all 52 block types. Rung AND logic, ladder OR logic, inversion. `VerifyRungTx` entry point. `LadderSignatureChecker` for Schnorr/PQ signature verification. |
+| `evaluator.h` / `evaluator.cpp` | Block evaluators for all 53 block types. Rung AND logic, ladder OR logic, inversion. `VerifyRungTx` entry point. `LadderSignatureChecker` for Schnorr/PQ signature verification. |
 | `sighash.h` / `sighash.cpp` | `SignatureHashLadder` tagged hash computation. |
 | `policy.h` / `policy.cpp` | Mempool policy enforcement: `IsStandardRungTx`, `IsStandardRungOutput`. |
 | `aggregate.h` / `aggregate.cpp` | Block-level signature aggregation and deferred attestation. |
@@ -581,7 +582,7 @@ The implementation includes comprehensive test coverage across two layers:
 
 **Unit tests** (`src/test/rung_tests.cpp`): 268 test cases covering:
 - Field validation for all 9 data types with boundary conditions
-- Serialization round-trips for all 52 block types
+- Serialization round-trips for all 53 block types
 - Deserialization rejection of malformed inputs (empty, truncated, trailing bytes, oversized, unknown types)
 - Block evaluation for all block types
 - Inversion logic including ERROR non-inversion

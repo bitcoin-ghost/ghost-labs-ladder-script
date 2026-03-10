@@ -178,7 +178,7 @@ The AGGREGATE mode uses an `AggregateProof` structure containing pubkey commitme
 
 ## 4. Block Type System
 
-Ladder Script defines 52 block types across nine families. Each family occupies a dedicated range in the uint16_t block type space.
+Ladder Script defines 53 block types across nine families. Each family occupies a dedicated range in the uint16_t block type space.
 
 ### 4.1 Signature Family (0x0001--0x00FF)
 
@@ -189,6 +189,10 @@ Identity verification blocks.
 **MULTISIG (0x0002):** M-of-N threshold signature. Fields: NUMERIC (threshold M), N PUBKEY fields, M SIGNATURE fields. All M signatures must verify against distinct pubkeys from the set.
 
 **ADAPTOR_SIG (0x0003):** Adaptor signature verification for atomic swaps and payment channels. Enables secret extraction from the difference between a pre-signature and the adapted on-chain signature.
+
+**MUSIG_THRESHOLD (0x0004):** Aggregate threshold signature. The conditions commit a PUBKEY_COMMIT for the aggregate key and NUMERIC fields for M and N. The witness provides the aggregate public key and a single Schnorr signature. The threshold signing ceremony occurs off-chain.
+
+**KEY_REF_SIG (0x0005):** Signature using a key commitment resolved from a relay block. Enables multiple rungs to share a single PUBKEY_COMMIT defined in a relay, avoiding duplication.
 
 ### 4.2 Timelock Family (0x0100--0x01FF)
 
@@ -477,7 +481,7 @@ The `MergeConditionsAndWitness` function performs strict structural validation b
 
 Ladder Script replaces Bitcoin's untyped, imperative scripting model with a typed, declarative block system that draws on decades of industrial control system design. By requiring every byte to be typed, every condition to be named, and every evaluation to be deterministic, Ladder Script eliminates the classes of ambiguity and complexity that have constrained Bitcoin's programmability.
 
-The 52 block types across nine families (signature, timelock, hash, covenant, recursion, anchor, PLC, compound, and governance) provide a comprehensive vocabulary for transaction authorisation. Post-quantum cryptography is supported natively through the SCHEME routing mechanism and PUBKEY_COMMIT compact representations. Spam resistance is structural rather than policy-dependent.
+The 53 block types across nine families (signature, timelock, hash, covenant, recursion, anchor, PLC, compound, and governance) provide a comprehensive vocabulary for transaction authorisation. Post-quantum cryptography is supported natively through the SCHEME routing mechanism and PUBKEY_COMMIT compact representations. Spam resistance is structural rather than policy-dependent.
 
 All block types activate simultaneously as a single deployment. Forward compatibility ensures that transactions using future block types are structurally valid even to nodes that do not yet implement those types.
 

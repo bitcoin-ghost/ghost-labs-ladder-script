@@ -130,7 +130,7 @@ area to simultaneously create a rung and place the block.
 
 | Category | Blocks |
 |----------|--------|
-| **Signatures** | SIG, MULTISIG, ADAPTOR_SIG, MUSIG_THRESHOLD |
+| **Signatures** | SIG, MULTISIG, ADAPTOR_SIG, MUSIG_THRESHOLD, KEY_REF_SIG |
 | **Timelocks** | CSV, CSV_TIME, CLTV, CLTV_TIME |
 | **Hash Proofs** | HASH_PREIMAGE, HASH160_PREIMAGE, TAGGED_HASH |
 | **Covenants** | CTV, VAULT_LOCK, AMOUNT_LOCK |

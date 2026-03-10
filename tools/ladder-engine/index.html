@@ -2332,6 +2332,10 @@ const BLOCK_FAMILIES = [
         { name: 'threshold', dataType: 'NUMERIC', label: 'Threshold (M)', placeholder: '2' },
         { name: 'group_size', dataType: 'NUMERIC', label: 'Group Size (N)', placeholder: '3' }
       ]},
+      { type: 'KEY_REF_SIG', label: 'KEY_REF_SIG', desc: 'Signature using key commitment from a relay block — cross-rung key sharing', fields: [
+        { name: 'relay_index', dataType: 'NUMERIC', label: 'Relay Index', placeholder: '0' },
+        { name: 'block_index', dataType: 'NUMERIC', label: 'Block Index', placeholder: '0' }
+      ]},
     ]
   },
   {
@@ -2587,6 +2591,7 @@ const BLOCK_RULES = {
   MULTISIG: 'M-of-N threshold: first NUMERIC is M, followed by N public keys and signatures. Exactly M valid signatures from distinct keys required.',
   ADAPTOR_SIG: 'Adaptor signature verification for atomic swaps. Second PUBKEY is the adaptor point T. Signature verified under combined challenge H(R+T || P || m).',
   MUSIG_THRESHOLD: 'MuSig2/FROST aggregate threshold signature. M-of-N signers produce a single Schnorr signature off-chain. On-chain footprint identical to single-sig. Schnorr-only (no PQ path).',
+  KEY_REF_SIG: 'Signature using a key commitment from a relay block. References PUBKEY_COMMIT + SCHEME from relays[relay_index].blocks[block_index]. Saves ~30 bytes per rung vs duplicating the commitment. The rung must declare relay_refs including the referenced relay.',
   CSV: 'Relative timelock in blocks (BIP-68). Satisfied when input sequence meets the required delay. Disable flag bypasses check.',
   CSV_TIME: 'Relative timelock in seconds (BIP-68 time-based). Same logic as CSV but with time flag.',
   CLTV: 'Absolute timelock by block height (BIP-65). Satisfied when nLockTime >= specified height.',
@@ -2646,6 +2651,7 @@ function generateTestData(blockType) {
     case 'MULTISIG': return { threshold: '2', pubkeys: TEST_PUBKEYS.slice(0, 3).join(', ') };
     case 'ADAPTOR_SIG': return { signing_key: TEST_PUBKEYS[0], adaptor_point: TEST_PUBKEYS[1].substring(2) };
     case 'MUSIG_THRESHOLD': return { agg_pubkey: TEST_PUBKEYS[0], threshold: '2', group_size: '3' };
+    case 'KEY_REF_SIG': return { relay_index: '0', block_index: '0' };
     case 'CSV': return { blocks: '144' };
     case 'CSV_TIME': return { seconds: '86400' };
     case 'CLTV': return { height: '850000' };
@@ -2795,6 +2801,11 @@ function evaluateBlock(block, simState) {
       result = (keyOk && m >= 1 && n >= m) ? 'satisfied' : 'unsatisfied';
       break;
     }
+    case 'KEY_REF_SIG':
+      // In simulation, KEY_REF_SIG is satisfied if relay reference is valid
+      // (simplified — real evaluation resolves relay key and checks signature)
+      result = 'satisfied';
+      break;
     case 'CSV': {
       const required = parseInt(v.blocks) || 0;
       const elapsed = simState.csvBlocks || 0;
@@ -5015,7 +5026,7 @@ function PropertiesPanel({ block, onChange, rungs, onExpand }) {
 
 function getTypeHex(type) {
   const map = {
-    SIG:'0001',MULTISIG:'0002',ADAPTOR_SIG:'0003',MUSIG_THRESHOLD:'0004',
+    SIG:'0001',MULTISIG:'0002',ADAPTOR_SIG:'0003',MUSIG_THRESHOLD:'0004',KEY_REF_SIG:'0005',
     CSV:'0101',CSV_TIME:'0102',CLTV:'0103',CLTV_TIME:'0104',
     HASH_PREIMAGE:'0201',HASH160_PREIMAGE:'0202',TAGGED_HASH:'0203',
     CTV:'0301',VAULT_LOCK:'0302',AMOUNT_LOCK:'0303',
@@ -5821,6 +5832,7 @@ function RegisterTable({ rungs, simMode, simState }) {
           case 'SIG': case 'ADAPTOR_SIG': case 'VAULT_LOCK': case 'CLTV_SIG':
             value = v.pubkey || v.signing_key || '—'; break;
           case 'MUSIG_THRESHOLD': value = `${v.threshold || '?'}-of-${v.group_size || '?'}`; break;
+          case 'KEY_REF_SIG': value = `relay[${v.relay_index || '?'}].block[${v.block_index || '?'}]`; break;
           case 'PTLC': value = `${v.blocks || '?'} blk`; break;
           case 'TIMELOCKED_MULTISIG': value = `${v.threshold || '?'}-of-N ${v.blocks || '?'} blk`; break;
           case 'CSV': value = `${v.blocks || '?'} blocks`; break;

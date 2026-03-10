@@ -122,7 +122,7 @@ Each block begins with a single header byte:
 | `0x80` | Escape to full header: followed by `[block_type: uint16_t LE]` + `[n_fields: varint]` (inverted=false) |
 | `0x81` | Escape to full header with inverted=true: followed by `[block_type: uint16_t LE]` + `[n_fields: varint]` |
 
-All 52 current block types fit in micro-header slots 0x00--0x33. Inverted blocks that have a micro-header slot use `0x81` escape + type instead of slot + inversion byte.
+All 53 current block types fit in micro-header slots 0x00--0x34. Inverted blocks that have a micro-header slot use `0x81` escape + type instead of slot + inversion byte.
 
 When a block uses a micro-header AND has an implicit field table for the current serialization context, field count and per-field type bytes are omitted entirely (see Section 3.4).
 
@@ -346,6 +346,7 @@ Block types are encoded as `uint16_t` little-endian. They are organised into ran
 | `0x0002` | MULTISIG | NUMERIC (threshold M), N x PUBKEY, M x SIGNATURE | SCHEME |
 | `0x0003` | ADAPTOR_SIG | 2 x PUBKEY (signing_key, adaptor_point), SIGNATURE | — |
 | `0x0004` | MUSIG_THRESHOLD | PUBKEY_COMMIT (aggregate key hash), 2 x NUMERIC (M, N), PUBKEY, SIGNATURE | — |
+| `0x0005` | KEY_REF_SIG | NUMERIC (relay_index), NUMERIC (block_index), SIGNATURE | SCHEME |
 
 ### 6.2 Timelock Family (0x0100--0x01FF)
 
@@ -1510,15 +1511,17 @@ Neither `0xc1` nor `0xc2` collides with any existing standard scriptPubKey first
 0x0001  SIG                 0x0401  RECURSE_SAME
 0x0002  MULTISIG            0x0402  RECURSE_MODIFIED
 0x0003  ADAPTOR_SIG         0x0403  RECURSE_UNTIL
-0x0101  CSV                 0x0404  RECURSE_COUNT
-0x0102  CSV_TIME            0x0405  RECURSE_SPLIT
-0x0103  CLTV                0x0406  RECURSE_DECAY
-0x0104  CLTV_TIME           0x0501  ANCHOR
-0x0201  HASH_PREIMAGE       0x0502  ANCHOR_CHANNEL
-0x0202  HASH160_PREIMAGE    0x0503  ANCHOR_POOL
-0x0203  TAGGED_HASH         0x0504  ANCHOR_RESERVE
-0x0301  CTV                 0x0505  ANCHOR_SEAL
-0x0302  VAULT_LOCK          0x0506  ANCHOR_ORACLE
+0x0004  MUSIG_THRESHOLD     0x0404  RECURSE_COUNT
+0x0005  KEY_REF_SIG         0x0405  RECURSE_SPLIT
+0x0101  CSV                 0x0406  RECURSE_DECAY
+0x0102  CSV_TIME            0x0501  ANCHOR
+0x0103  CLTV                0x0502  ANCHOR_CHANNEL
+0x0104  CLTV_TIME           0x0503  ANCHOR_POOL
+0x0201  HASH_PREIMAGE       0x0504  ANCHOR_RESERVE
+0x0202  HASH160_PREIMAGE    0x0505  ANCHOR_SEAL
+0x0203  TAGGED_HASH         0x0506  ANCHOR_ORACLE
+0x0301  CTV
+0x0302  VAULT_LOCK
 0x0303  AMOUNT_LOCK
 0x0601  HYSTERESIS_FEE      0x0641  COMPARE
 0x0602  HYSTERESIS_VALUE    0x0651  SEQUENCER
