@@ -908,6 +908,185 @@ static RPCHelpMan createrungtx()
     };
 }
 
+/** Determine if a PQ scheme string is valid. Returns the scheme enum if so. */
+static bool ParsePQScheme(const std::string& s, RungScheme& out)
+{
+    if (s == "FALCON512")  { out = RungScheme::FALCON512; return true; }
+    if (s == "FALCON1024") { out = RungScheme::FALCON1024; return true; }
+    if (s == "DILITHIUM3") { out = RungScheme::DILITHIUM3; return true; }
+    if (s == "SPHINCS_SHA") { out = RungScheme::SPHINCS_SHA; return true; }
+    return false;
+}
+
+/** Sign with PQ or Schnorr, routing based on block_spec fields.
+ *  - If "pq_privkey" + "scheme" → PQ sign, push PUBKEY (if pq_pubkey given) + SIGNATURE.
+ *  - If "privkey" → Schnorr sign, push PUBKEY + SIGNATURE.
+ *  - If "scheme" is a PQ scheme but pq_privkey is missing → ERROR (prevents silent fallback).
+ *  Returns true if signing was handled. */
+static void SignSingleKey(const UniValue& block_spec,
+                          RungBlock& block,
+                          const CMutableTransaction& mtx,
+                          unsigned int input_idx,
+                          const PrecomputedTransactionData& txdata,
+                          const RungConditions& conditions,
+                          const char* block_name)
+{
+    // Check for PQ scheme
+    if (block_spec.exists("scheme")) {
+        std::string scheme_str = block_spec["scheme"].get_str();
+        RungScheme scheme;
+        if (ParsePQScheme(scheme_str, scheme)) {
+            // PQ scheme declared — require pq_privkey
+            if (!block_spec.exists("pq_privkey")) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("%s: PQ scheme %s requires 'pq_privkey' (hex), not 'privkey' (WIF)", block_name, scheme_str));
+            }
+            if (!rung::HasPQSupport()) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR,
+                    strprintf("%s: PQ signing requires liboqs support (not compiled in)", block_name));
+            }
+
+            auto pq_privkey = ParseHex(block_spec["pq_privkey"].get_str());
+            if (pq_privkey.empty()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("%s: Empty pq_privkey", block_name));
+            }
+
+            uint256 sighash;
+            if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: Failed to compute sighash", block_name));
+            }
+
+            // Push PQ pubkey for PUBKEY_COMMIT resolution
+            if (block_spec.exists("pq_pubkey")) {
+                auto pubkey_bytes = ParseHex(block_spec["pq_pubkey"].get_str());
+                if (pubkey_bytes.empty()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("%s: Empty pq_pubkey", block_name));
+                }
+                block.fields.push_back({RungDataType::PUBKEY, std::move(pubkey_bytes)});
+            }
+
+            std::vector<uint8_t> pq_sig;
+            std::span<const uint8_t> msg{sighash.begin(), 32};
+            if (!rung::SignPQ(scheme, pq_privkey, msg, pq_sig)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: PQ signing failed", block_name));
+            }
+            block.fields.push_back({RungDataType::SIGNATURE, std::move(pq_sig)});
+            return;
+        }
+        // SCHNORR / ECDSA scheme strings fall through to classical path
+    }
+
+    // Classical Schnorr path
+    if (!block_spec.exists("privkey")) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("%s: requires 'privkey' (WIF)", block_name));
+    }
+    std::string wif = block_spec["privkey"].get_str();
+    CKey privkey = DecodeSecret(wif);
+    if (!privkey.IsValid()) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("%s: Invalid private key", block_name));
+    }
+
+    uint256 sighash;
+    if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: Failed to compute sighash", block_name));
+    }
+
+    CPubKey pubkey = privkey.GetPubKey();
+    block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
+
+    unsigned char sig_buf[64];
+    uint256 aux_rand = GetRandHash();
+    if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: Schnorr signing failed", block_name));
+    }
+    block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+}
+
+/** PQ-aware multi-key signing for MULTISIG and TIMELOCKED_MULTISIG.
+ *  Routes to PQ if "scheme" + "pq_privkeys" present, else classical. */
+static void SignMultiKey(const UniValue& block_spec,
+                         RungBlock& block,
+                         const CMutableTransaction& mtx,
+                         unsigned int input_idx,
+                         const PrecomputedTransactionData& txdata,
+                         const RungConditions& conditions,
+                         const char* block_name)
+{
+    // Check for PQ scheme
+    if (block_spec.exists("scheme")) {
+        std::string scheme_str = block_spec["scheme"].get_str();
+        RungScheme scheme;
+        if (ParsePQScheme(scheme_str, scheme)) {
+            if (!block_spec.exists("pq_privkeys")) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("%s: PQ scheme %s requires 'pq_privkeys' (hex array), not 'privkeys' (WIF array)", block_name, scheme_str));
+            }
+            if (!rung::HasPQSupport()) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR,
+                    strprintf("%s: PQ signing requires liboqs support (not compiled in)", block_name));
+            }
+
+            const UniValue& pq_privkeys_arr = block_spec["pq_privkeys"].get_array();
+            if (pq_privkeys_arr.empty()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("%s: requires at least one pq_privkey", block_name));
+            }
+
+            uint256 sighash;
+            if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: Failed to compute sighash", block_name));
+            }
+
+            // Include PQ PUBKEYs for PUBKEY_COMMIT resolution
+            if (block_spec.exists("pq_pubkeys")) {
+                const UniValue& pq_pubkeys_arr = block_spec["pq_pubkeys"].get_array();
+                for (size_t p = 0; p < pq_pubkeys_arr.size(); ++p) {
+                    auto pubkey_bytes = ParseHex(pq_pubkeys_arr[p].get_str());
+                    block.fields.push_back({RungDataType::PUBKEY, std::move(pubkey_bytes)});
+                }
+            }
+
+            std::span<const uint8_t> msg{sighash.begin(), 32};
+            for (size_t s = 0; s < pq_privkeys_arr.size(); ++s) {
+                auto pq_privkey = ParseHex(pq_privkeys_arr[s].get_str());
+                std::vector<uint8_t> pq_sig;
+                if (!rung::SignPQ(scheme, pq_privkey, msg, pq_sig)) {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: PQ signing failed for key %d", block_name, s));
+                }
+                block.fields.push_back({RungDataType::SIGNATURE, std::move(pq_sig)});
+            }
+            return;
+        }
+    }
+
+    // Classical path
+    const UniValue& privkeys_arr = block_spec["privkeys"].get_array();
+    if (privkeys_arr.empty()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("%s: requires at least one privkey", block_name));
+    }
+
+    uint256 sighash;
+    if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: Failed to compute sighash", block_name));
+    }
+
+    for (size_t s = 0; s < privkeys_arr.size(); ++s) {
+        CKey privkey = DecodeSecret(privkeys_arr[s].get_str());
+        if (!privkey.IsValid()) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("%s: Invalid private key at index %d", block_name, s));
+        }
+
+        CPubKey pubkey = privkey.GetPubKey();
+        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
+
+        unsigned char sig_buf[64];
+        uint256 aux_rand = GetRandHash();
+        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, strprintf("%s: Schnorr signing failed for key %d", block_name, s));
+        }
+        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+    }
+}
+
 /** Build a witness block for a single signing spec entry. */
 static RungBlock BuildWitnessBlock(const UniValue& block_spec,
                                    const CMutableTransaction& mtx,
@@ -926,149 +1105,22 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
 
     switch (btype) {
     case RungBlockType::SIG: {
-        // Check for PQ scheme
-        if (block_spec.exists("scheme") && block_spec.exists("pq_privkey")) {
-            std::string scheme_str = block_spec["scheme"].get_str();
-            RungScheme scheme;
-            if (scheme_str == "FALCON512") scheme = RungScheme::FALCON512;
-            else if (scheme_str == "FALCON1024") scheme = RungScheme::FALCON1024;
-            else if (scheme_str == "DILITHIUM3") scheme = RungScheme::DILITHIUM3;
-            else if (scheme_str == "SPHINCS_SHA") scheme = RungScheme::SPHINCS_SHA;
-            else throw JSONRPCError(RPC_INVALID_PARAMETER, "Unknown PQ scheme: " + scheme_str);
-
-            if (!rung::HasPQSupport()) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "PQ signing requires liboqs support");
-            }
-
-            auto pq_privkey = ParseHex(block_spec["pq_privkey"].get_str());
-            if (pq_privkey.empty()) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty pq_privkey");
-            }
-
-            uint256 sighash;
-            if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-            }
-
-            std::vector<uint8_t> pq_sig;
-            std::span<const uint8_t> msg{sighash.begin(), 32};
-            if (!rung::SignPQ(scheme, pq_privkey, msg, pq_sig)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "PQ signing failed");
-            }
-
-            // If conditions use PUBKEY_COMMIT, push full pubkey into witness for verification
-            if (block_spec.exists("pq_pubkey")) {
-                auto pubkey_bytes = ParseHex(block_spec["pq_pubkey"].get_str());
-                if (pubkey_bytes.empty()) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty pq_pubkey");
-                }
-                block.fields.push_back({RungDataType::PUBKEY, std::move(pubkey_bytes)});
-            }
-            block.fields.push_back({RungDataType::SIGNATURE, std::move(pq_sig)});
-            break;
-        }
-
-        std::string wif = block_spec["privkey"].get_str();
-        CKey privkey = DecodeSecret(wif);
-        if (!privkey.IsValid()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-        }
-
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-
-        // Include PUBKEY for PUBKEY_COMMIT resolution by evaluator
-        CPubKey pubkey = privkey.GetPubKey();
-        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-
-        unsigned char sig_buf[64];
-        uint256 aux_rand = GetRandHash();
-        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-        }
-
-        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "SIG");
         break;
     }
     case RungBlockType::MULTISIG: {
-        // Check for PQ scheme
-        if (block_spec.exists("scheme") && block_spec.exists("pq_privkeys")) {
-            std::string scheme_str = block_spec["scheme"].get_str();
-            RungScheme scheme;
-            if (scheme_str == "FALCON512") scheme = RungScheme::FALCON512;
-            else if (scheme_str == "FALCON1024") scheme = RungScheme::FALCON1024;
-            else if (scheme_str == "DILITHIUM3") scheme = RungScheme::DILITHIUM3;
-            else if (scheme_str == "SPHINCS_SHA") scheme = RungScheme::SPHINCS_SHA;
-            else throw JSONRPCError(RPC_INVALID_PARAMETER, "Unknown PQ scheme: " + scheme_str);
-
-            if (!rung::HasPQSupport()) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "PQ signing requires liboqs support");
-            }
-
-            const UniValue& pq_privkeys_arr = block_spec["pq_privkeys"].get_array();
-            if (pq_privkeys_arr.empty()) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "MULTISIG PQ requires at least one pq_privkey");
-            }
-
-            uint256 sighash;
-            if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-            }
-
-            // Include PQ PUBKEYs for PUBKEY_COMMIT resolution
-            if (block_spec.exists("pq_pubkeys")) {
-                const UniValue& pq_pubkeys_arr = block_spec["pq_pubkeys"].get_array();
-                for (size_t p = 0; p < pq_pubkeys_arr.size(); ++p) {
-                    auto pubkey_bytes = ParseHex(pq_pubkeys_arr[p].get_str());
-                    block.fields.push_back({RungDataType::PUBKEY, std::move(pubkey_bytes)});
-                }
-            }
-
-            std::span<const uint8_t> msg{sighash.begin(), 32};
-            for (size_t s = 0; s < pq_privkeys_arr.size(); ++s) {
-                auto pq_privkey = ParseHex(pq_privkeys_arr[s].get_str());
-                std::vector<uint8_t> pq_sig;
-                if (!rung::SignPQ(scheme, pq_privkey, msg, pq_sig)) {
-                    throw JSONRPCError(RPC_INTERNAL_ERROR, "PQ MULTISIG signing failed");
-                }
-                block.fields.push_back({RungDataType::SIGNATURE, std::move(pq_sig)});
-            }
-            break;
-        }
-
-        const UniValue& privkeys_arr = block_spec["privkeys"].get_array();
-        if (privkeys_arr.empty()) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "MULTISIG requires at least one privkey");
-        }
-
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-
-        for (size_t s = 0; s < privkeys_arr.size(); ++s) {
-            CKey privkey = DecodeSecret(privkeys_arr[s].get_str());
-            if (!privkey.IsValid()) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid MULTISIG private key");
-            }
-
-            // Include PUBKEY for PUBKEY_COMMIT resolution by evaluator
-            CPubKey pubkey = privkey.GetPubKey();
-            block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-
-            unsigned char sig_buf[64];
-            uint256 aux_rand = GetRandHash();
-            if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "MULTISIG Schnorr signing failed");
-            }
-            block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
-        }
+        SignMultiKey(block_spec, block, mtx, input_idx, txdata, conditions, "MULTISIG");
         break;
     }
     case RungBlockType::ADAPTOR_SIG: {
-        // Adaptor signature: privkey + adaptor_secret → adapted Schnorr sig
+        // Adaptor signature: privkey + adaptor_secret → adapted Schnorr sig (no PQ support)
+        if (block_spec.exists("scheme")) {
+            std::string scheme_str = block_spec["scheme"].get_str();
+            RungScheme scheme;
+            if (ParsePQScheme(scheme_str, scheme)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "ADAPTOR_SIG does not support PQ schemes (Schnorr-only)");
+            }
+        }
         if (block_spec.exists("privkey")) {
             std::string wif = block_spec["privkey"].get_str();
             CKey privkey = DecodeSecret(wif);
@@ -1106,51 +1158,13 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
         break;
     }
     case RungBlockType::MUSIG_THRESHOLD: {
-        // MuSig2/FROST aggregate threshold: single aggregate key + signature.
-        // From the node's perspective, identical to single-sig Schnorr.
-        if (block_spec.exists("privkey")) {
-            std::string wif = block_spec["privkey"].get_str();
-            CKey privkey = DecodeSecret(wif);
-            if (!privkey.IsValid()) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-            }
-            uint256 sighash;
-            if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-            }
-            CPubKey pubkey = privkey.GetPubKey();
-            block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-            unsigned char sig_buf[64];
-            uint256 aux_rand = GetRandHash();
-            if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-            }
-            block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
-        }
+        // MuSig2/FROST aggregate threshold: Schnorr-only (no PQ path).
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "MUSIG_THRESHOLD");
         break;
     }
     case RungBlockType::VAULT_LOCK: {
-        // Vault lock: plain Schnorr signature from privkey
-        if (block_spec.exists("privkey")) {
-            std::string wif = block_spec["privkey"].get_str();
-            CKey privkey = DecodeSecret(wif);
-            if (!privkey.IsValid()) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-            }
-            uint256 sighash;
-            if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-            }
-            // Include PUBKEY for PUBKEY_COMMIT resolution by evaluator
-            CPubKey pubkey = privkey.GetPubKey();
-            block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-            unsigned char sig_buf[64];
-            uint256 aux_rand = GetRandHash();
-            if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-            }
-            block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
-        }
+        // Vault lock: PQ or Schnorr signature
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "VAULT_LOCK");
         break;
     }
     case RungBlockType::HASH_PREIMAGE:
@@ -1182,84 +1196,41 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
         // No witness fields needed — NUMERIC comes from conditions
         break;
     case RungBlockType::TIMELOCKED_SIG: {
-        // Compound SIG + CSV: sign like SIG, CSV timelock comes from conditions
-        std::string wif = block_spec["privkey"].get_str();
-        CKey privkey = DecodeSecret(wif);
-        if (!privkey.IsValid()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-        }
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-        CPubKey pubkey = privkey.GetPubKey();
-        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-        unsigned char sig_buf[64];
-        uint256 aux_rand = GetRandHash();
-        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-        }
-        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        // Compound SIG + CSV: PQ or Schnorr sign, CSV timelock comes from conditions
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "TIMELOCKED_SIG");
         break;
     }
     case RungBlockType::HASH_SIG: {
-        // Compound HASH_PREIMAGE + SIG: preimage + sign
+        // Compound HASH_PREIMAGE + SIG: preimage + PQ/Schnorr sign
         std::string preimage_hex = block_spec["preimage"].get_str();
         auto preimage_data = ParseHex(preimage_hex);
         if (preimage_data.empty()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "HASH_SIG requires non-empty preimage hex");
         }
         block.fields.push_back({RungDataType::PREIMAGE, preimage_data});
-
-        std::string wif = block_spec["privkey"].get_str();
-        CKey privkey = DecodeSecret(wif);
-        if (!privkey.IsValid()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-        }
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-        CPubKey pubkey = privkey.GetPubKey();
-        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-        unsigned char sig_buf[64];
-        uint256 aux_rand = GetRandHash();
-        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-        }
-        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "HASH_SIG");
         break;
     }
     case RungBlockType::HTLC: {
-        // Compound HASH_PREIMAGE + CSV + SIG: preimage + sign, CSV from conditions
+        // Compound HASH_PREIMAGE + CSV + SIG: preimage + PQ/Schnorr sign, CSV from conditions
         std::string preimage_hex = block_spec["preimage"].get_str();
         auto preimage_data = ParseHex(preimage_hex);
         if (preimage_data.empty()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "HTLC requires non-empty preimage hex");
         }
         block.fields.push_back({RungDataType::PREIMAGE, preimage_data});
-
-        std::string wif = block_spec["privkey"].get_str();
-        CKey privkey = DecodeSecret(wif);
-        if (!privkey.IsValid()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-        }
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-        CPubKey pubkey = privkey.GetPubKey();
-        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-        unsigned char sig_buf[64];
-        uint256 aux_rand = GetRandHash();
-        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-        }
-        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "HTLC");
         break;
     }
     case RungBlockType::PTLC: {
-        // Compound ADAPTOR_SIG + CSV: adaptor sign, CSV from conditions
+        // Compound ADAPTOR_SIG + CSV: adaptor sign, CSV from conditions (no PQ support)
+        if (block_spec.exists("scheme")) {
+            std::string scheme_str = block_spec["scheme"].get_str();
+            RungScheme scheme;
+            if (ParsePQScheme(scheme_str, scheme)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "PTLC does not support PQ schemes (Schnorr-only adaptor signatures)");
+            }
+        }
         if (block_spec.exists("privkey")) {
             std::string wif = block_spec["privkey"].get_str();
             CKey privkey = DecodeSecret(wif);
@@ -1295,81 +1266,19 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
         break;
     }
     case RungBlockType::CLTV_SIG: {
-        // Compound SIG + CLTV: sign like SIG, CLTV from conditions
-        std::string wif = block_spec["privkey"].get_str();
-        CKey privkey = DecodeSecret(wif);
-        if (!privkey.IsValid()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-        }
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-        CPubKey pubkey = privkey.GetPubKey();
-        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-        unsigned char sig_buf[64];
-        uint256 aux_rand = GetRandHash();
-        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-        }
-        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        // Compound SIG + CLTV: PQ or Schnorr sign, CLTV from conditions
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "CLTV_SIG");
         break;
     }
     case RungBlockType::TIMELOCKED_MULTISIG: {
-        // Compound MULTISIG + CSV: sign like MULTISIG, CSV from conditions
-        const UniValue& privkeys_arr = block_spec["privkeys"].get_array();
-        if (privkeys_arr.empty()) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "TIMELOCKED_MULTISIG requires at least one privkey");
-        }
-
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-
-        for (size_t s = 0; s < privkeys_arr.size(); ++s) {
-            CKey privkey = DecodeSecret(privkeys_arr[s].get_str());
-            if (!privkey.IsValid()) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid TIMELOCKED_MULTISIG private key");
-            }
-
-            // Include PUBKEY for PUBKEY_COMMIT resolution by evaluator
-            CPubKey pubkey = privkey.GetPubKey();
-            block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-
-            unsigned char sig_buf[64];
-            uint256 aux_rand = GetRandHash();
-            if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "TIMELOCKED_MULTISIG Schnorr signing failed");
-            }
-            block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
-        }
+        // Compound MULTISIG + CSV: PQ or Schnorr multi-sign, CSV from conditions
+        SignMultiKey(block_spec, block, mtx, input_idx, txdata, conditions, "TIMELOCKED_MULTISIG");
         break;
     }
     case RungBlockType::KEY_REF_SIG: {
-        // Sign using a privkey whose pubkey commitment lives in a relay block.
-        // Witness contains: PUBKEY (full key for commitment check) + SIGNATURE.
-        // The relay_index and block_index NUMERIC fields are in conditions, not witness.
-        std::string wif = block_spec["privkey"].get_str();
-        CKey privkey = DecodeSecret(wif);
-        if (!privkey.IsValid()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid KEY_REF_SIG private key");
-        }
-
-        uint256 sighash;
-        if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
-        }
-
-        CPubKey pubkey = privkey.GetPubKey();
-        block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(pubkey.begin(), pubkey.end())});
-
-        unsigned char sig_buf[64];
-        uint256 aux_rand = GetRandHash();
-        if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "KEY_REF_SIG Schnorr signing failed");
-        }
-        block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        // Sign using a key whose pubkey commitment lives in a relay block.
+        // PQ or Schnorr, depending on scheme. Relay resolves SCHEME at evaluation time.
+        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "KEY_REF_SIG");
         break;
     }
     default:
