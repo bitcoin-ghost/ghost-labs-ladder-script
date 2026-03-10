@@ -145,6 +145,29 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
 
         size_t preimage_block_count = 0;
         for (const auto& rung : ladder.rungs) {
+            // Compact rungs: validate compact data, skip block iteration
+            if (rung.IsCompact()) {
+                if (!IsKnownCompactRungType(static_cast<uint8_t>(rung.compact->type))) {
+                    reason = "rung-unknown-compact-type";
+                    return false;
+                }
+                if (rung.compact->type == CompactRungType::COMPACT_SIG) {
+                    if (rung.compact->pubkey_commit.size() != 32) {
+                        reason = "rung-compact-sig-bad-commit-size";
+                        return false;
+                    }
+                    if (!IsKnownScheme(static_cast<uint8_t>(rung.compact->scheme))) {
+                        reason = "rung-compact-sig-unknown-scheme";
+                        return false;
+                    }
+                }
+                if (!rung.relay_refs.empty()) {
+                    reason = "rung-compact-has-relay-refs";
+                    return false;
+                }
+                continue;
+            }
+
             if (rung.blocks.size() > MAX_BLOCKS_PER_RUNG) {
                 reason = "rung-too-many-blocks";
                 return false;
@@ -276,6 +299,29 @@ bool IsStandardRungOutput(const CScript& scriptPubKey, std::string& reason)
     }
 
     for (const auto& rung : conditions.rungs) {
+        // Compact rungs: validate and skip
+        if (rung.IsCompact()) {
+            if (!IsKnownCompactRungType(static_cast<uint8_t>(rung.compact->type))) {
+                reason = "rung-output-unknown-compact-type";
+                return false;
+            }
+            if (rung.compact->type == CompactRungType::COMPACT_SIG) {
+                if (rung.compact->pubkey_commit.size() != 32) {
+                    reason = "rung-output-compact-sig-bad-commit-size";
+                    return false;
+                }
+                if (!IsKnownScheme(static_cast<uint8_t>(rung.compact->scheme))) {
+                    reason = "rung-output-compact-sig-unknown-scheme";
+                    return false;
+                }
+            }
+            if (!rung.relay_refs.empty()) {
+                reason = "rung-output-compact-has-relay-refs";
+                return false;
+            }
+            continue;
+        }
+
         if (rung.blocks.size() > MAX_BLOCKS_PER_RUNG) {
             reason = "rung-output-too-many-blocks";
             return false;

@@ -3070,7 +3070,7 @@ function validateLadder(rungs, txInputs, txOutputs, locktime) {
     if (isNaN(amt) || amt <= 0) {
       errors.push(`Output ${idx + 1}: amount must be greater than 0`);
     } else if (amt < 546) {
-      warnings.push(`Output ${idx + 1}: amount ${amt} sats is below dust limit (546)`);
+      errors.push(`Output ${idx + 1}: amount ${amt} sats is below dust limit (546) — transaction will be rejected by the network`);
     } else if (amt > 2100000000000000) {
       errors.push(`Output ${idx + 1}: amount exceeds maximum supply`);
     }
@@ -3394,6 +3394,10 @@ function validateLadder(rungs, txInputs, txOutputs, locktime) {
     }
   });
 
+  // ── MISSING CHANGE OUTPUT ──
+  if (validInputs.length > 0 && validOutputs.length === 1) {
+    warnings.push('Only 1 output defined — no change output. Any excess input value will be lost to fees.');
+  }
   return { errors, warnings };
 }
 
@@ -5833,16 +5837,16 @@ const FAKE_PQ = {
   falcon2: 'f512ff00ee11dd22cc33bb44aa5599668877f512ff00ee11dd22cc33bb44aa5599668877ff00ee11dd22cc33bb44aa5599668877ff00ee11dd22cc33bb44aa559966',
   dilith1: 'd3aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344556677889900aabb',
   dilith2: 'd3ff11ee22dd33cc44bb55aa66997788d3ff11ee22dd33cc44bb55aa66997788ff11ee22dd33cc44bb55aa66997788ff11ee22dd33cc44bb55aa6699778800112233',
-  sphincs1: 'sp256f0a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567',
+  sphincs1: 'aa256f0a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567',
 };
 
 const FAKE = {
-  pk1: '02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1',
+  pk1: '02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2',
   pk2: '03f9e8d7c6b5a4938271605f4e3d2c1b0a9f8e7d6c5b4a3928170605f4e3d2c1b0',
   pk3: '02b4c5d6e7f8091a2b3c4d5e6f70819a2b3c4d5e6f70819a2b3c4d5e6f7081920a',
-  pk4: '03c6d7e8f90a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b600',
-  pk5: '0299aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899',
-  oracle: '02ddee11223344556677889900aabbccddeeff11223344556677889900aabbccddee',
+  pk4: '03aabb112233445566778899aabbccddeeff0011223344556677889900aabbccdd',
+  pk5: '0211223344556677889900aabbccddeeff0011223344556677889900aabbccddee',
+  oracle: '02ffee112233445566778899aabbccddeeff112233445566778899aabbccddeeff',
   hash1: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2',
   hash2: 'f0e1d2c3b4a59687f0e1d2c3b4a59687f0e1d2c3b4a59687f0e1d2c3b4a59687',
   hash3: '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
@@ -5850,7 +5854,7 @@ const FAKE = {
   txid1: '7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b',
   txid2: 'e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2',
   txid3: '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
-  txid4: 'aabbccdd11223344556677889900eeff1122334455667788aabbccddeeff001122',
+  txid4: 'aabbccdd11223344556677889900eeff1122334455667788aabbccddeeff0011',
   addr1: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
   addr2: 'bc1q9h5yjqka54m3v0z7g4fkwfcm3l8kgv44w6frre',
   addr3: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
@@ -6733,14 +6737,77 @@ function decodedToBuilderRungs(data) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SIGNET PANEL
+// REGTEST PANEL
 // ═══════════════════════════════════════════════════════════════
 
 const SIGNET_API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'http://localhost:8801'
   : 'https://bitcoinghost.org';
 
-function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
+function ConvertPanel({ onViewAsLadder }) {
+  const [pasteJson, setPasteJson] = useState('');
+  const [pasteError, setPasteError] = useState(null);
+
+  const sty = {
+    section: { marginBottom: 12, padding: '12px 16px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 12 },
+    label: { fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 6 },
+    input: { width: '100%', padding: '6px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none', marginBottom: 8 },
+    btn: { padding: '6px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: 0.5, cursor: 'pointer', border: '1px solid', transition: 'all 0.15s', marginRight: 6 },
+    btnPrimary: { color: 'var(--amber)', background: 'var(--amber-glow)', borderColor: 'var(--amber-dim)' },
+    btnDefault: { color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', borderColor: 'var(--border)' },
+    sectionTitle: { fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--amber)', textTransform: 'uppercase', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 },
+  };
+
+  return (
+    <div style={{ padding: '20px 32px', overflow: 'auto', flex: 1, maxWidth: 1008, margin: '0 auto', width: '100%' }}>
+      <div style={sty.sectionTitle}>CONVERT JSON TO LADDER</div>
+      <div style={sty.section}>
+        <div style={sty.label}>PASTE RUNG TX JSON</div>
+        <div style={{ color: 'var(--text-dim)', fontSize: 10, marginBottom: 6, lineHeight: 1.5 }}>
+          Paste decoded JSON from <code style={{ color: 'var(--amber)', background: 'var(--bg-primary)', padding: '0 3px' }}>decoderung</code>, <code style={{ color: 'var(--amber)', background: 'var(--bg-primary)', padding: '0 3px' }}>createrungtx</code>, or <code style={{ color: 'var(--amber)', background: 'var(--bg-primary)', padding: '0 3px' }}>decoderawtransaction</code> output to visualize it as a ladder diagram. Works offline — no signet connection needed.
+        </div>
+        <textarea
+          style={{ ...sty.input, height: 160, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 11 }}
+          placeholder={'{\n  "rungs": [{ "blocks": [{ "block_type": "SIG", "params": [...] }], "coil": {...} }]\n}'}
+          value={pasteJson}
+          onChange={e => { setPasteJson(e.target.value); setPasteError(null); }}
+        />
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button style={{ ...sty.btn, ...sty.btnPrimary }} onClick={() => {
+            if (!pasteJson.trim()) { setPasteError('Paste some JSON first.'); return; }
+            try {
+              const parsed = JSON.parse(pasteJson.trim());
+              const result = decodedToBuilderRungs(parsed);
+              if (!result || result.rungs.length === 0) {
+                setPasteError('Could not find rung structure. Expected { rungs: [...] } or { outputs: [{ conditions: [...] }] } format.');
+                return;
+              }
+              setPasteError(null);
+              onViewAsLadder(parsed);
+            } catch (e) {
+              setPasteError('Invalid JSON: ' + e.message);
+            }
+          }}>VIEW AS LADDER</button>
+          <button style={{ ...sty.btn, ...sty.btnDefault }} onClick={() => { navigator.clipboard.readText().then(t => { setPasteJson(t); setPasteError(null); }); }}>PASTE FROM CLIPBOARD</button>
+          <button style={{ ...sty.btn, ...sty.btnDefault }} onClick={() => { setPasteJson(''); setPasteError(null); }}>CLEAR</button>
+        </div>
+        {pasteError && <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(200,40,40,0.1)', border: '1px solid rgba(200,40,40,0.3)', fontSize: 10, color: 'var(--red-bright)' }}>{pasteError}</div>}
+      </div>
+      <div style={{ ...sty.section, borderColor: 'var(--border)', background: 'var(--bg-tertiary)' }}>
+        <div style={{ color: 'var(--text-dim)', fontSize: 11, lineHeight: 1.7 }}>
+          <strong style={{ color: 'var(--text-secondary)' }}>Supported formats:</strong>
+          <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+            <li><code style={{ color: 'var(--amber)' }}>decoderung</code> output — decoded witness/conditions with block_type, params</li>
+            <li><code style={{ color: 'var(--amber)' }}>createrungtx</code> format — inputs, outputs with conditions and blocks</li>
+            <li><code style={{ color: 'var(--amber)' }}>decoderawtransaction</code> output — raw tx with scriptPubKey</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsLadder, setTxInputs, setTxOutputs }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState('');
   const [error, setError] = useState(null);
@@ -6751,6 +6818,7 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
   const [txHex, setTxHex] = useState('');
   const [signedHex, setSignedHex] = useState('');
   const [txid, setTxid] = useState('');
+  const [mined, setMined] = useState(false);
   const [txHistory, setTxHistory] = useState([]);
   const [expandedTx, setExpandedTx] = useState(null);
   const [lookupTxid, setLookupTxid] = useState('');
@@ -6761,8 +6829,17 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
   const [validateResult, setValidateResult] = useState(null);
   const [mempoolInfo, setMempoolInfo] = useState(null);
   const [recentBlocks, setRecentBlocks] = useState(null);
-  const [pasteJson, setPasteJson] = useState('');
-  const [pasteError, setPasteError] = useState(null);
+  const [expandedBlock, setExpandedBlock] = useState(null);
+  const [showTxJson, setShowTxJson] = useState(true);
+  const [funded, setFunded] = useState(false);
+  const [signingData, setSigningData] = useState(null); // { keypairs, spentOutputs }
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  const copyWithFeedback = (text, key) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(prev => prev === key ? null : prev), 1500);
+  };
 
   const apiCall = async (endpoint, body, silent) => {
     if (!silent) setError(null);
@@ -6834,23 +6911,47 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
   const handleCreate = async () => {
     const txData = exportCreateRungtx(rungs, txOutputs, txInputs, locktime);
     const data = await apiCall('/api/ladder/create', txData);
-    if (data) { setTxHex(data.hex); setSignedHex(''); setTxid(''); }
+    if (data) { setTxHex(data.hex); setSignedHex(''); setTxid(''); setMined(false); }
   };
   const handleSign = async () => {
     if (!txHex) { setError('No transaction hex. Create first.'); return; }
-    const data = await apiCall('/api/ladder/sign', { hex: txHex });
+    if (!signingData) { setError('No signing data. Click FUND FROM WALLET first.'); return; }
+
+    // Bootstrap signing: the wallet UTXOs are standard wpkh outputs, not ladder outputs.
+    // The ladder conditions define the new OUTPUT spending rules (already encoded by createrungtx).
+    // For INPUT signing, we just need a simple SIG block per input using a wallet private key.
+    const firstKey = signingData.keypairs[0];
+    const signers = signingData.selectedUtxos.map((u, inputIdx) => ({
+      input: inputIdx,
+      privkey: firstKey.privkey,
+    }));
+
+    // Build spent_outputs
+    const spent_outputs = signingData.selectedUtxos.map(u => ({
+      amount: u.amount,
+      scriptPubKey: u.scriptPubKey,
+    }));
+
+    const data = await apiCall('/api/ladder/sign', {
+      hex: txHex,
+      signers,
+      spent_outputs,
+    });
     if (data) setSignedHex(data.hex || txHex);
   };
   const handleBroadcast = async () => {
     const hex = signedHex || txHex;
     if (!hex) { setError('No transaction to broadcast.'); return; }
     const data = await apiCall('/api/ladder/broadcast', { hex });
-    if (data) { setTxid(data.txid); addToHistory('broadcast', data.txid, rungs.length + ' rungs'); setTimeout(refreshWallet, 2000); }
+    if (data) { setTxid(data.txid); addToHistory('broadcast', data.txid, rungs.length + ' rungs'); setTimeout(refreshWallet, 2000); refreshMempool(); }
   };
   const handleDecode = async () => {
     if (!decodeHex.trim()) { setError('Enter hex to decode.'); return; }
-    const data = await apiCall('/api/ladder/decode', { hex: decodeHex.trim() });
-    if (data) setDecodeResult(data);
+    const data = await apiCall('/api/ladder/decode', { hex: decodeHex.trim() }, true);
+    if (data) { setDecodeResult(data); return; }
+    // Fallback: try decoding as a full raw transaction
+    const txData = await apiCall('/api/ladder/decode-tx', { hex: decodeHex.trim() });
+    if (txData) setDecodeResult(txData);
   };
   const handleDecodeTx = async () => {
     if (!decodeHex.trim()) { setError('Enter hex to decode.'); return; }
@@ -6877,6 +6978,170 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
   };
   const addToHistory = (type, txid, detail) => {
     setTxHistory(prev => [{ type, txid, detail, time: Date.now(), confirmations: 0 }, ...prev]);
+  };
+
+  const handleFundFromWallet = async () => {
+    // 1. Fetch UTXOs
+    const utxoData = await apiCall('/api/ladder/wallet/utxos');
+    if (!utxoData || utxoData.length === 0) { setError('No UTXOs in wallet. Use faucet or mine blocks first.'); return; }
+
+    const confirmed = utxoData.filter(u => u.confirmations > 0).sort((a, b) => b.amount - a.amount);
+    if (confirmed.length === 0) { setError('No confirmed UTXOs. Mine a block first.'); return; }
+
+    // 2. Count how many unique pubkeys we need (across all SIG/MULTISIG blocks)
+    const pubkeyFields = [];
+    rungs.forEach((rung, ri) => {
+      rung.blocks.forEach((block, bi) => {
+        if (block.type === 'SIG' && block.values.pubkey) {
+          pubkeyFields.push({ ri, bi, field: 'pubkey', multi: false });
+        } else if ((block.type === 'MULTISIG' || block.type === 'TIMELOCKED_MULTISIG') && block.values.pubkeys) {
+          pubkeyFields.push({ ri, bi, field: 'pubkeys', multi: true });
+        } else if (block.type === 'MUSIG_THRESHOLD' && block.values.agg_pubkey) {
+          pubkeyFields.push({ ri, bi, field: 'agg_pubkey', multi: false });
+        } else if (block.type === 'ADAPTOR_SIG' && block.values.signing_key) {
+          pubkeyFields.push({ ri, bi, field: 'signing_key', multi: false });
+        }
+      });
+    });
+
+    // 3. Generate enough wallet keypairs for all unique pubkeys needed
+    const allPubkeysNeeded = new Set();
+    pubkeyFields.forEach(pf => {
+      const block = rungs[pf.ri].blocks[pf.bi];
+      if (pf.multi) {
+        const keys = (block.values[pf.field] || '').split(',').map(k => k.trim()).filter(Boolean);
+        keys.forEach(k => allPubkeysNeeded.add(k));
+      } else {
+        allPubkeysNeeded.add(block.values[pf.field]);
+      }
+    });
+
+    const numKeypairs = Math.max(allPubkeysNeeded.size, 1);
+    const keypairs = [];
+    for (let i = 0; i < numKeypairs; i++) {
+      const kp = await apiCall('/api/ladder/wallet/keypair');
+      if (!kp) { setError('Failed to generate wallet keypair.'); return; }
+      keypairs.push(kp);
+    }
+
+    // 4. Map old fake pubkeys to new wallet pubkeys
+    const oldToNew = new Map();
+    const oldKeys = [...allPubkeysNeeded];
+    oldKeys.forEach((oldKey, i) => {
+      oldToNew.set(oldKey, keypairs[i % keypairs.length].pubkey);
+    });
+
+    // 5. Replace pubkeys in rungs
+    setRungs(prev => prev.map((rung, ri) => ({
+      ...rung,
+      blocks: rung.blocks.map((block, bi) => {
+        const vals = { ...block.values };
+        if (block.type === 'SIG' && vals.pubkey && oldToNew.has(vals.pubkey)) {
+          vals.pubkey = oldToNew.get(vals.pubkey);
+        } else if ((block.type === 'MULTISIG' || block.type === 'TIMELOCKED_MULTISIG') && vals.pubkeys) {
+          const keys = vals.pubkeys.split(',').map(k => k.trim()).filter(Boolean);
+          vals.pubkeys = keys.map(k => oldToNew.get(k) || k).join(', ');
+        } else if (block.type === 'MUSIG_THRESHOLD' && vals.agg_pubkey && oldToNew.has(vals.agg_pubkey)) {
+          vals.agg_pubkey = oldToNew.get(vals.agg_pubkey);
+        } else if (block.type === 'ADAPTOR_SIG' && vals.signing_key && oldToNew.has(vals.signing_key)) {
+          vals.signing_key = oldToNew.get(vals.signing_key);
+        }
+        return { ...block, values: vals };
+      }),
+    })));
+
+    // 6. Select UTXOs for inputs
+    const outputCount = Math.max(txOutputs.filter(o => parseInt(o.amount) > 0 || o.address).length, 1);
+    const totalOutputSats = txOutputs.reduce((sum, o) => sum + (parseInt(o.amount) || 0), 0);
+    const feeSats = 1000;
+    const needSats = totalOutputSats > 0 ? totalOutputSats + feeSats : 0;
+
+    let selected = [];
+    let selectedTotal = 0;
+    for (const u of confirmed) {
+      selected.push(u);
+      selectedTotal += Math.round(u.amount * 1e8);
+      if (needSats > 0 && selectedTotal >= needSats) break;
+      if (needSats === 0 && selected.length >= 1) break;
+    }
+
+    // 7. Generate fresh addresses for outputs
+    const newOutputs = [];
+    for (let i = 0; i < outputCount; i++) {
+      const addrData = await apiCall('/api/ladder/wallet/address');
+      if (!addrData) { setError('Failed to generate address.'); return; }
+      const existingAmt = parseInt(txOutputs[i]?.amount) || 0;
+      newOutputs.push({
+        id: txOutputs[i]?.id || uid(),
+        address: addrData.address,
+        amount: existingAmt > 0 ? existingAmt : Math.floor((selectedTotal - feeSats) / outputCount),
+      });
+    }
+
+    // Scale down if needed
+    let totalNewOutputSats = newOutputs.reduce((s, o) => s + o.amount, 0);
+    if (totalNewOutputSats + feeSats > selectedTotal) {
+      const available = selectedTotal - feeSats;
+      const perOutput = Math.floor(available / newOutputs.length);
+      newOutputs.forEach(o => { o.amount = perOutput; });
+      totalNewOutputSats = newOutputs.reduce((s, o) => s + o.amount, 0);
+    }
+
+    // Add change output if there's significant excess (> 1000 sats beyond fee)
+    const changeSats = selectedTotal - totalNewOutputSats - feeSats;
+    let changeRung = null;
+    if (changeSats > 1000) {
+      const changeAddr = await apiCall('/api/ladder/wallet/address');
+      if (changeAddr) {
+        const changeId = uid();
+        newOutputs.push({
+          id: changeId,
+          address: changeAddr.address,
+          amount: changeSats,
+        });
+        // Create a SIG rung for the change output so createrungtx has valid conditions
+        changeRung = {
+          id: uid(),
+          label: 'CHANGE',
+          blocks: [{ id: uid(), type: 'SIG', values: { pubkey: keypairs[0].pubkey } }],
+          output: { name: 'CHANGE', type: 'standard', txOutputId: changeId },
+          outputRefs: [],
+        };
+      }
+    }
+
+    // 8. Build spent outputs for signing (amount + scriptPubKey from each UTXO)
+    const spentOutputs = selected.map(u => ({
+      amount: u.amount,
+      scriptPubKey: u.scriptPubKey || u.desc || '',
+    }));
+
+    // 9. Store signing data for handleSign
+    setSigningData({
+      keypairs,
+      oldToNew,
+      spentOutputs,
+      selectedUtxos: selected,
+    });
+
+    // 10. Update engine state
+    setTxInputs(selected.map(u => ({
+      id: uid(),
+      txid: u.txid,
+      vout: u.vout,
+      sequence: '',
+    })));
+    setTxOutputs(newOutputs);
+    if (changeRung) {
+      setRungs(prev => [...prev, changeRung]);
+    }
+    setTxHex('');
+    setSignedHex('');
+    setTxid('');
+    setMined(false);
+    setError(null);
+    setFunded(true);
+    setTimeout(() => setFunded(false), 4000);
   };
 
   const sty = {
@@ -6927,41 +7192,6 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
         </div>
       )}
 
-      {/* VIEW EXISTING TX AS LADDER — works offline, no signet required */}
-      <div style={sty.divider} />
-      <div style={sty.sectionTitle}>VIEW TRANSACTION AS LADDER</div>
-      <div style={sty.section}>
-        <div style={sty.label}>PASTE RUNG TX JSON</div>
-        <div style={{ color: 'var(--text-dim)', fontSize: 10, marginBottom: 6, lineHeight: 1.5 }}>
-          Paste decoded JSON from <code style={{ color: 'var(--amber)', background: 'var(--bg-primary)', padding: '0 3px' }}>decoderung</code>, <code style={{ color: 'var(--amber)', background: 'var(--bg-primary)', padding: '0 3px' }}>createrungtx</code>, or <code style={{ color: 'var(--amber)', background: 'var(--bg-primary)', padding: '0 3px' }}>decoderawtransaction</code> output to visualize it as a ladder diagram. Works offline.
-        </div>
-        <textarea
-          style={{ ...sty.input, height: 100, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 11 }}
-          placeholder={'{\n  "rungs": [{ "blocks": [{ "block_type": "SIG", "params": [...] }], "coil": {...} }]\n}'}
-          value={pasteJson}
-          onChange={e => { setPasteJson(e.target.value); setPasteError(null); }}
-        />
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button style={{ ...sty.btn, ...sty.btnPrimary }} onClick={() => {
-            if (!pasteJson.trim()) { setPasteError('Paste some JSON first.'); return; }
-            try {
-              const parsed = JSON.parse(pasteJson.trim());
-              const result = decodedToBuilderRungs(parsed);
-              if (!result || result.rungs.length === 0) {
-                setPasteError('Could not find rung structure. Expected { rungs: [...] } or { outputs: [{ conditions: [...] }] } format.');
-                return;
-              }
-              setPasteError(null);
-              onViewAsLadder(parsed);
-            } catch (e) {
-              setPasteError('Invalid JSON: ' + e.message);
-            }
-          }}>VIEW AS LADDER</button>
-          <button style={{ ...sty.btn, ...sty.btnDefault }} onClick={() => { setPasteJson(''); setPasteError(null); }}>CLEAR</button>
-          {pasteError && <span style={{ color: 'var(--red-bright)', fontSize: 10, marginLeft: 4 }}>{pasteError}</span>}
-        </div>
-      </div>
-
       {/* WALLET */}
       <div style={sty.divider} />
       <div style={sty.sectionTitle}>WALLET</div>
@@ -6984,7 +7214,7 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
           {newAddress && (
             <div style={{ ...sty.result, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, maxHeight: 'none' }}>
               <span style={{ wordBreak: 'break-all', flex: 1 }}>{newAddress}</span>
-              <button style={{ ...sty.btn, ...sty.btnDefault, marginRight: 0, whiteSpace: 'nowrap' }} onClick={() => navigator.clipboard.writeText(newAddress)}>COPY</button>
+              <button style={{ ...sty.btn, ...sty.btnDefault, marginRight: 0, whiteSpace: 'nowrap', ...(copiedKey === 'addr' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(newAddress, 'addr')}>{copiedKey === 'addr' ? '✓ COPIED' : 'COPY'}</button>
             </div>
           )}
           <div style={{ ...sty.label, marginTop: 12 }}>FAUCET</div>
@@ -7020,7 +7250,7 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
                   <td style={{ padding: '4px 8px' }}>{u.vout}</td>
                   <td style={{ padding: '4px 8px', textAlign: 'right', color: 'var(--amber)' }}>{formatSats(u.amount)}</td>
                   <td style={{ padding: '4px 8px', color: u.confirmations > 0 ? 'var(--green-bright)' : 'var(--amber)' }}>{u.confirmations}</td>
-                  <td style={{ padding: '4px 8px' }}><button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 6px', fontSize: 9, marginRight: 0 }} onClick={() => navigator.clipboard.writeText(u.txid + ':' + u.vout)} title="Copy txid:vout">COPY</button></td>
+                  <td style={{ padding: '4px 8px' }}><button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 6px', fontSize: 9, marginRight: 0, ...(copiedKey === 'utxo-'+i ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(u.txid + ':' + u.vout, 'utxo-'+i)} title="Copy txid:vout">{copiedKey === 'utxo-'+i ? '✓' : 'COPY'}</button></td>
                 </tr>
               ))}</tbody>
             </table>
@@ -7031,35 +7261,146 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
       {/* BUILD & BROADCAST */}
       <div style={sty.divider} />
       <div style={sty.sectionTitle}>BUILD &amp; BROADCAST</div>
+      {/* TX PREVIEW — inputs, outputs, rungs + JSON */}
+      {(() => {
+        const txJson = exportCreateRungtx(rungs, txOutputs, txInputs, locktime);
+        const jsonStr = JSON.stringify(txJson, null, 2);
+        const hasInputs = txJson.inputs && txJson.inputs.length > 0;
+        const hasOutputs = txJson.outputs && txJson.outputs.length > 0;
+        const hasFakeInputs = (txJson.inputs && txJson.inputs.some(i => !(/^[0-9a-f]{64}$/i.test(i.txid)))) ||
+          (txOutputs.some(o => o.address && !o.address.startsWith('bcrt1')));
+        return (<>
+        {/* FUNDED SUCCESS BANNER */}
+        {funded && (
+          <div style={{ marginBottom: 12, padding: '10px 16px', background: 'var(--green-dim)', border: '1px solid var(--green)', display: 'flex', alignItems: 'center', gap: 10, animation: 'fadeIn 0.3s' }}>
+            <span style={{ color: 'var(--green-bright)', fontSize: 18 }}>&#x2713;</span>
+            <span style={{ color: 'var(--green-bright)', fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>Funded — inputs and outputs replaced with real wallet data</span>
+          </div>
+        )}
+        {/* INPUTS / OUTPUTS GRID */}
+        <div style={{ ...sty.section, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={sty.label}>TRANSACTION</div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                {hasInputs ? txJson.inputs.length + ' in' : '0 in'}
+                {' / '}
+                {hasOutputs ? txJson.outputs.length + ' out' : '0 out'}
+                {' / '}
+                {rungs.length + ' rung' + (rungs.length !== 1 ? 's' : '')}
+              </span>
+              {online && (
+                <button style={{ ...sty.btn, ...(hasFakeInputs || !hasInputs ? sty.btnPrimary : sty.btnDefault), padding: '4px 10px', fontSize: 10 }} onClick={handleFundFromWallet} disabled={loading}>
+                  {loading === '/api/ladder/wallet/utxos' ? 'LOADING...' : 'FUND FROM WALLET'}
+                </button>
+              )}
+            </div>
+          </div>
+          {hasFakeInputs && online && !funded && (
+            <div style={{ marginBottom: 10, padding: '6px 10px', background: 'var(--amber-glow)', border: '1px solid var(--amber-dim)', fontSize: 10, color: 'var(--amber)' }}>
+              Inputs contain example data. Click FUND FROM WALLET to replace with real wallet UTXOs and valid addresses.
+            </div>
+          )}
+          {!hasInputs && !funded && (
+            <div style={{ marginBottom: 10, padding: '6px 10px', background: 'var(--amber-glow)', border: '1px solid var(--amber-dim)', fontSize: 10, color: 'var(--amber)' }}>
+              No inputs. Add in BUILD tab or click FUND FROM WALLET.
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--amber)', fontWeight: 600, letterSpacing: 1, marginBottom: 4 }}>INPUTS</div>
+              {txInputs.filter(i => i.txid).length > 0 ? txInputs.filter(i => i.txid).map((inp, i) => (
+                <div key={i} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', padding: '4px 6px', marginBottom: 2, background: 'var(--bg-primary)', border: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>#{i} </span>
+                  <span style={{ color: hasFakeInputs ? 'var(--amber)' : 'var(--text-primary)' }}>{inp.txid.substring(0, 12)}...{inp.txid.substring(inp.txid.length - 4)}</span>
+                  <span style={{ color: 'var(--text-dim)' }}>:{inp.vout}</span>
+                </div>
+              )) : <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: '4px 6px' }}>None</div>}
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--amber)', fontWeight: 600, letterSpacing: 1, marginBottom: 4 }}>OUTPUTS</div>
+              {txOutputs.filter(o => o.address || parseInt(o.amount) > 0).map((out, i) => (
+                <div key={i} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', padding: '4px 6px', marginBottom: 2, background: 'var(--bg-primary)', border: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>#{i} </span>
+                  <span style={{ color: out.address && !out.address.startsWith('bcrt1') ? 'var(--amber)' : 'inherit' }}>{out.address ? out.address.substring(0, 16) + '...' : '(no addr)'}</span>
+                  <span style={{ color: 'var(--amber)', float: 'right' }}>{parseInt(out.amount) > 0 ? formatSats(parseInt(out.amount) / 1e8) : '—'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--amber)', fontWeight: 600, letterSpacing: 1, marginBottom: 4 }}>RUNGS</div>
+            {rungs.length > 0 ? (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {rungs.map((r, i) => (
+                  <span key={i} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--bg-primary)', border: '1px solid var(--border)', color: 'var(--text-secondary)', letterSpacing: 0.5 }}>
+                    {r.label || `R${i}`}: {r.blocks.map(b => b.type).join(' + ')}
+                  </span>
+                ))}
+              </div>
+            ) : <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: '4px 6px' }}>No rungs — design in BUILD tab first</div>}
+          </div>
+        </div>
+        {/* COLLAPSIBLE JSON */}
+        <div style={{ ...sty.section, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showTxJson ? 8 : 0 }}>
+            <div style={{ ...sty.label, marginBottom: 0, cursor: 'pointer' }} onClick={() => setShowTxJson(!showTxJson)}>
+              {showTxJson ? '\u25BC' : '\u25B6'} CREATERUNGTX JSON
+            </div>
+            <button style={{ ...sty.btn, ...sty.btnDefault, padding: '3px 8px', fontSize: 9, ...(copiedKey === 'json' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(jsonStr, 'json')}>{copiedKey === 'json' ? '✓ COPIED' : 'COPY JSON'}</button>
+          </div>
+          {showTxJson && (
+            <pre style={{ margin: 0, padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border)', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5 }}>{jsonStr}</pre>
+          )}
+        </div>
+        </>);
+      })()}
       <div style={{ ...sty.section, padding: '16px 20px' }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div style={{ flex: '1 1 200px', minWidth: 200 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ flex: '1 1 160px', minWidth: 140, textAlign: 'center' }}>
             <div style={sty.label}>1. CREATE</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Sends ladder JSON to createrungtx RPC.</div>
             <button style={{ ...sty.btn, ...sty.btnPrimary, opacity: online ? 1 : 0.3 }} onClick={handleCreate} disabled={!online || loading === '/api/ladder/create'}>
               {loading === '/api/ladder/create' ? 'CREATING...' : 'CREATERUNGTX'}
             </button>
-            {txHex && (<div style={{ ...sty.result, marginTop: 6 }}><div style={{ color: 'var(--green-bright)', marginBottom: 4 }}>TX HEX ({txHex.length / 2} bytes)</div>{txHex.substring(0, 80)}...<button style={{ ...sty.btn, ...sty.btnDefault, marginTop: 4, display: 'block' }} onClick={() => navigator.clipboard.writeText(txHex)}>COPY HEX</button></div>)}
           </div>
-          <div style={{ color: 'var(--border-light)', fontSize: 20, alignSelf: 'center', padding: '20px 0' }}>&#x2192;</div>
-          <div style={{ flex: '1 1 200px', minWidth: 200 }}>
+          <div style={{ color: 'var(--border-light)', fontSize: 20 }}>&#x2192;</div>
+          <div style={{ flex: '1 1 160px', minWidth: 140, textAlign: 'center' }}>
             <div style={sty.label}>2. SIGN</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Signs via signrungtx RPC.</div>
             <button style={{ ...sty.btn, ...sty.btnPrimary, opacity: (online && txHex) ? 1 : 0.3 }} onClick={handleSign} disabled={!online || !txHex || loading === '/api/ladder/sign'}>
               {loading === '/api/ladder/sign' ? 'SIGNING...' : 'SIGNRUNGTX'}
             </button>
-            {signedHex && signedHex !== txHex && (<div style={{ ...sty.result, marginTop: 6 }}><div style={{ color: 'var(--green-bright)', marginBottom: 4 }}>SIGNED ({signedHex.length / 2} bytes)</div>{signedHex.substring(0, 80)}...</div>)}
           </div>
-          <div style={{ color: 'var(--border-light)', fontSize: 20, alignSelf: 'center', padding: '20px 0' }}>&#x2192;</div>
-          <div style={{ flex: '1 1 200px', minWidth: 200 }}>
+          <div style={{ color: 'var(--border-light)', fontSize: 20 }}>&#x2192;</div>
+          <div style={{ flex: '1 1 160px', minWidth: 140, textAlign: 'center' }}>
             <div style={sty.label}>3. BROADCAST</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Push to signet network.</div>
             <button style={{ ...sty.btn, ...sty.btnGreen, opacity: (online && (signedHex || txHex)) ? 1 : 0.3 }} onClick={handleBroadcast} disabled={!online || !(signedHex || txHex) || loading === '/api/ladder/broadcast'}>
               {loading === '/api/ladder/broadcast' ? 'BROADCASTING...' : 'BROADCAST'}
             </button>
-            {txid && (<div style={{ ...sty.result, marginTop: 6 }}><div style={{ color: 'var(--green-bright)', marginBottom: 4 }}>SUCCESS</div><a href={`https://mempool.space/signet/tx/${txid}`} target="_blank" rel="noopener" style={{ color: 'var(--amber)', textDecoration: 'none', wordBreak: 'break-all', fontSize: 10 }}>{txid}</a></div>)}
+          </div>
+          <div style={{ color: 'var(--border-light)', fontSize: 20 }}>&#x2192;</div>
+          <div style={{ flex: '1 1 160px', minWidth: 140, textAlign: 'center' }}>
+            <div style={sty.label}>4. CONFIRM</div>
+            <button style={{ ...sty.btn, ...(mined ? sty.btnGreen : sty.btnDefault), opacity: (online && txid) ? 1 : 0.3 }} onClick={async () => {
+              const d = await apiCall('/api/ladder/mine', { blocks: 1 });
+              if (d) {
+                setMined(true);
+                refreshWallet();
+                refreshMempool();
+                setTxHistory(prev => prev.map(h => h.txid === txid ? { ...h, confirmations: (h.confirmations || 0) + 1 } : h));
+              }
+            }} disabled={!online || !txid || loading === '/api/ladder/mine'}>
+              {loading === '/api/ladder/mine' ? 'MINING...' : mined ? '\u2713 CONFIRMED' : 'MINE BLOCK'}
+            </button>
           </div>
         </div>
+        {/* Results row — shown below the buttons */}
+        {(txHex || signedHex || txid) && (
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {txHex && (<div style={{ ...sty.result, margin: 0 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}><span style={{ color: 'var(--green-bright)' }}>TX HEX ({txHex.length / 2} bytes)</span><button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 8px', fontSize: 9, ...(copiedKey === 'txhex' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(txHex, 'txhex')}>{copiedKey === 'txhex' ? '✓ COPIED' : 'COPY'}</button></div><span style={{ fontSize: 10, wordBreak: 'break-all' }}>{txHex.substring(0, 100)}...</span></div>)}
+            {signedHex && signedHex !== txHex && (<div style={{ ...sty.result, margin: 0 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}><span style={{ color: 'var(--green-bright)' }}>SIGNED ({signedHex.length / 2} bytes)</span><button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 8px', fontSize: 9, ...(copiedKey === 'signed' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(signedHex, 'signed')}>{copiedKey === 'signed' ? '✓ COPIED' : 'COPY'}</button></div><span style={{ fontSize: 10, wordBreak: 'break-all' }}>{signedHex.substring(0, 100)}...</span></div>)}
+            {txid && (<div style={{ ...sty.result, margin: 0 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--green-bright)' }}>BROADCAST SUCCESS</span><button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 8px', fontSize: 9, ...(copiedKey === 'txid' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(txid, 'txid')}>{copiedKey === 'txid' ? '✓ COPIED' : 'COPY TXID'}</button></div><span style={{ color: 'var(--amber)', wordBreak: 'break-all', fontSize: 10 }}>{txid}</span></div>)}
+          </div>
+        )}
       </div>
 
       {/* SESSION HISTORY */}
@@ -7088,9 +7429,23 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
                   <div style={{ marginTop: 8, padding: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border)', fontSize: 10, fontFamily: 'var(--font-mono)' }}>
                     <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-dim)' }}>TXID: </span><span style={{ color: 'var(--text-primary)', wordBreak: 'break-all' }}>{tx.txid}</span></div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                      <button style={{ ...sty.btn, ...sty.btnDefault, padding: '3px 8px', fontSize: 9 }} onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(tx.txid); }}>COPY TXID</button>
-                      <a href={`https://mempool.space/signet/tx/${tx.txid}`} target="_blank" rel="noopener" style={{ ...sty.btn, ...sty.btnDefault, padding: '3px 8px', fontSize: 9, textDecoration: 'none', color: 'var(--amber)' }} onClick={(e) => e.stopPropagation()}>MEMPOOL.SPACE</a>
+                      <button style={{ ...sty.btn, ...sty.btnDefault, padding: '3px 8px', fontSize: 9, ...(copiedKey === 'hist-'+tx.txid ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={(e) => { e.stopPropagation(); copyWithFeedback(tx.txid, 'hist-'+tx.txid); }}>{copiedKey === 'hist-'+tx.txid ? '✓ COPIED' : 'COPY TXID'}</button>
+                      <button style={{ ...sty.btn, ...sty.btnDefault, padding: '3px 8px', fontSize: 9, color: 'var(--amber)' }} onClick={async (e) => { e.stopPropagation(); const d = await apiCall(`/api/ladder/tx/${tx.txid}`, undefined, true); if (d) { tx.detail_data = d; setTxHistory(prev => [...prev]); } }}>VIEW TX</button>
                     </div>
+                    {tx.detail_data && (
+                      <div style={{ marginTop: 8, padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', fontSize: 10, fontFamily: 'var(--font-mono)', maxHeight: 200, overflow: 'auto' }}>
+                        <div><span style={{ color: 'var(--text-dim)' }}>CONFIRMATIONS: </span><span style={{ color: tx.detail_data.confirmations > 0 ? 'var(--green-bright)' : 'var(--amber)' }}>{tx.detail_data.confirmations ?? 'pending'}</span></div>
+                        <div><span style={{ color: 'var(--text-dim)' }}>SIZE: </span>{tx.detail_data.size} bytes / {tx.detail_data.vsize} vbytes</div>
+                        <div><span style={{ color: 'var(--text-dim)' }}>INPUTS: </span>{tx.detail_data.vin?.length}</div>
+                        <div><span style={{ color: 'var(--text-dim)' }}>OUTPUTS: </span>{tx.detail_data.vout?.length}</div>
+                        {tx.detail_data.vout?.map((v, vi) => (
+                          <div key={vi} style={{ marginTop: 4, paddingLeft: 8, borderLeft: '2px solid var(--border)' }}>
+                            <span style={{ color: 'var(--amber)' }}>OUT[{vi}]</span> {v.value} tBTC
+                            <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>{v.scriptPubKey?.type}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -7105,25 +7460,37 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
       <div style={sty.grid2}>
         <div style={sty.section}>
           <div style={sty.label}>DECODE RAW HEX</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>DECODE LADDER parses raw ladder hex (scriptPubKey data or witness stack item). DECODE RAW TX parses a full transaction. Either accepts full tx hex — ladder decode falls back to raw tx automatically.</div>
           <textarea style={{ ...sty.input, height: 60, resize: 'vertical', fontFamily: 'var(--font-mono)' }} placeholder="Paste raw transaction or ladder witness hex..." value={decodeHex} onChange={e => setDecodeHex(e.target.value)} disabled={!online} />
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button style={{ ...sty.btn, ...sty.btnPrimary, opacity: online ? 1 : 0.3 }} onClick={handleDecode} disabled={!online || loading === '/api/ladder/decode'}>{loading === '/api/ladder/decode' ? 'DECODING...' : 'DECODE LADDER'}</button>
             <button style={{ ...sty.btn, ...sty.btnDefault, opacity: online ? 1 : 0.3 }} onClick={handleDecodeTx} disabled={!online || loading === '/api/ladder/decode-tx'}>{loading === '/api/ladder/decode-tx' ? 'DECODING...' : 'DECODE RAW TX'}</button>
+            {(signedHex || txHex) && <button style={{ ...sty.btn, ...sty.btnDefault }} onClick={() => setDecodeHex(signedHex || txHex)}>USE CURRENT TX</button>}
           </div>
           {decodeResult && (<div style={{ ...sty.result, maxHeight: 260 }}>
-            {decodedToBuilderRungs(decodeResult) && (
-              <button style={{ ...sty.btn, ...sty.btnPrimary, marginBottom: 8, display: 'block' }} onClick={() => onViewAsLadder(decodeResult)}>VIEW AS LADDER</button>
-            )}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {decodedToBuilderRungs(decodeResult) && (
+                <button style={{ ...sty.btn, ...sty.btnPrimary }} onClick={() => onViewAsLadder(decodeResult)}>VIEW AS LADDER</button>
+              )}
+              <button style={{ ...sty.btn, ...sty.btnDefault, ...(copiedKey === 'decode' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(JSON.stringify(decodeResult, null, 2), 'decode')}>{copiedKey === 'decode' ? '✓ COPIED' : 'COPY'}</button>
+            </div>
             <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(decodeResult, null, 2)}</pre>
           </div>)}
         </div>
         <div style={sty.section}>
           <div style={sty.label}>VALIDATE LADDER</div>
-          <textarea style={{ ...sty.input, height: 60, resize: 'vertical', fontFamily: 'var(--font-mono)' }} placeholder="Paste ladder witness hex to validate..." value={validateHex} onChange={e => setValidateHex(e.target.value)} disabled={!online} />
-          <button style={{ ...sty.btn, ...sty.btnPrimary, opacity: online ? 1 : 0.3 }} onClick={handleValidate} disabled={!online || loading === '/api/ladder/validate'}>{loading === '/api/ladder/validate' ? 'VALIDATING...' : 'VALIDATE'}</button>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Paste a raw ladder conditions or witness hex (from scriptPubKey or witness stack, not the full transaction).</div>
+          <textarea style={{ ...sty.input, height: 60, resize: 'vertical', fontFamily: 'var(--font-mono)' }} placeholder="Paste ladder conditions/witness hex..." value={validateHex} onChange={e => setValidateHex(e.target.value)} disabled={!online} />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button style={{ ...sty.btn, ...sty.btnPrimary, opacity: online ? 1 : 0.3 }} onClick={handleValidate} disabled={!online || loading === '/api/ladder/validate'}>{loading === '/api/ladder/validate' ? 'VALIDATING...' : 'VALIDATE'}</button>
+            {(signedHex || txHex) && <button style={{ ...sty.btn, ...sty.btnDefault }} onClick={() => setValidateHex(signedHex || txHex)}>USE CURRENT TX</button>}
+          </div>
           {validateResult && (
             <div style={{ ...sty.result, maxHeight: 220 }}>
-              {validateResult.valid !== undefined && <div style={{ color: validateResult.valid ? 'var(--green-bright)' : 'var(--red-bright)', marginBottom: 6, fontWeight: 600 }}>{validateResult.valid ? 'VALID LADDER STRUCTURE' : 'INVALID'}</div>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                {validateResult.valid !== undefined && <div style={{ color: validateResult.valid ? 'var(--green-bright)' : 'var(--red-bright)', fontWeight: 600 }}>{validateResult.valid ? 'VALID LADDER STRUCTURE' : 'INVALID'}</div>}
+                <button style={{ ...sty.btn, ...sty.btnDefault, ...(copiedKey === 'validate' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(JSON.stringify(validateResult, null, 2), 'validate')}>{copiedKey === 'validate' ? '✓ COPIED' : 'COPY'}</button>
+              </div>
               <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(validateResult, null, 2)}</pre>
             </div>
           )}
@@ -7132,19 +7499,23 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
 
       {/* TRANSACTION LOOKUP */}
       <div style={sty.divider} />
-      <div style={sty.sectionTitle}>TRANSACTION LOOKUP</div>
+      <div style={sty.sectionTitle} data-lookup="1">TRANSACTION LOOKUP</div>
       <div style={sty.section}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <input style={{ ...sty.input, flex: 1, marginBottom: 0 }} placeholder="txid (64 hex chars)" value={lookupTxid} onChange={e => setLookupTxid(e.target.value)} disabled={!online} />
           <button style={{ ...sty.btn, ...sty.btnPrimary, opacity: online ? 1 : 0.3 }} onClick={handleLookup} disabled={!online}>LOOKUP</button>
+          {txid && <button style={{ ...sty.btn, ...sty.btnDefault }} onClick={() => setLookupTxid(txid)}>USE CURRENT TX</button>}
         </div>
         {lookupResult && (
           <div style={{ ...sty.result, maxHeight: 300, marginTop: 10 }}>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-              <div><span style={{ color: 'var(--text-dim)' }}>CONF: </span><span style={{ color: lookupResult.confirmations > 0 ? 'var(--green-bright)' : 'var(--amber)' }}>{lookupResult.confirmations || 0}</span></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>SIZE: </span>{lookupResult.size} bytes</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>VSIZE: </span>{lookupResult.vsize} vbytes</div>
-              {lookupResult.version && <div><span style={{ color: 'var(--text-dim)' }}>VERSION: </span>{lookupResult.version}</div>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div><span style={{ color: 'var(--text-dim)' }}>CONF: </span><span style={{ color: lookupResult.confirmations > 0 ? 'var(--green-bright)' : 'var(--amber)' }}>{lookupResult.confirmations || 0}</span></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>SIZE: </span>{lookupResult.size} bytes</div>
+                <div><span style={{ color: 'var(--text-dim)' }}>VSIZE: </span>{lookupResult.vsize} vbytes</div>
+                {lookupResult.version && <div><span style={{ color: 'var(--text-dim)' }}>VERSION: </span>{lookupResult.version}</div>}
+              </div>
+              <button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 8px', fontSize: 9, ...(copiedKey === 'lookup' ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={() => copyWithFeedback(JSON.stringify(lookupResult, null, 2), 'lookup')}>{copiedKey === 'lookup' ? '✓ COPIED' : 'COPY'}</button>
             </div>
             {lookupResult.vin && (<div style={{ marginBottom: 6 }}><div style={{ color: 'var(--text-dim)', fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>INPUTS ({lookupResult.vin.length})</div>{lookupResult.vin.map((vin, i) => <div key={i} style={{ fontSize: 10, color: 'var(--text-secondary)', padding: '2px 0' }}>{vin.coinbase ? 'coinbase' : `${(vin.txid || '').substring(0, 16)}...:${vin.vout}`}</div>)}</div>)}
             {lookupResult.vout && (<div><div style={{ color: 'var(--text-dim)', fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>OUTPUTS ({lookupResult.vout.length})</div>{lookupResult.vout.map((vout, i) => <div key={i} style={{ fontSize: 10, color: 'var(--text-secondary)', padding: '2px 0', display: 'flex', justifyContent: 'space-between' }}><span>#{vout.n} {vout.scriptPubKey?.type || ''}</span><span style={{ color: 'var(--amber)' }}>{formatSats(vout.value)}</span></div>)}</div>)}
@@ -7173,13 +7544,31 @@ function SignetPanel({ rungs, txOutputs, txInputs, locktime, onViewAsLadder }) {
               <th style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>TIME</th>
             </tr></thead>
             <tbody>{recentBlocks.map((b, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '6px 8px', color: 'var(--amber)' }}>{b.height}</td>
+              <React.Fragment key={i}>
+              <tr style={{ borderBottom: expandedBlock === b.height ? 'none' : '1px solid var(--border)', cursor: 'pointer' }} onClick={() => setExpandedBlock(expandedBlock === b.height ? null : b.height)}>
+                <td style={{ padding: '6px 8px', color: 'var(--amber)' }}>{expandedBlock === b.height ? '▼' : '▶'} {b.height}</td>
                 <td style={{ padding: '6px 8px', color: 'var(--text-secondary)' }} title={b.hash}>{b.hash.substring(0, 16)}...</td>
                 <td style={{ padding: '6px 8px', textAlign: 'right' }}>{b.tx_count}</td>
                 <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-dim)' }}>{(b.size / 1024).toFixed(1)} KB</td>
                 <td style={{ padding: '6px 8px', color: 'var(--text-dim)' }}>{new Date(b.time * 1000).toLocaleTimeString()}</td>
               </tr>
+              {expandedBlock === b.height && b.txids && b.txids.length > 0 && (
+                <tr><td colSpan={5} style={{ padding: '0 8px 8px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 10px' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 4 }}>TRANSACTIONS ({b.txids.length})</div>
+                    {b.txids.map((txid, j) => (
+                      <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: j < b.txids.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', flex: 1, marginRight: 8 }}>{txid}</span>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 6px', fontSize: 9, ...(copiedKey === 'blk-'+txid ? { color: 'var(--green-bright)', borderColor: 'var(--green-bright)' } : {}) }} onClick={(e) => { e.stopPropagation(); copyWithFeedback(txid, 'blk-'+txid); }}>{copiedKey === 'blk-'+txid ? '✓' : 'COPY'}</button>
+                          <button style={{ ...sty.btn, ...sty.btnDefault, padding: '2px 6px', fontSize: 9, color: 'var(--amber)' }} onClick={async (e) => { e.stopPropagation(); setLookupTxid(txid); document.querySelector('[data-lookup]')?.scrollIntoView({ behavior: 'smooth' }); const d = await apiCall('/api/ladder/tx/' + txid, undefined, true); if (d) setLookupResult(d); }}>LOOKUP</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </td></tr>
+              )}
+              </React.Fragment>
             ))}</tbody>
           </table>
         ) : <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>{online ? 'Loading...' : 'Unavailable'}</div>}
@@ -8257,6 +8646,7 @@ ${ladderRows.map(r => `
         <div className="mode-tabs">
           <button className={`mode-tab ${mode === 'build' ? 'active' : ''}`} onClick={() => setMode('build')} title={showTooltips ? 'Construct ladder rungs — drag blocks from palette' : undefined}>BUILD</button>
           <button className={`mode-tab ${mode === 'simulate' ? 'active' : ''}`} onClick={() => setMode('simulate')} title={showTooltips ? 'Test rungs — click rung labels to step through, Alt+click blocks to force' : undefined}>SIMULATE</button>
+          <button className={`mode-tab ${mode === 'convert' ? 'active' : ''}`} onClick={() => setMode('convert')} title={showTooltips ? 'Paste RPC JSON output to convert back to ladder diagram' : undefined}>CONVERT</button>
           <button className={`mode-tab ${mode === 'signet' ? 'active' : ''}`} onClick={() => setMode('signet')} title={showTooltips ? 'Submit transactions to Ghost signet via RPC proxy' : undefined} style={mode === 'signet' ? { color: 'var(--green-bright)', borderBottomColor: 'var(--green-bright)' } : {}}>SIGNET</button>
           <button className={`mode-tab ${mode === 'watch' ? 'active' : ''}`} onClick={() => setMode('watch')} title={showTooltips ? 'Live mode — block height auto-increments' : undefined}>WATCH</button>
         </div>
@@ -8270,9 +8660,13 @@ ${ladderRows.map(r => `
 
       {/* Main */}
       <div className="main-content">
-        {mode === 'signet' ? (
+        {mode === 'convert' ? (
           <div style={{ gridColumn: '1 / -1', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <SignetPanel rungs={rungs} txOutputs={txOutputs} txInputs={txInputs} locktime={locktime} onViewAsLadder={handleViewAsLadder} />
+            <ConvertPanel onViewAsLadder={handleViewAsLadder} />
+          </div>
+        ) : mode === 'signet' ? (
+          <div style={{ gridColumn: '1 / -1', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <SignetPanel rungs={rungs} setRungs={setRungs} txOutputs={txOutputs} txInputs={txInputs} locktime={locktime} onViewAsLadder={handleViewAsLadder} setTxInputs={setTxInputs} setTxOutputs={setTxOutputs} />
           </div>
         ) : <>
         {isSimMode ? (

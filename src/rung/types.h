@@ -382,11 +382,38 @@ struct RungBlock {
     bool inverted{false}; //!< If true, evaluation result is inverted (SATISFIED↔UNSATISFIED)
 };
 
-/** A single rung in a ladder. All blocks must be satisfied (AND logic). */
+/** Compact rung types — efficient encodings for common single-block patterns.
+ *  Triggered by n_blocks == 0 sentinel within a rung.
+ *  See COMPACT_RUNG_PLAN.md for design rationale. */
+enum class CompactRungType : uint8_t {
+    COMPACT_SIG = 0x01,  //!< Single SIG with explicit PUBKEY_COMMIT + SCHEME
+};
+
+/** Returns true if the byte is a known CompactRungType. */
+inline bool IsKnownCompactRungType(uint8_t b)
+{
+    return b == 0x01;
+}
+
+/** Compact rung data — stored in Rung when compact is set.
+ *  COMPACT_SIG: pubkey_commit (32 bytes) + scheme.
+ *  Resolves to an equivalent SIG block at evaluation time. */
+struct CompactRungData {
+    CompactRungType type;
+    std::vector<uint8_t> pubkey_commit;  //!< 32-byte SHA-256(pubkey)
+    RungScheme scheme{RungScheme::SCHNORR};
+};
+
+/** A single rung in a ladder. All blocks must be satisfied (AND logic).
+ *  When compact is set, the rung has no blocks — it encodes a single
+ *  condition compactly (e.g., COMPACT_SIG = SIG with inline PUBKEY_COMMIT). */
 struct Rung {
     std::vector<RungBlock> blocks;
     uint8_t rung_id{0};                //!< Rung identifier within the ladder
     std::vector<uint16_t> relay_refs;    //!< Indices into relay array that must be satisfied
+    std::optional<CompactRungData> compact; //!< Compact rung encoding (n_blocks == 0 on wire)
+
+    bool IsCompact() const { return compact.has_value(); }
 };
 
 /** A relay definition: blocks evaluated for cross-referencing, not tied to an output.

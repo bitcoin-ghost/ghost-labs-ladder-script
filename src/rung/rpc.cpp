@@ -170,9 +170,27 @@ static UniValue LadderWitnessToJSON(const LadderWitness& ladder)
     for (size_t r = 0; r < ladder.rungs.size(); ++r) {
         UniValue rung_obj(UniValue::VOBJ);
         rung_obj.pushKV("rung_index", static_cast<int>(r));
-        rung_obj.pushKV("blocks", BlocksToJSON(ladder.rungs[r].blocks));
-        if (!ladder.rungs[r].relay_refs.empty()) {
-            rung_obj.pushKV("relay_refs", RelayRefsToJSON(ladder.rungs[r].relay_refs));
+        if (ladder.rungs[r].IsCompact()) {
+            const auto& compact = *ladder.rungs[r].compact;
+            rung_obj.pushKV("compact", true);
+            if (compact.type == rung::CompactRungType::COMPACT_SIG) {
+                rung_obj.pushKV("compact_type", "COMPACT_SIG");
+                rung_obj.pushKV("pubkey_commit", HexStr(compact.pubkey_commit));
+                switch (compact.scheme) {
+                case RungScheme::SCHNORR:     rung_obj.pushKV("scheme", "SCHNORR"); break;
+                case RungScheme::ECDSA:       rung_obj.pushKV("scheme", "ECDSA"); break;
+                case RungScheme::FALCON512:   rung_obj.pushKV("scheme", "FALCON512"); break;
+                case RungScheme::FALCON1024:  rung_obj.pushKV("scheme", "FALCON1024"); break;
+                case RungScheme::DILITHIUM3:  rung_obj.pushKV("scheme", "DILITHIUM3"); break;
+                case RungScheme::SPHINCS_SHA: rung_obj.pushKV("scheme", "SPHINCS_SHA"); break;
+                default: rung_obj.pushKV("scheme", "UNKNOWN"); break;
+                }
+            }
+        } else {
+            rung_obj.pushKV("blocks", BlocksToJSON(ladder.rungs[r].blocks));
+            if (!ladder.rungs[r].relay_refs.empty()) {
+                rung_obj.pushKV("relay_refs", RelayRefsToJSON(ladder.rungs[r].relay_refs));
+            }
         }
         rungs_arr.push_back(rung_obj);
     }
@@ -666,6 +684,35 @@ static RungConditions ParseConditionsSpec(const UniValue& rungs_arr,
     for (size_t r = 0; r < rungs_arr.size(); ++r) {
         const UniValue& rung_obj = rungs_arr[r];
         Rung rung;
+
+        // Compact rung: {"compact_type": "COMPACT_SIG", "pubkey_commit": "hex", "scheme": "SCHNORR"}
+        if (rung_obj.exists("compact_type")) {
+            std::string ctype = rung_obj["compact_type"].get_str();
+            if (ctype == "COMPACT_SIG") {
+                CompactRungData compact;
+                compact.type = CompactRungType::COMPACT_SIG;
+                compact.pubkey_commit = ParseHex(rung_obj["pubkey_commit"].get_str());
+                if (compact.pubkey_commit.size() != 32) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        "compact_type COMPACT_SIG requires 32-byte pubkey_commit");
+                }
+                if (rung_obj.exists("scheme")) {
+                    std::string scheme_str = rung_obj["scheme"].get_str();
+                    if (scheme_str == "SCHNORR") compact.scheme = RungScheme::SCHNORR;
+                    else if (scheme_str == "ECDSA") compact.scheme = RungScheme::ECDSA;
+                    else if (scheme_str == "FALCON512") compact.scheme = RungScheme::FALCON512;
+                    else if (scheme_str == "FALCON1024") compact.scheme = RungScheme::FALCON1024;
+                    else if (scheme_str == "DILITHIUM3") compact.scheme = RungScheme::DILITHIUM3;
+                    else if (scheme_str == "SPHINCS_SHA") compact.scheme = RungScheme::SPHINCS_SHA;
+                    else throw JSONRPCError(RPC_INVALID_PARAMETER, "Unknown scheme: " + scheme_str);
+                }
+                rung.compact = std::move(compact);
+            } else {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Unknown compact_type: " + ctype);
+            }
+            conditions.rungs.push_back(std::move(rung));
+            continue;
+        }
 
         const UniValue& blocks_arr = rung_obj["blocks"].get_array();
         for (size_t b = 0; b < blocks_arr.size(); ++b) {
@@ -1549,40 +1596,75 @@ static RPCHelpMan signrungtx()
                             "target rung " + std::to_string(target_rung) +
                             " out of range (conditions have " + std::to_string(conditions.rungs.size()) + " rungs)");
                     }
-                    if (blocks_arr.size() != conditions.rungs[target_rung].blocks.size()) {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER,
-                            "blocks count (" + std::to_string(blocks_arr.size()) +
-                            ") must match conditions rung " + std::to_string(target_rung) +
-                            " block count (" + std::to_string(conditions.rungs[target_rung].blocks.size()) + ")");
-                    }
-                    Rung wit_rung;
-                    for (size_t b = 0; b < blocks_arr.size(); ++b) {
+
+                    const auto& cond_target = conditions.rungs[target_rung];
+                    if (cond_target.IsCompact()) {
+                        // Compact rung: witness must provide exactly 1 SIG block
+                        if (blocks_arr.size() != 1) {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                                "compact SIG rung requires exactly 1 witness block, got " +
+                                std::to_string(blocks_arr.size()));
+                        }
+                        Rung wit_rung;
                         wit_rung.blocks.push_back(
-                            BuildWitnessBlock(blocks_arr[b], mtx, input_idx, txdata, conditions));
+                            BuildWitnessBlock(blocks_arr[0], mtx, input_idx, txdata, conditions));
+                        ladder.rungs.push_back(std::move(wit_rung));
+                    } else {
+                        if (blocks_arr.size() != cond_target.blocks.size()) {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                                "blocks count (" + std::to_string(blocks_arr.size()) +
+                                ") must match conditions rung " + std::to_string(target_rung) +
+                                " block count (" + std::to_string(cond_target.blocks.size()) + ")");
+                        }
+                        Rung wit_rung;
+                        for (size_t b = 0; b < blocks_arr.size(); ++b) {
+                            wit_rung.blocks.push_back(
+                                BuildWitnessBlock(blocks_arr[b], mtx, input_idx, txdata, conditions));
+                        }
+                        ladder.rungs.push_back(std::move(wit_rung));
                     }
-                    ladder.rungs.push_back(std::move(wit_rung));
                 } else {
                     // Legacy: build witness for all rungs (target gets real data, others get dummies)
                     for (size_t r = 0; r < conditions.rungs.size(); ++r) {
                         Rung wit_rung;
 
                         if (r == target_rung) {
-                            if (blocks_arr.size() != conditions.rungs[r].blocks.size()) {
-                                throw JSONRPCError(RPC_INVALID_PARAMETER,
-                                    "blocks count (" + std::to_string(blocks_arr.size()) +
-                                    ") must match conditions rung " + std::to_string(r) +
-                                    " block count (" + std::to_string(conditions.rungs[r].blocks.size()) + ")");
-                            }
-                            for (size_t b = 0; b < blocks_arr.size(); ++b) {
+                            const auto& cond_r = conditions.rungs[r];
+                            if (cond_r.IsCompact()) {
+                                // Compact rung: witness must provide exactly 1 SIG block
+                                if (blocks_arr.size() != 1) {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                                        "compact SIG rung requires exactly 1 witness block, got " +
+                                        std::to_string(blocks_arr.size()));
+                                }
                                 wit_rung.blocks.push_back(
-                                    BuildWitnessBlock(blocks_arr[b], mtx, input_idx, txdata, conditions));
+                                    BuildWitnessBlock(blocks_arr[0], mtx, input_idx, txdata, conditions));
+                            } else {
+                                if (blocks_arr.size() != cond_r.blocks.size()) {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                                        "blocks count (" + std::to_string(blocks_arr.size()) +
+                                        ") must match conditions rung " + std::to_string(r) +
+                                        " block count (" + std::to_string(cond_r.blocks.size()) + ")");
+                                }
+                                for (size_t b = 0; b < blocks_arr.size(); ++b) {
+                                    wit_rung.blocks.push_back(
+                                        BuildWitnessBlock(blocks_arr[b], mtx, input_idx, txdata, conditions));
+                                }
                             }
                         } else {
-                            // Dummy rung — correct types, empty fields
-                            for (const auto& cond_block : conditions.rungs[r].blocks) {
+                            const auto& cond_r = conditions.rungs[r];
+                            if (cond_r.IsCompact()) {
+                                // Compact dummy: 1 SIG block with empty fields
                                 RungBlock dummy;
-                                dummy.type = cond_block.type;
+                                dummy.type = RungBlockType::SIG;
                                 wit_rung.blocks.push_back(std::move(dummy));
+                            } else {
+                                // Normal dummy: correct types, empty fields
+                                for (const auto& cond_block : cond_r.blocks) {
+                                    RungBlock dummy;
+                                    dummy.type = cond_block.type;
+                                    wit_rung.blocks.push_back(std::move(dummy));
+                                }
                             }
                         }
                         ladder.rungs.push_back(std::move(wit_rung));

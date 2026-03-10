@@ -2405,6 +2405,21 @@ EvalResult EvalRung(const Rung& rung,
                     const RungEvalContext& ctx,
                     const std::vector<EvalResult>* relay_results)
 {
+    // Compact rung: resolve to equivalent SIG block and evaluate
+    if (rung.IsCompact()) {
+        if (rung.compact->type == CompactRungType::COMPACT_SIG) {
+            // Build a SIG block from compact data
+            RungBlock resolved;
+            resolved.type = RungBlockType::SIG;
+            resolved.inverted = false;
+            resolved.fields.push_back({RungDataType::PUBKEY_COMMIT, rung.compact->pubkey_commit});
+            resolved.fields.push_back({RungDataType::SCHEME,
+                {static_cast<uint8_t>(rung.compact->scheme)}});
+            return EvalBlock(resolved, checker, sigversion, execdata, ctx);
+        }
+        return EvalResult::ERROR; // unknown compact type
+    }
+
     if (rung.blocks.empty()) {
         return EvalResult::ERROR;
     }
@@ -2479,6 +2494,46 @@ static bool MergeConditionsAndWitness(const RungConditions& conditions,
     for (size_t r = 0; r < conditions.rungs.size(); ++r) {
         const auto& cond_rung = conditions.rungs[r];
         const auto& wit_rung = witness.rungs[r];
+
+        // Compact conditions rung: resolve to SIG block with merged fields
+        if (cond_rung.IsCompact()) {
+            if (cond_rung.compact->type == CompactRungType::COMPACT_SIG) {
+                // Witness must provide exactly 1 SIG block with PUBKEY + SIGNATURE
+                if (wit_rung.blocks.size() != 1) {
+                    error = "compact SIG rung " + std::to_string(r) +
+                            " witness must have exactly 1 block, got " +
+                            std::to_string(wit_rung.blocks.size());
+                    return false;
+                }
+                if (wit_rung.blocks[0].type != RungBlockType::SIG) {
+                    error = "compact SIG rung " + std::to_string(r) +
+                            " witness block must be SIG type";
+                    return false;
+                }
+
+                // Build merged SIG block: conditions fields (from compact) + witness fields
+                RungBlock merged_block;
+                merged_block.type = RungBlockType::SIG;
+                merged_block.inverted = false;
+                // Conditions fields: PUBKEY_COMMIT + SCHEME
+                merged_block.fields.push_back({RungDataType::PUBKEY_COMMIT,
+                    cond_rung.compact->pubkey_commit});
+                merged_block.fields.push_back({RungDataType::SCHEME,
+                    {static_cast<uint8_t>(cond_rung.compact->scheme)}});
+                // Witness fields: PUBKEY + SIGNATURE
+                merged_block.fields.insert(merged_block.fields.end(),
+                    wit_rung.blocks[0].fields.begin(),
+                    wit_rung.blocks[0].fields.end());
+
+                merged.rungs[r].blocks.push_back(std::move(merged_block));
+                merged.rungs[r].rung_id = cond_rung.rung_id;
+                // Compact rungs have no relay_refs
+            } else {
+                error = "unknown compact type in rung " + std::to_string(r);
+                return false;
+            }
+            continue;
+        }
 
         if (cond_rung.blocks.size() != wit_rung.blocks.size()) {
             error = "block count mismatch in rung " + std::to_string(r);

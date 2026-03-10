@@ -21,7 +21,7 @@ This guide documents every feature of the engine. For the block type reference, 
 7. [Navigation](#7-navigation)
 8. [Import / Export](#8-import--export)
 9. [Examples Library](#9-examples-library)
-10. [Signet Integration](#10-signet-integration)
+10. [Signet Integration](#10-signet-integration) — Connection, Wallet, Transaction Pipeline, Decode & Validate, Transaction Lookup, Session History, Copy Feedback
 11. [Status Bar](#11-status-bar)
 12. [Visual Reference](#12-visual-reference)
 
@@ -69,13 +69,17 @@ displayed when the signet connection is active, along with the live height.
 
 Submit transactions to Ghost signet via the RPC proxy. Provides:
 
-- **Wallet integration:** balance display, address generation, and a faucet button
-  (Request 0.001 tBTC).
-- **UTXO management:** load and select spendable outputs.
-- **Transaction workflow:** CREATERUNGTX → SIGNRUNGTX → BROADCAST.
-- **Inspection tools:** DECODE LADDER (parse ladder witness hex), DECODE RAW TX (parse
-  any raw transaction hex).
-- **VALIDATE:** structural validation against signet consensus rules.
+- **Live chain info:** block height, mempool transaction count, and wallet balance
+  displayed in the header, updated after broadcasts and mining.
+- **Wallet integration:** balance display, address generation with BIP32 key
+  derivation, faucet funding, and UTXO management.
+- **Transaction pipeline:** four-step flow — FUND FROM WALLET → SIGN → BROADCAST →
+  MINE BLOCK — with automatic change output creation and visual confirmation.
+- **Decode & validate:** DECODE LADDER (parse ladder wire format with automatic
+  fallback to raw transaction decoding), DECODE RAW TX, and structural VALIDATE.
+- **Transaction lookup:** fetch any transaction by txid with detailed output display.
+- **Session history:** broadcast log with confirmation tracking and per-entry actions.
+- **Copy feedback:** all COPY buttons show green "✓ COPIED" confirmation.
 - Connection status shows **GHOST SIGNET ONLINE** (green) or **SIGNET OFFLINE**.
 
 ---
@@ -358,34 +362,127 @@ entirely.
 
 ### 10.1 Connection
 
-Switch to **SIGNET** mode. The engine connects to Ghost signet via the RPC proxy.
-Connection status is displayed: **GHOST SIGNET ONLINE** (green) when connected, or
-**SIGNET OFFLINE** when the proxy is unreachable.
+Switch to **SIGNET** mode. The engine connects to Ghost signet via the RPC proxy
+(default `localhost:8801`). Connection status is displayed at the top of the page:
+**GHOST SIGNET ONLINE** (green) when connected, or **SIGNET OFFLINE** when the proxy
+is unreachable.
+
+When connected, the header displays live chain information: current block height,
+mempool transaction count, and wallet balance.
 
 ### 10.2 Wallet
 
-The signet wallet provides:
+The signet wallet section provides:
 
-- **Balance display** showing the current tBTC balance.
-- **Address generation** for receiving funds.
-- **Faucet** button to request 0.001 tBTC for testing.
-- **LOAD UTXOs** to fetch available spendable outputs from the wallet.
+- **Balance display** showing the current tBTC balance, updated after broadcasts and
+  mining.
+- **Address generation** — click **NEW ADDRESS** to generate a fresh bech32 address.
+  A COPY button copies it to the clipboard with green "✓ COPIED" feedback.
+- **Faucet** — click **REQUEST 0.001 tBTC** to fund your wallet from the faucet. The
+  wallet balance updates automatically after funding.
+- **LOAD UTXOs** — fetches available spendable outputs from the wallet. UTXOs are
+  displayed in a table showing txid:vout, amount, and confirmations. Each row has a
+  COPY button for the outpoint reference.
 
-### 10.3 Transaction Workflow
+### 10.3 Transaction Pipeline
 
-1. Build your ladder in **BUILD** mode.
-2. Switch to **SIGNET** mode.
-3. Click **CREATERUNGTX** to construct the transaction from the current ladder.
-4. Click **SIGNRUNGTX** to sign with available keys.
-5. Click **BROADCAST** to submit the signed transaction to the signet.
+The pipeline is a four-step flow: **CREATE → SIGN → BROADCAST → CONFIRM**, displayed
+as a horizontal button row with arrow indicators between each step.
 
-### 10.4 Decoding and Validation
+#### Step 1: CREATE
+
+Click **FUND FROM WALLET** to automatically:
+
+1. Generate a fresh keypair (pubkey + private key) via BIP32 derivation from the
+   wallet's descriptor.
+2. Select wallet UTXOs to cover the transaction's output amounts plus fees.
+3. Add a **change output** with a SIG condition rung if the selected UTXOs provide
+   more than 1000 sats beyond the required amount plus fee. The change output is
+   returned to the wallet.
+4. Construct the v3 `RUNG_TX` via `createrungtx` RPC.
+
+The resulting unsigned transaction hex is displayed below the buttons with a COPY
+button.
+
+A collapsible **CREATERUNGTX JSON** section shows the full wire-format JSON that was
+sent to the RPC, with a COPY JSON button.
+
+#### Step 2: SIGN
+
+Click **SIGN** to sign all inputs using the wallet keypair. For bootstrap spends
+(spending standard wallet UTXOs), the engine uses simple `{input, privkey}` signer
+format. The signed transaction hex is displayed with a COPY button.
+
+#### Step 3: BROADCAST
+
+Click **BROADCAST** to submit the signed transaction to the network via
+`sendrawtransaction`. On success, the txid is displayed with a COPY TXID button, and
+the transaction is added to the session history. The mempool transaction count in the
+header updates immediately.
+
+#### Step 4: CONFIRM
+
+Click **MINE BLOCK** to mine a block (regtest/signet with mining authority). The
+button changes to **✓ CONFIRMED** on success. The wallet balance, mempool info, and
+recent blocks all refresh automatically. The session history entry for the transaction
+updates its confirmation count.
+
+### 10.4 Decode & Validate
+
+The decode and validate section provides tools for inspecting raw hex data. All result
+areas include COPY buttons with green feedback.
 
 | Control | Description |
 |---------|-------------|
-| **DECODE LADDER** | Parse ladder witness hex back into a human-readable ladder structure. |
-| **DECODE RAW TX** | Parse any raw transaction hex for inspection. |
-| **VALIDATE** | Check structural validity of the current ladder against signet consensus rules. Reports any violations. |
+| **DECODE LADDER** | Parse raw ladder conditions or witness hex (extracted from a scriptPubKey or witness stack item) into a human-readable structure. If the input is not valid ladder hex, automatically falls back to decoding as a raw transaction. |
+| **DECODE RAW TX** | Parse a full raw transaction hex via `decoderawtransaction` RPC. Shows version, inputs, outputs, witness data, and locktime. |
+| **USE CURRENT TX** | Populates the input field with the current transaction hex (signed or unsigned) from the pipeline above. Available on both decode and validate sections. |
+| **VALIDATE** | Structural validation of ladder conditions or witness hex against consensus rules. Reports VALID or INVALID with detailed error information. |
+| **VIEW AS LADDER** | When decode results contain valid ladder rungs, this button loads them back into the builder for visual inspection. |
+
+**Note:** DECODE LADDER expects raw ladder-specific bytes — not a full transaction.
+A full transaction starts with version/input bytes that are not valid ladder wire
+format. The automatic fallback handles this transparently: if `decoderung` fails,
+the engine retries with `decoderawtransaction`.
+
+### 10.5 Transaction Lookup
+
+Enter a txid (64 hex characters) and click **LOOKUP** to fetch transaction details
+from the node via `getrawtransaction`. A **USE CURRENT TX** button populates the txid
+field from the most recent broadcast.
+
+The result display shows:
+
+- **Confirmation count** (green if confirmed, amber if unconfirmed).
+- **Size** and **vsize** in bytes/vbytes.
+- **Version** number.
+- **Inputs** list with truncated txid:vout references.
+- **Outputs** list with type and amount for each output.
+- **VIEW AS LADDER** button if the transaction contains ladder conditions.
+- **RAW JSON** collapsible section with the full decoded transaction.
+- **COPY** button for the complete JSON output.
+
+### 10.6 Session History
+
+All broadcast transactions are recorded in a session history list below the pipeline.
+Each entry shows:
+
+- Transaction type and rung count.
+- Timestamp.
+- Confirmation count (updated when blocks are mined).
+- Expandable detail view with full txid.
+- **COPY TXID** and **VIEW TX** buttons per entry.
+
+The session history persists for the duration of the browser session. Mining a block
+increments the confirmation count on the most recent broadcast entry rather than
+adding a duplicate.
+
+### 10.7 Copy Feedback
+
+All COPY buttons across the signet interface provide visual feedback: the button text
+changes to **✓ COPIED** and the button border turns green for 1.5 seconds after
+clicking. This applies to address, UTXO, JSON, transaction hex, txid, decode result,
+validate result, and lookup result copy actions.
 
 ---
 

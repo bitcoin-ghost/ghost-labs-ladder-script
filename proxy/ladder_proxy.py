@@ -16,12 +16,16 @@ Endpoints:
   GET  /api/ladder/status      - proxy health + chain info
 """
 
+import hashlib
+import hmac as hmac_mod
 import json
 import os
+import struct
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
 
+import coincurve
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,14 +33,16 @@ from fastapi.responses import JSONResponse
 
 # --- Config ---
 
-RPC_URL = os.environ.get("RPC_URL", "http://127.0.0.1:38332")
+RPC_BASE = os.environ.get("RPC_URL", "http://127.0.0.1:18443")
+RPC_URL = RPC_BASE
+RPC_WALLET_URL = RPC_BASE + "/wallet/" + os.environ.get("RPC_WALLET", "ladder")
 RPC_USER = os.environ.get("RPC_USER", "ghostrpc")
 RPC_PASS = os.environ.get("RPC_PASS", "ghost_signet_rpc_2024")
 FAUCET_AMOUNT = float(os.environ.get("FAUCET_AMOUNT", "0.001"))
 FAUCET_COOLDOWN = int(os.environ.get("FAUCET_COOLDOWN", "300"))  # seconds per IP
 RATE_LIMIT_RPM = int(os.environ.get("RATE_LIMIT_RPM", "30"))  # requests per minute
 ALLOWED_ORIGINS = os.environ.get(
-    "ALLOWED_ORIGINS", "https://bitcoinghost.org,https://www.bitcoinghost.org"
+    "ALLOWED_ORIGINS", "https://bitcoinghost.org,https://www.bitcoinghost.org,http://localhost:8080,http://127.0.0.1:8080"
 ).split(",")
 LISTEN_HOST = os.environ.get("LISTEN_HOST", "127.0.0.1")
 LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "8801"))
@@ -78,6 +84,111 @@ async def lifespan(app: FastAPI):
     await _http_client.aclose()
 
 
+WALLET_METHODS = {
+    "getbalance", "getbalances", "getwalletinfo", "getnewaddress",
+    "listunspent", "sendtoaddress", "signrawtransactionwithwallet",
+    "signrungtx", "createrungtx", "validateaddress", "generatetoaddress",
+    "getaddressinfo", "listdescriptors",
+}
+
+
+# --- BIP32 key derivation (for descriptor wallets that lack dumpprivkey) ---
+
+_B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+_SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+_master_privkey: bytes | None = None
+_master_chaincode: bytes | None = None
+
+
+def _b58decode(s: str) -> bytes:
+    n = 0
+    for c in s:
+        n = n * 58 + _B58_ALPHABET.index(c)
+    result = []
+    while n > 0:
+        n, r = divmod(n, 256)
+        result.insert(0, r)
+    pad = len(s) - len(s.lstrip('1'))
+    return bytes(pad) + bytes(result)
+
+
+def _b58decode_check(s: str) -> bytes:
+    data = _b58decode(s)
+    payload, checksum = data[:-4], data[-4:]
+    expected = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
+    if checksum != expected:
+        raise ValueError("Bad base58 checksum")
+    return payload
+
+
+def _b58encode(data: bytes) -> str:
+    n = int.from_bytes(data, 'big')
+    result = ''
+    while n > 0:
+        n, r = divmod(n, 58)
+        result = _B58_ALPHABET[r] + result
+    for b in data:
+        if b == 0:
+            result = '1' + result
+        else:
+            break
+    return result
+
+
+def _parse_xprv(xprv_str: str) -> tuple[bytes, bytes]:
+    data = _b58decode_check(xprv_str)
+    chain_code = data[13:45]
+    privkey = data[46:78]
+    return privkey, chain_code
+
+
+def _derive_child(privkey: bytes, chain_code: bytes, index: int, hardened: bool = False) -> tuple[bytes, bytes]:
+    if hardened:
+        index += 0x80000000
+        data = b'\x00' + privkey + struct.pack('>I', index)
+    else:
+        pubkey = coincurve.PublicKey.from_secret(privkey).format(compressed=True)
+        data = pubkey + struct.pack('>I', index)
+    I = hmac_mod.new(chain_code, data, hashlib.sha512).digest()
+    IL, IR = I[:32], I[32:]
+    child_int = (int.from_bytes(IL, 'big') + int.from_bytes(privkey, 'big')) % _SECP256K1_N
+    return child_int.to_bytes(32, 'big'), IR
+
+
+def _derive_path(privkey: bytes, chain_code: bytes, path: str) -> bytes:
+    """Derive a child private key from a BIP32 path like m/84'/1'/0'/0/22."""
+    parts = path.strip().lstrip('m').lstrip('/').split('/')
+    for part in parts:
+        hardened = part.endswith("'") or part.endswith("h")
+        idx = int(part.rstrip("'h"))
+        privkey, chain_code = _derive_child(privkey, chain_code, idx, hardened)
+    return privkey
+
+
+def _privkey_to_wif(privkey: bytes, testnet: bool = True) -> str:
+    prefix = b'\xef' if testnet else b'\x80'
+    payload = prefix + privkey + b'\x01'  # compressed
+    checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
+    return _b58encode(payload + checksum)
+
+
+async def _ensure_master_key():
+    """Fetch and cache the master xprv from the wallet's descriptors."""
+    global _master_privkey, _master_chaincode
+    if _master_privkey is not None:
+        return
+    descriptors = await rpc_call("listdescriptors", [True])
+    # Find the wpkh descriptor (bech32 = m/84'/1'/0')
+    for desc in descriptors.get("descriptors", []):
+        desc_str = desc.get("desc", "")
+        if desc_str.startswith("wpkh(tprv") and not desc.get("internal", False):
+            # Extract xprv from wpkh(tprv.../*)
+            xprv = desc_str.split("wpkh(")[1].split("/")[0]
+            _master_privkey, _master_chaincode = _parse_xprv(xprv)
+            return
+    raise HTTPException(500, "Could not find wpkh descriptor with private key.")
+
+
 async def rpc_call(method: str, params=None):
     if params is None:
         params = []
@@ -87,9 +198,10 @@ async def rpc_call(method: str, params=None):
         "method": method,
         "params": params,
     }
+    url = RPC_WALLET_URL if method in WALLET_METHODS else RPC_URL
     try:
         resp = await _http_client.post(
-            RPC_URL,
+            url,
             json=payload,
             auth=(RPC_USER, RPC_PASS),
             headers={"Content-Type": "application/json"},
@@ -101,7 +213,7 @@ async def rpc_call(method: str, params=None):
 
     if resp.status_code == 401:
         raise HTTPException(503, "RPC authentication failed.")
-    if resp.status_code != 200:
+    if resp.status_code not in (200, 404, 500):
         raise HTTPException(502, f"RPC error: HTTP {resp.status_code}")
 
     data = resp.json()
@@ -187,7 +299,19 @@ async def create_rungtx(request: Request):
     if not isinstance(data, dict):
         raise HTTPException(400, "Request must be a JSON object.")
 
-    result = await rpc_call("createrungtx", [json.dumps(data)])
+    inputs = data.get("inputs", [])
+    outputs = data.get("outputs", [])
+    locktime = data.get("locktime", 0)
+    relays = data.get("relays")
+
+    params = [inputs, outputs, locktime]
+    if relays:
+        params.append(relays)
+
+    result = await rpc_call("createrungtx", params)
+    # RPC returns {"hex": "..."} — unwrap if needed
+    if isinstance(result, dict) and "hex" in result:
+        return {"hex": result["hex"]}
     return {"hex": result}
 
 
@@ -207,7 +331,14 @@ async def sign_rungtx(request: Request):
     if not tx_hex:
         raise HTTPException(400, "Missing 'hex' field.")
 
-    result = await rpc_call("signrungtx", [tx_hex])
+    signers = data.get("signers")
+    spent_outputs = data.get("spent_outputs")
+
+    if not signers or not spent_outputs:
+        raise HTTPException(400, "Missing 'signers' and/or 'spent_outputs'. "
+                            "Use FUND FROM WALLET to set up signing data.")
+
+    result = await rpc_call("signrungtx", [tx_hex, signers, spent_outputs])
     return result
 
 
@@ -315,10 +446,13 @@ async def faucet(request: Request):
 @app.get("/api/ladder/wallet/balance")
 async def wallet_balance():
     """Get wallet balance info."""
+    balance = await rpc_call("getbalance")
+    balances = await rpc_call("getbalances")
+    unconfirmed = balances.get("mine", {}).get("untrusted_pending", 0) if balances else 0
     info = await rpc_call("getwalletinfo")
     return {
-        "balance": info.get("balance"),
-        "unconfirmed_balance": info.get("unconfirmed_balance"),
+        "balance": balance,
+        "unconfirmed_balance": unconfirmed,
         "txcount": info.get("txcount"),
     }
 
@@ -328,6 +462,25 @@ async def wallet_address():
     """Generate a new bech32 receiving address."""
     address = await rpc_call("getnewaddress", ["", "bech32"])
     return {"address": address}
+
+
+@app.get("/api/ladder/wallet/keypair")
+async def wallet_keypair():
+    """Generate a new address and return its pubkey + privkey (descriptor wallet)."""
+    await _ensure_master_key()
+    address = await rpc_call("getnewaddress", ["", "bech32"])
+    info = await rpc_call("getaddressinfo", [address])
+    pubkey = info.get("pubkey", "")
+    hdkeypath = info.get("hdkeypath", "")
+    if not hdkeypath:
+        raise HTTPException(500, "Address has no HD key path.")
+    child_privkey = _derive_path(_master_privkey, _master_chaincode, hdkeypath)
+    # Verify derivation matches
+    derived_pub = coincurve.PublicKey.from_secret(child_privkey).format(compressed=True).hex()
+    if derived_pub != pubkey:
+        raise HTTPException(500, f"Key derivation mismatch: got {derived_pub}, expected {pubkey}")
+    wif = _privkey_to_wif(child_privkey)
+    return {"address": address, "pubkey": pubkey, "privkey": wif}
 
 
 @app.get("/api/ladder/wallet/utxos")
@@ -384,8 +537,28 @@ async def blocks_recent():
             "time": block.get("time"),
             "tx_count": len(block.get("tx", [])),
             "size": block.get("size"),
+            "txids": block.get("tx", []),
         })
     return blocks
+
+
+@app.post("/api/ladder/mine")
+async def mine_blocks(request: Request):
+    """Mine blocks on regtest (for local testing only)."""
+    body = await request.body()
+    try:
+        data = json.loads(body) if body else {}
+    except json.JSONDecodeError:
+        data = {}
+
+    n_blocks = min(int(data.get("blocks", 1)), 10)  # cap at 10
+    address = data.get("address", "")
+
+    if not address:
+        address = await rpc_call("getnewaddress", ["", "bech32"])
+
+    result = await rpc_call("generatetoaddress", [n_blocks, address])
+    return {"blocks_mined": len(result), "hashes": result}
 
 
 # --- Entry point ---

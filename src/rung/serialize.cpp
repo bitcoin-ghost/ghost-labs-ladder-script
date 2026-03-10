@@ -406,8 +406,35 @@ bool DeserializeLadderWitness(const std::vector<uint8_t>& witness_bytes,
         for (uint64_t r = 0; r < n_rungs; ++r) {
             uint64_t n_blocks = ReadCompactSize(ss);
             if (n_blocks == 0) {
-                error = "rung " + std::to_string(r) + " has zero blocks";
-                return false;
+                // Compact rung mode: n_blocks == 0 signals a compact encoding
+                uint8_t compact_type_byte;
+                ss >> compact_type_byte;
+
+                if (!IsKnownCompactRungType(compact_type_byte)) {
+                    error = "rung " + std::to_string(r) + " unknown compact type: 0x" +
+                            HexStr(std::span<const uint8_t>{&compact_type_byte, 1});
+                    return false;
+                }
+
+                CompactRungData compact;
+                compact.type = static_cast<CompactRungType>(compact_type_byte);
+
+                if (compact.type == CompactRungType::COMPACT_SIG) {
+                    // Read 32-byte PUBKEY_COMMIT
+                    compact.pubkey_commit.resize(32);
+                    ss.read(MakeWritableByteSpan(compact.pubkey_commit));
+                    // Read scheme byte
+                    uint8_t scheme_byte;
+                    ss >> scheme_byte;
+                    if (!IsKnownScheme(scheme_byte)) {
+                        error = "rung " + std::to_string(r) + " compact SIG unknown scheme";
+                        return false;
+                    }
+                    compact.scheme = static_cast<RungScheme>(scheme_byte);
+                }
+
+                ladder_out.rungs[r].compact = std::move(compact);
+                continue; // next rung — no blocks to read
             }
             if (n_blocks > MAX_BLOCKS_PER_RUNG) {
                 error = "rung " + std::to_string(r) + " has too many blocks: " + std::to_string(n_blocks);
@@ -596,6 +623,15 @@ std::vector<uint8_t> SerializeLadderWitness(const LadderWitness& ladder,
 
     WriteCompactSize(ss, ladder.rungs.size());
     for (const auto& rung : ladder.rungs) {
+        if (rung.IsCompact()) {
+            WriteCompactSize(ss, 0); // sentinel: n_blocks == 0
+            ss << static_cast<uint8_t>(rung.compact->type);
+            if (rung.compact->type == CompactRungType::COMPACT_SIG) {
+                ss.write(MakeByteSpan(rung.compact->pubkey_commit));
+                ss << static_cast<uint8_t>(rung.compact->scheme);
+            }
+            continue;
+        }
         WriteCompactSize(ss, rung.blocks.size());
         for (const auto& block : rung.blocks) {
             SerializeBlock(ss, block, ctx_val);
@@ -663,6 +699,23 @@ std::vector<uint8_t> SerializeLadderWitness(const LadderWitness& ladder,
 std::vector<uint8_t> SerializeRungBlocks(const Rung& rung, SerializationContext ctx)
 {
     DataStream ss{};
+
+    if (rung.IsCompact()) {
+        // Compact rung: sentinel + type + data
+        WriteCompactSize(ss, 0); // n_blocks == 0 sentinel
+        ss << static_cast<uint8_t>(rung.compact->type);
+        if (rung.compact->type == CompactRungType::COMPACT_SIG) {
+            ss.write(MakeByteSpan(rung.compact->pubkey_commit));
+            ss << static_cast<uint8_t>(rung.compact->scheme);
+        }
+        // Compact rungs have no relay_refs
+        WriteCompactSize(ss, 0);
+
+        std::vector<uint8_t> result(ss.size());
+        ss.read(MakeWritableByteSpan(result));
+        return result;
+    }
+
     uint8_t ctx_val = static_cast<uint8_t>(ctx);
 
     WriteCompactSize(ss, rung.blocks.size());
