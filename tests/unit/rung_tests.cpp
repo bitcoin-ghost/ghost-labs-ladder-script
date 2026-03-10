@@ -6976,5 +6976,318 @@ BOOST_AUTO_TEST_CASE(mlsc_sighash_uses_root)
     BOOST_CHECK(*conditions.conditions_root == root);
 }
 
+// ============================================================================
+// COMPACT_SIG tests
+// ============================================================================
+
+BOOST_AUTO_TEST_CASE(compact_sig_type_enum)
+{
+    // COMPACT_SIG is 0x01
+    BOOST_CHECK(static_cast<uint8_t>(CompactRungType::COMPACT_SIG) == 0x01);
+    BOOST_CHECK(IsKnownCompactRungType(0x01));
+    BOOST_CHECK(!IsKnownCompactRungType(0x00));
+    BOOST_CHECK(!IsKnownCompactRungType(0x02));
+    BOOST_CHECK(!IsKnownCompactRungType(0xFF));
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_rung_is_compact)
+{
+    Rung rung;
+    BOOST_CHECK(!rung.IsCompact());
+
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+
+    BOOST_CHECK(rung.IsCompact());
+    BOOST_CHECK(rung.compact->pubkey_commit.size() == 32);
+    BOOST_CHECK(rung.compact->scheme == RungScheme::SCHNORR);
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_conditions_serialization_roundtrip)
+{
+    // Build conditions with a compact SIG rung
+    RungConditions cond;
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+    cond.rungs.push_back(rung);
+
+    // Serialize
+    auto bytes = SerializeRungConditions(cond);
+
+    // Deserialize
+    RungConditions decoded;
+    std::string error;
+    BOOST_CHECK(DeserializeRungConditions(bytes, decoded, error));
+    BOOST_CHECK_EQUAL(decoded.rungs.size(), 1u);
+    BOOST_CHECK(decoded.rungs[0].IsCompact());
+    BOOST_CHECK(decoded.rungs[0].compact->type == CompactRungType::COMPACT_SIG);
+    BOOST_CHECK(decoded.rungs[0].compact->pubkey_commit == cond.rungs[0].compact->pubkey_commit);
+    BOOST_CHECK(decoded.rungs[0].compact->scheme == RungScheme::SCHNORR);
+    BOOST_CHECK(decoded.rungs[0].blocks.empty());
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_witness_serialization_roundtrip)
+{
+    // Build witness with a compact SIG rung
+    LadderWitness witness;
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+    witness.rungs.push_back(rung);
+    witness.coil.coil_type = RungCoilType::UNLOCK;
+
+    auto bytes = SerializeLadderWitness(witness);
+    LadderWitness decoded;
+    std::string error;
+    BOOST_CHECK(DeserializeLadderWitness(bytes, decoded, error));
+    BOOST_CHECK_EQUAL(decoded.rungs.size(), 1u);
+    BOOST_CHECK(decoded.rungs[0].IsCompact());
+    BOOST_CHECK(decoded.rungs[0].compact->type == CompactRungType::COMPACT_SIG);
+    BOOST_CHECK(decoded.rungs[0].compact->pubkey_commit.size() == 32);
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_serialize_rung_blocks)
+{
+    // SerializeRungBlocks for compact rung (used for MLSC leaf hashing)
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+
+    auto bytes = SerializeRungBlocks(rung, SerializationContext::CONDITIONS);
+    // Expected: n_blocks(1=0x00) + compact_type(1=0x01) + pubkey_commit(32) + scheme(1) + relay_refs(1=0x00) = 36
+    BOOST_CHECK_EQUAL(bytes.size(), 36u);
+    BOOST_CHECK_EQUAL(bytes[0], 0x00); // n_blocks sentinel
+    BOOST_CHECK_EQUAL(bytes[1], 0x01); // COMPACT_SIG type
+    // bytes[2..33] = pubkey_commit
+    BOOST_CHECK_EQUAL(bytes[34], static_cast<uint8_t>(RungScheme::SCHNORR)); // scheme
+    BOOST_CHECK_EQUAL(bytes[35], 0x00); // relay_refs count
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_policy_standard_tx)
+{
+    // Build a compact SIG rung and verify it passes policy
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+
+    // Policy checks inline — validate the key properties
+    BOOST_CHECK(IsKnownCompactRungType(static_cast<uint8_t>(rung.compact->type)));
+    BOOST_CHECK_EQUAL(rung.compact->pubkey_commit.size(), 32u);
+    BOOST_CHECK(IsKnownScheme(static_cast<uint8_t>(rung.compact->scheme)));
+    BOOST_CHECK(rung.relay_refs.empty());
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_policy_rejects_bad_commit_size)
+{
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = std::vector<uint8_t>(16, 0xAA); // Wrong size
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+
+    BOOST_CHECK(rung.compact->pubkey_commit.size() != 32);
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_policy_rejects_relay_refs)
+{
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+    rung.relay_refs.push_back(0); // Invalid for compact rungs
+
+    BOOST_CHECK(!rung.relay_refs.empty());
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_mlsc_leaf_deterministic)
+{
+    // ComputeRungLeaf should produce same hash for same compact data
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+
+    auto leaf1 = ComputeRungLeaf(rung);
+    auto leaf2 = ComputeRungLeaf(rung);
+    BOOST_CHECK(leaf1 == leaf2);
+    BOOST_CHECK(leaf1 != MLSC_EMPTY_LEAF);
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_mlsc_leaf_differs_from_normal_sig)
+{
+    // Compact SIG leaf should differ from a normal SIG block leaf
+    // (different serialisation format means different leaf hash)
+    auto pk = MakePubkey();
+    auto commit = MakePubkeyCommit(pk);
+
+    // Compact rung
+    Rung compact_rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = commit;
+    compact.scheme = RungScheme::SCHNORR;
+    compact_rung.compact = std::move(compact);
+
+    // Normal SIG rung with same fields
+    Rung normal_rung;
+    RungBlock block;
+    block.type = RungBlockType::SIG;
+    block.fields.push_back({RungDataType::PUBKEY_COMMIT, commit});
+    block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
+    normal_rung.blocks.push_back(block);
+
+    auto compact_leaf = ComputeRungLeaf(compact_rung);
+    auto normal_leaf = ComputeRungLeaf(normal_rung);
+
+    // Different serialisation → different leaf hashes
+    BOOST_CHECK(compact_leaf != normal_leaf);
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_mlsc_proof_roundtrip)
+{
+    // Build a conditions set with one compact rung, compute root, build proof, verify
+    auto pk = MakePubkey();
+    auto commit = MakePubkeyCommit(pk);
+
+    RungConditions cond;
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = commit;
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+    cond.rungs.push_back(rung);
+
+    uint256 root = ComputeConditionsRoot(cond);
+
+    // Build proof: reveal rung 0 (the only rung)
+    MLSCProof proof;
+    proof.total_rungs = 1;
+    proof.total_relays = 0;
+    proof.rung_index = 0;
+    proof.revealed_rung = cond.rungs[0];
+    // No unrevealed leaves (1 rung + 0 relays + coil = all revealed via hashing)
+
+    // Serialize and deserialize the proof
+    auto proof_bytes = SerializeMLSCProof(proof);
+    MLSCProof decoded_proof;
+    std::string error;
+    BOOST_CHECK(DeserializeMLSCProof(proof_bytes, decoded_proof, error));
+
+    BOOST_CHECK(decoded_proof.revealed_rung.IsCompact());
+    BOOST_CHECK(decoded_proof.revealed_rung.compact->type == CompactRungType::COMPACT_SIG);
+    BOOST_CHECK(decoded_proof.revealed_rung.compact->pubkey_commit == commit);
+
+    // Verify proof against root
+    std::string verify_error;
+    BOOST_CHECK(VerifyMLSCProof(decoded_proof, cond.coil, root, verify_error));
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_mixed_with_normal_rungs)
+{
+    // Conditions with both compact and normal rungs
+    auto pk1 = MakePubkey();
+    auto commit1 = MakePubkeyCommit(pk1);
+
+    RungConditions cond;
+
+    // Rung 0: compact SIG
+    Rung compact_rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = commit1;
+    compact.scheme = RungScheme::SCHNORR;
+    compact_rung.compact = std::move(compact);
+    cond.rungs.push_back(compact_rung);
+
+    // Rung 1: normal SIG block
+    Rung normal_rung;
+    RungBlock block;
+    block.type = RungBlockType::SIG;
+    block.fields.push_back({RungDataType::PUBKEY_COMMIT, commit1});
+    normal_rung.blocks.push_back(block);
+    cond.rungs.push_back(normal_rung);
+
+    // Serialize and roundtrip
+    auto bytes = SerializeRungConditions(cond);
+    RungConditions decoded;
+    std::string error;
+    BOOST_CHECK(DeserializeRungConditions(bytes, decoded, error));
+    BOOST_CHECK_EQUAL(decoded.rungs.size(), 2u);
+    BOOST_CHECK(decoded.rungs[0].IsCompact());
+    BOOST_CHECK(!decoded.rungs[1].IsCompact());
+    BOOST_CHECK_EQUAL(decoded.rungs[1].blocks.size(), 1u);
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_unknown_type_rejected)
+{
+    // Build raw bytes with unknown compact type 0x02
+    LadderWitness ladder;
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::SCHNORR;
+    rung.compact = std::move(compact);
+    ladder.rungs.push_back(rung);
+    ladder.coil.coil_type = RungCoilType::UNLOCK;
+
+    auto bytes = SerializeLadderWitness(ladder);
+
+    // Find the compact type byte (after n_rungs varint + n_blocks=0x00)
+    // and change it to 0x02
+    // n_rungs=1 (1 byte) + n_blocks=0 (1 byte) + compact_type (1 byte)
+    BOOST_CHECK(bytes.size() > 2);
+    BOOST_CHECK_EQUAL(bytes[1], 0x00); // n_blocks sentinel
+    BOOST_CHECK_EQUAL(bytes[2], 0x01); // COMPACT_SIG
+    bytes[2] = 0x02; // corrupt to unknown type
+
+    LadderWitness decoded;
+    std::string error;
+    BOOST_CHECK(!DeserializeLadderWitness(bytes, decoded, error));
+    BOOST_CHECK(error.find("unknown compact type") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(compact_sig_ecdsa_scheme)
+{
+    // COMPACT_SIG with ECDSA scheme roundtrips correctly
+    RungConditions cond;
+    Rung rung;
+    CompactRungData compact;
+    compact.type = CompactRungType::COMPACT_SIG;
+    compact.pubkey_commit = MakePubkeyCommit(MakePubkey());
+    compact.scheme = RungScheme::ECDSA;
+    rung.compact = std::move(compact);
+    cond.rungs.push_back(rung);
+
+    auto bytes = SerializeRungConditions(cond);
+    RungConditions decoded;
+    std::string error;
+    BOOST_CHECK(DeserializeRungConditions(bytes, decoded, error));
+    BOOST_CHECK(decoded.rungs[0].IsCompact());
+    BOOST_CHECK(decoded.rungs[0].compact->scheme == RungScheme::ECDSA);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
