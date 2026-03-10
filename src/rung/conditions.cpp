@@ -506,6 +506,8 @@ bool DeserializeMLSCProof(const std::vector<uint8_t>& data, MLSCProof& proof, st
             return false;
         }
 
+        uint8_t cond_ctx = static_cast<uint8_t>(SerializationContext::CONDITIONS);
+
         if (n_blocks == 0) {
             // Compact rung: n_blocks == 0 signals compact encoding
             uint8_t compact_type_byte;
@@ -532,7 +534,6 @@ bool DeserializeMLSCProof(const std::vector<uint8_t>& data, MLSCProof& proof, st
         } else {
             // Normal rung: deserialize blocks
             proof.revealed_rung.blocks.resize(n_blocks);
-            uint8_t cond_ctx = static_cast<uint8_t>(SerializationContext::CONDITIONS);
             for (uint64_t b = 0; b < n_blocks; ++b) {
                 uint8_t first_byte;
                 ss >> first_byte;

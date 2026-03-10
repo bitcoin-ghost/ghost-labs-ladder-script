@@ -43,6 +43,8 @@ using rung::RungAttestationMode;
 using rung::RungScheme;
 using rung::WitnessReference;
 using rung::WitnessDiff;
+using rung::CompactRungType;
+using rung::CompactRungData;
 
 /** Convert blocks to JSON array (shared between input rungs and coil condition rungs). */
 static UniValue BlocksToJSON(const std::vector<RungBlock>& blocks)
