@@ -297,6 +297,9 @@
       <div class="sidebar-divider"></div>
       <div class="sidebar-label">Block Reference</div>
       <a href="#BLOCKS" class="sidebar-link" data-doc="__BLOCK_INDEX__" data-title="Block Reference">All 54 Blocks</a>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-label">Transaction Examples</div>
+      <a href="#TX_INDEX" class="sidebar-link" data-doc="__TX_INDEX__" data-title="Transaction Examples">All Examples</a>
     </aside>
 
     <main class="content">
@@ -430,6 +433,92 @@
       }
     ];
 
+    // Transaction examples data
+    const TX_EXAMPLES = [
+      {
+        name: 'Post-Quantum', cls: 'pq',
+        intro: 'Round-trip transactions demonstrating post-quantum signature schemes supported by Ladder Script.',
+        txs: [
+          { file: 'falcon512-roundtrip', name: 'Falcon-512 Round-Trip', desc: 'Complete fund-and-spend cycle using a 897-byte Falcon-512 public key and 657-byte signature. First proven PQ spend.', date: '2026-03-10', scheme: 'FALCON-512' },
+        ]
+      }
+    ];
+
+    function renderTxIndex() {
+      let html = '<h1 style="font-size:32px;font-weight:800;color:var(--white);margin-bottom:8px;">Transaction Examples</h1>';
+      html += '<p style="font-size:15px;color:var(--gray-400);margin-bottom:32px;max-width:640px;line-height:1.7;">Proven Ladder Script transaction round-trips. Each record documents a UTXO funded with rung conditions and then successfully spent on-chain, with full witness verification.</p>';
+
+      for (const cat of TX_EXAMPLES) {
+        html += '<div class="family-section">';
+        html += '<h2 class="family-title" style="color: var(--cyan);">' + cat.name + '</h2>';
+        html += '<p class="family-intro">' + cat.intro + '</p>';
+        html += '<div class="block-ref-grid">';
+        for (const tx of cat.txs) {
+          html += '<div class="block-ref-card" onclick="loadTx(\'' + tx.file + '\', \'' + tx.name.replace(/'/g, "\\'") + '\')" style="cursor:pointer;">';
+          html += '<div class="block-ref-code">' + tx.date + ' &middot; ' + tx.scheme + '</div>';
+          html += '<div class="block-ref-name">' + tx.name + '</div>';
+          html += '<div class="block-ref-desc">' + tx.desc + '</div>';
+          html += '<div class="block-ref-badge" style="color: var(--cyan); background: rgba(0, 212, 255, 0.1);">Verified</div>';
+          html += '</div>';
+        }
+        html += '</div></div>';
+      }
+      return html;
+    }
+
+    async function loadTx(file, name) {
+      loading.style.display = 'block';
+      docContent.innerHTML = '';
+      breadcrumb.textContent = name;
+      document.title = name + ' | Transaction Examples | Ladder Script';
+      currentDoc = '__TX__' + file;
+
+      links.forEach(l => l.classList.remove('active'));
+      const txLink = document.querySelector('[data-doc="__TX_INDEX__"]');
+      if (txLink) txLink.classList.add('active');
+
+      history.pushState(null, '', '#TX_' + file);
+
+      try {
+        const res = await fetch('txs/' + file + '.html');
+        if (!res.ok) throw new Error('Not found');
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const content = doc.querySelector('.doc-content');
+
+        if (content) {
+          loading.style.display = 'none';
+          let txHtml = '<span class="block-detail-back" onclick="loadTxIndex()">\u2190 All Transaction Examples</span>';
+          txHtml += content.innerHTML;
+          docContent.innerHTML = txHtml;
+        } else {
+          loading.style.display = 'none';
+          docContent.innerHTML = '<p style="color:var(--gray-400);">Could not parse transaction documentation.</p>';
+        }
+      } catch (e) {
+        loading.style.display = 'none';
+        docContent.innerHTML = '<p style="color:var(--gray-400);">Could not load transaction documentation.</p>';
+      }
+
+      window.scrollTo(0, 0);
+    }
+
+    function loadTxIndex() {
+      currentDoc = '__TX_INDEX__';
+      loading.style.display = 'none';
+      breadcrumb.textContent = 'Transaction Examples';
+      document.title = 'Transaction Examples | Ladder Script';
+
+      links.forEach(l => l.classList.remove('active'));
+      const txLink = document.querySelector('[data-doc="__TX_INDEX__"]');
+      if (txLink) txLink.classList.add('active');
+
+      history.pushState(null, '', '#TX_INDEX');
+      docContent.innerHTML = renderTxIndex();
+      window.scrollTo(0, 0);
+    }
+
     function renderBlockIndex() {
       let html = '<h1 style="font-size:32px;font-weight:800;color:var(--white);margin-bottom:8px;">Block Reference</h1>';
       html += '<p style="font-size:15px;color:var(--gray-400);margin-bottom:32px;max-width:640px;line-height:1.7;">Deep-dive documentation for each of the 54 block types in the Ladder Script evaluation engine. Each page covers wire format, fields, evaluation logic, JSON output, and real-world use cases.</p>';
@@ -534,6 +623,11 @@
         return;
       }
 
+      if (filename === '__TX_INDEX__') {
+        loadTxIndex();
+        return;
+      }
+
       loading.style.display = 'block';
       docContent.innerHTML = '';
       breadcrumb.textContent = title;
@@ -581,6 +675,25 @@
       // Block reference index
       if (hash === 'BLOCKS') {
         loadBlockIndex();
+        return;
+      }
+
+      // Transaction examples index
+      if (hash === 'TX_INDEX') {
+        loadTxIndex();
+        return;
+      }
+
+      // Individual tx page: #TX_falcon512-roundtrip, etc.
+      if (hash.startsWith('TX_')) {
+        const file = hash.substring(3);
+        let txName = file;
+        for (const cat of TX_EXAMPLES) {
+          for (const tx of cat.txs) {
+            if (tx.file === file) { txName = tx.name; break; }
+          }
+        }
+        loadTx(file, txName);
         return;
       }
 
