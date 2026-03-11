@@ -3483,6 +3483,29 @@ function toNumericHex(val) {
   return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+function fromNumericHex(hex) {
+  if (!hex || hex.length < 2) return 0;
+  const bytes = [];
+  for (let i = 0; i < hex.length && i < 8; i += 2) bytes.push(parseInt(hex.substr(i, 2), 16) || 0);
+  while (bytes.length < 4) bytes.push(0);
+  return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
+}
+
+// Convert stored rung objects back to createrungtx conditions format
+function rungsToConditions(storedRungs) {
+  return storedRungs.map(rung => {
+    const cond = {
+      blocks: (rung.blocks || [])
+        .filter(b => b.type !== 'OUTPUT_REF')
+        .map(exportBlockFields)
+    };
+    if (rung.relayRefs && rung.relayRefs.length > 0) {
+      cond.relay_refs = rung.relayRefs;
+    }
+    return cond;
+  });
+}
+
 // Export a single block to wire format (shared by both export functions)
 function isCompactSigEligible(rung) {
   const nonRefBlocks = rung.blocks.filter(b => b.type !== 'OUTPUT_REF');
@@ -7093,10 +7116,25 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
           })),
           changeKey: null,
           preimages: signingData.preimages || [],
-          rungs: signingData.rungSnapshot || rungs.map(r => {
+          rungs: signingData.rungSnapshot || rungs.filter(r => r.output.type !== 'relay').map(r => {
             const voutIdx = txOutputs.findIndex(o => o.id === r.output?.txOutputId);
-            return { label: r.label, vout: voutIdx >= 0 ? voutIdx : null, blocks: r.blocks.map(b => ({ type: b.type, values: { ...b.values } })) };
+            // Resolve relay name refs to indices for spend-time reconstruction
+            const relayRungs = rungs.filter(rr => rr.output.type === 'relay');
+            const relayNameMap = new Map();
+            relayRungs.forEach((rr, idx) => {
+              const name = rr.output.name || rr.label || 'R' + String(rungs.indexOf(rr)).padStart(3, '0');
+              relayNameMap.set(name, idx);
+            });
+            const relayRefs = (r.outputRefs || []).map(ref => relayNameMap.get(ref)).filter(idx => idx !== undefined);
+            return { label: r.label, vout: voutIdx >= 0 ? voutIdx : null, blocks: r.blocks.map(b => ({ type: b.type, values: { ...b.values } })), relayRefs: relayRefs.length > 0 ? relayRefs : undefined };
           }),
+          relays: (() => {
+            const relayRungs = rungs.filter(r => r.output.type === 'relay');
+            if (relayRungs.length === 0) return undefined;
+            return relayRungs.map(r => ({
+              blocks: r.blocks.filter(b => b.type !== 'OUTPUT_REF').map(b => ({ type: b.type, values: { ...b.values } })),
+            }));
+          })(),
         };
         console.log('%c[BROADCAST] hasSnapshot:', 'color: orange', !!signingData.rungSnapshot,
           'record.rungs:', JSON.stringify(record.rungs.map(r => ({ label: r.label, vout: r.vout, blocks: r.blocks.map(b => b.type) }))));
@@ -8331,37 +8369,169 @@ function SpendPanel({ onViewAsLadder }) {
         }
       }
 
-      // Warn about blocks that may cause consensus rejection
-      const COVENANT_TYPES = ['AMOUNT_LOCK', 'CTV', 'RELATIVE_VALUE', 'INPUT_COUNT', 'OUTPUT_COUNT', 'WEIGHT_LIMIT',
-        'EPOCH_GATE', 'HYSTERESIS_FEE', 'HYSTERESIS_VALUE', 'ACCUMULATOR', 'COSIGN', 'ANCHOR_ORACLE',
-        'RECURSE_SAME', 'RECURSE_MODIFIED', 'RECURSE_SPLIT', 'RECURSE_DECAY', 'RECURSE_COUNT', 'RECURSE_UNTIL',
-        'RATE_LIMIT', 'COUNTER_DOWN', 'COUNTER_UP', 'COUNTER_PRESET', 'SEQUENCER',
-        'LATCH_SET', 'LATCH_RESET', 'ONE_SHOT', 'TIMER_CONTINUOUS', 'TIMER_OFF_DELAY', 'ANCHOR_CHANNEL', 'COMPARE'];
-      const covenantBlocks = rungBlocks.filter(b => COVENANT_TYPES.includes(b.type));
-      if (covenantBlocks.length > 0) {
-        const types = [...new Set(covenantBlocks.map(b => b.type))].join(', ');
-        addLog('⚠ Rung contains covenant/policy blocks: ' + types + '. Spend may fail consensus validation.', 'warn');
+      // Determine output construction mode from covenant/recursion blocks
+      const CARRY_IDENTICAL = ['RECURSE_SAME'];
+      const CARRY_MUTATED = ['RECURSE_MODIFIED', 'RECURSE_DECAY'];
+      const CARRY_COUNT = ['RECURSE_COUNT'];
+      const CARRY_SPLIT = ['RECURSE_SPLIT'];
+      const CARRY_UNTIL = ['RECURSE_UNTIL'];
+      const TX_CONSTRAINT = ['AMOUNT_LOCK', 'RELATIVE_VALUE', 'INPUT_COUNT', 'OUTPUT_COUNT', 'WEIGHT_LIMIT',
+        'EPOCH_GATE', 'HYSTERESIS_FEE', 'HYSTERESIS_VALUE', 'RATE_LIMIT'];
+
+      let outputMode = 'fresh';
+      let carryBlock = null;
+      for (const b of rungBlocks) {
+        if (CARRY_IDENTICAL.includes(b.type)) { outputMode = 'identical'; carryBlock = b; }
+        else if (CARRY_MUTATED.includes(b.type)) { outputMode = 'mutated'; carryBlock = b; }
+        else if (CARRY_COUNT.includes(b.type)) { outputMode = 'count'; carryBlock = b; }
+        else if (CARRY_SPLIT.includes(b.type)) { outputMode = 'split'; carryBlock = b; }
+        else if (CARRY_UNTIL.includes(b.type)) { outputMode = 'until'; carryBlock = b; }
+        else if (b.type === 'CTV') {
+          addLog('⚠ CTV requires pre-committed template — cannot auto-construct spending tx.', 'warn');
+        }
       }
+
+      // Validate TX-structure constraints
+      for (const b of rungBlocks) {
+        if (b.type === 'AMOUNT_LOCK') {
+          const min = parseInt(b.values?.min) || 0;
+          const max = parseInt(b.values?.max) || Number.MAX_SAFE_INTEGER;
+          if (sendSats < min || sendSats > max) throw new Error('AMOUNT_LOCK: output ' + sendSats + ' sats outside range [' + min + ', ' + max + ']');
+          addLog('AMOUNT_LOCK: ' + sendSats + ' sats within [' + min + ', ' + max + ']', 'ok');
+        }
+        if (b.type === 'RELATIVE_VALUE') {
+          const num = parseInt(b.values?.numerator) || 0;
+          const den = parseInt(b.values?.denominator) || 1;
+          const minOutput = Math.ceil(utxoAmountSats * num / den);
+          if (sendSats < minOutput) throw new Error('RELATIVE_VALUE: output must be >= ' + minOutput + ' sats (' + num + '/' + den + ' of input)');
+          addLog('RELATIVE_VALUE: ' + sendSats + ' sats >= ' + minOutput + ' required', 'ok');
+        }
+      }
+
       if (txLocktime > 500000000) {
-        addLog('⚠ CLTV_TIME lock: tx locked until ' + new Date(txLocktime * 1000).toISOString() + '. May fail if time not reached.', 'warn');
+        addLog('⚠ CLTV_TIME lock: tx locked until ' + new Date(txLocktime * 1000).toISOString(), 'warn');
       } else if (txLocktime > 0 && st.blocks < txLocktime) {
-        addLog('⚠ CLTV lock: needs block height ' + txLocktime + ' but chain is at ' + st.blocks + '. Will fail.', 'warn');
+        addLog('⚠ CLTV lock: needs height ' + txLocktime + ' but chain at ' + st.blocks, 'warn');
       }
       if (inputSequence < 0x400000 && inputSequence > 1) {
-        addLog('⚠ CSV lock: ' + inputSequence + ' blocks relative timelock. Need ' + inputSequence + ' confirmations after send.', 'warn');
+        addLog('CSV: ' + inputSequence + ' blocks relative timelock', 'info');
       }
 
       const spendInputs = [{ txid, vout, sequence: inputSequence }];
       const spendAmount = sendSats / 1e8;
+      const freshSigOutput = { amount: spendAmount, conditions: [{ blocks: [{ type: 'SIG', fields: [{ type: 'PUBKEY', hex: walletKey.pubkey }] }] }] };
 
-      // Create the spending tx (output gets a simple SIG condition)
-      const createPayload = {
-        inputs: spendInputs,
-        outputs: [{
-          amount: spendAmount,
-          conditions: [{ blocks: [{ type: 'SIG', fields: [{ type: 'PUBKEY', hex: walletKey.pubkey }] }] }],
-        }],
-      };
+      // Build output conditions based on covenant requirements
+      let createOutputs;
+      switch (outputMode) {
+        case 'identical': {
+          const conditions = rungsToConditions(voutRungs);
+          createOutputs = [{ amount: spendAmount, conditions }];
+          addLog('Carry-forward: identical conditions (RECURSE_SAME)', 'info');
+          break;
+        }
+        case 'mutated': {
+          const conditions = rungsToConditions(voutRungs);
+          const isDecay = carryBlock.type === 'RECURSE_DECAY';
+          const blockIdx = parseInt(carryBlock.values?.block_idx) || 0;
+          const paramIdx = parseInt(carryBlock.values?.param_idx) || 0;
+          const rawDelta = parseInt(carryBlock.values?.delta || carryBlock.values?.decay_per_step) || 1;
+          const delta = isDecay ? -rawDelta : rawDelta;
+          if (conditions[0] && conditions[0].blocks[blockIdx]) {
+            const targetBlock = conditions[0].blocks[blockIdx];
+            let numCount = 0;
+            for (let fi = 0; fi < targetBlock.fields.length; fi++) {
+              if (targetBlock.fields[fi].type === 'NUMERIC') {
+                if (numCount === paramIdx) {
+                  const oldVal = fromNumericHex(targetBlock.fields[fi].hex);
+                  targetBlock.fields[fi].hex = toNumericHex(String(oldVal + delta));
+                  addLog('Mutated [block=' + blockIdx + ', param=' + paramIdx + ']: ' + oldVal + ' → ' + (oldVal + delta), 'info');
+                  break;
+                }
+                numCount++;
+              }
+            }
+          }
+          createOutputs = [{ amount: spendAmount, conditions }];
+          addLog('Carry-forward: ' + (isDecay ? 'decayed' : 'mutated') + ' (' + carryBlock.type + ')', 'info');
+          break;
+        }
+        case 'count': {
+          const remaining = parseInt(carryBlock.values?.remaining) || 0;
+          if (remaining <= 0) {
+            createOutputs = [freshSigOutput];
+            addLog('RECURSE_COUNT exhausted — free spend', 'ok');
+          } else {
+            const conditions = rungsToConditions(voutRungs);
+            for (const cond of conditions) {
+              for (const blk of cond.blocks) {
+                if (blk.type === 'RECURSE_COUNT') {
+                  for (const f of blk.fields) {
+                    if (f.type === 'NUMERIC') { f.hex = toNumericHex(String(fromNumericHex(f.hex) - 1)); break; }
+                  }
+                  break;
+                }
+              }
+            }
+            createOutputs = [{ amount: spendAmount, conditions }];
+            addLog('Carry-forward: count ' + remaining + ' → ' + (remaining - 1), 'info');
+          }
+          break;
+        }
+        case 'split': {
+          const maxSplits = parseInt(carryBlock.values?.max_splits) || 2;
+          const minSats = parseInt(carryBlock.values?.min_sats) || 546;
+          if (maxSplits <= 0) {
+            createOutputs = [freshSigOutput];
+            addLog('RECURSE_SPLIT exhausted — free spend', 'ok');
+          } else {
+            const half = Math.floor(sendSats / 2);
+            if (half < minSats) throw new Error('RECURSE_SPLIT: half (' + half + ') below min_sats (' + minSats + ')');
+            const makeSplitConds = () => {
+              const conds = rungsToConditions(voutRungs);
+              for (const cond of conds) {
+                for (const blk of cond.blocks) {
+                  if (blk.type === 'RECURSE_SPLIT') {
+                    for (const f of blk.fields) {
+                      if (f.type === 'NUMERIC') { f.hex = toNumericHex(String(fromNumericHex(f.hex) - 1)); break; }
+                    }
+                  }
+                }
+              }
+              return conds;
+            };
+            createOutputs = [
+              { amount: half / 1e8, conditions: makeSplitConds() },
+              { amount: (sendSats - half) / 1e8, conditions: makeSplitConds() },
+            ];
+            addLog('RECURSE_SPLIT: 2-way (' + half + ' + ' + (sendSats - half) + ' sats), splits ' + maxSplits + ' → ' + (maxSplits - 1), 'info');
+          }
+          break;
+        }
+        case 'until': {
+          const targetHeight = parseInt(carryBlock.values?.target_height) || 0;
+          if (st.blocks >= targetHeight) {
+            createOutputs = [freshSigOutput];
+            addLog('RECURSE_UNTIL: height ' + targetHeight + ' reached (chain ' + st.blocks + ') — free spend', 'ok');
+          } else {
+            const conditions = rungsToConditions(voutRungs);
+            createOutputs = [{ amount: spendAmount, conditions }];
+            addLog('RECURSE_UNTIL: before target (' + st.blocks + '/' + targetHeight + '), carry-forward', 'info');
+          }
+          break;
+        }
+        default: {
+          createOutputs = [freshSigOutput];
+        }
+      }
+
+      // Build create payload
+      const createPayload = { inputs: spendInputs, outputs: createOutputs };
+      if (rec.relays && rec.relays.length > 0) {
+        createPayload.relays = rec.relays.map(r => ({
+          blocks: (r.blocks || []).filter(b => b.type !== 'OUTPUT_REF').map(exportBlockFields)
+        }));
+      }
       if (txLocktime > 0) createPayload.locktime = txLocktime;
       const createResult = await apiCall('/api/ladder/create', createPayload, true);
       if (!createResult || !createResult.hex) throw new Error('Failed to create spending tx.');
