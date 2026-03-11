@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fee-Gated Covenant — Transaction Examples</title>
+<link rel="stylesheet" href="../blocks/style.css">
+<style>
+  .tx-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  .tx-box { background: #0a0a0a; border: 1px solid #242424; border-radius: 10px; padding: 18px; }
+  .tx-box-label { font-size: 10px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; color: #888; }
+  .tx-box-label .arrow-right { color: #f7931a; }
+  .tx-box-label .arrow-left { color: #00d4ff; }
+  .tx-field { margin-bottom: 10px; }
+  .tx-field:last-child { margin-bottom: 0; }
+  .tx-field-name { font-size: 11px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; color: #666; margin-bottom: 2px; }
+  .tx-field-value { font-size: 13px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; color: #ccc; word-break: break-all; }
+  .tx-field-value.txid { font-size: 11px; color: #f7931a; }
+  .tx-field-value.highlight { color: #00ff88; }
+
+  .witness-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin: 16px 0 8px; }
+  .witness-seg { display: flex; align-items: center; justify-content: center; font-size: 9px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; font-weight: 600; color: #050505; }
+  .witness-seg.w-pubkey { background: #f7931a; }
+  .witness-seg.w-sig { background: #00ff88; }
+  .witness-seg.w-overhead { background: #4a4a4a; }
+  .witness-seg.w-fee { background: #a855f7; }
+  .witness-seg.w-amount { background: #ff6b9d; }
+  .witness-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
+  .witness-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; color: #888; }
+  .witness-legend-dot { width: 9px; height: 9px; border-radius: 3px; }
+
+  .verify-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+  .verify-item { background: #0a0a0a; border: 1px solid rgba(0, 255, 136, 0.25); border-radius: 8px; padding: 14px; text-align: center; }
+  .verify-label { font-size: 10px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; color: #666; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .verify-value { font-size: 16px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; font-weight: 600; color: #00ff88; }
+  .verify-check { font-size: 11px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; color: #00ff88; margin-top: 4px; }
+
+  .scheme-badge { display: inline-block; font-size: 10px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; font-weight: 600; padding: 3px 10px; border-radius: 5px; letter-spacing: 0.5px; }
+  .scheme-badge.fee { background: rgba(168, 85, 247, 0.1); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.25); }
+  .scheme-badge.amount { background: rgba(255, 107, 157, 0.1); color: #ff6b9d; border: 1px solid rgba(255, 107, 157, 0.25); }
+  .scheme-badge.schnorr { background: rgba(0, 212, 255, 0.1); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.25); }
+
+  .json-block { background: #141414; border: 1px solid #1a1a1a; border-radius: 10px; padding: 18px 22px; margin: 16px 0; overflow-x: auto; font-size: 12px; line-height: 1.6; }
+  .json-block pre { margin: 0; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; color: #ccc; white-space: pre-wrap; word-break: break-all; }
+  .json-key { color: #00d4ff; }
+  .json-str { color: #00ff88; }
+  .json-num { color: #f7931a; }
+
+  .rung-diagram { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; }
+  .rung-row { display: flex; align-items: stretch; gap: 0; }
+  .rung-label-box { width: 80px; min-width: 80px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; font-weight: 700; letter-spacing: 1px; border-radius: 6px 0 0 6px; padding: 10px 6px; }
+  .rung-blocks { display: flex; gap: 4px; flex: 1; padding: 8px; background: #0a0a0a; border: 1px solid #242424; border-left: none; border-radius: 0 6px 6px 0; align-items: center; flex-wrap: wrap; }
+  .rung-block { font-size: 9px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; font-weight: 600; padding: 6px 10px; border-radius: 4px; display: flex; align-items: center; letter-spacing: 0.5px; }
+  .rung-arrow { font-size: 11px; color: #444; margin: 0 2px; }
+  .rung-output { font-size: 9px; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; font-weight: 600; padding: 6px 10px; border-radius: 4px; letter-spacing: 0.5px; background: rgba(0, 255, 136, 0.08); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.2); margin-left: auto; }
+
+  @media (max-width: 640px) {
+    .tx-pair { grid-template-columns: 1fr; }
+    .verify-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-content">
+
+<div class="block-title-section">
+  <div class="block-type-code">TRANSACTION EXAMPLE &middot; GOVERNANCE</div>
+  <h1 class="block-title">Fee-Gated Covenant</h1>
+  <p class="block-subtitle">A covenant that restricts spending based on fee rate and output amount. The SEND path requires a valid signature, the transaction fee rate to be within 5&ndash;50 sat/vB (HYSTERESIS_FEE), and the output to be within 10,000&ndash;100,000 sats (AMOUNT_LOCK). This prevents panic-spending during fee spikes and enforces minimum output sizes. An EMERGENCY path bypasses all constraints with dual signatures.</p>
+  <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+    <span class="scheme-badge fee">HYSTERESIS_FEE &middot; 5&ndash;50 sat/vB</span>
+    <span class="scheme-badge amount">AMOUNT_LOCK &middot; 10k&ndash;100k sats</span>
+    <span class="scheme-badge schnorr">SCHNORR &middot; SCHEME 0x01</span>
+  </div>
+</div>
+
+<!-- Rung Diagram -->
+<div class="doc-section">
+  <div class="section-label">Rung Structure</div>
+  <p class="section-text">Two outputs with separate spending conditions. The SEND output (vout 0) enforces fee and amount constraints for normal operation. The EMERGENCY output (vout 1) requires two signatures but has no other restrictions.</p>
+
+  <div class="rung-diagram">
+    <div class="rung-row">
+      <div class="rung-label-box" style="background: rgba(168, 85, 247, 0.1); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2);">SEND</div>
+      <div class="rung-blocks">
+        <div class="rung-block" style="background: rgba(247, 147, 26, 0.1); color: #f7931a; border: 1px solid rgba(247, 147, 26, 0.2);">SIG (owner)</div>
+        <div class="rung-arrow">+</div>
+        <div class="rung-block" style="background: rgba(168, 85, 247, 0.1); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2);">HYSTERESIS_FEE (5&ndash;50)</div>
+        <div class="rung-arrow">+</div>
+        <div class="rung-block" style="background: rgba(255, 107, 157, 0.1); color: #ff6b9d; border: 1px solid rgba(255, 107, 157, 0.2);">AMOUNT_LOCK (10k&ndash;100k)</div>
+        <div class="rung-arrow">&rarr;</div>
+        <div class="rung-output">FEE_GATE &middot; vout 0</div>
+      </div>
+    </div>
+    <div class="rung-row">
+      <div class="rung-label-box" style="background: rgba(0, 255, 136, 0.1); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.2);">EMERG</div>
+      <div class="rung-blocks">
+        <div class="rung-block" style="background: rgba(247, 147, 26, 0.1); color: #f7931a; border: 1px solid rgba(247, 147, 26, 0.2);">SIG (owner)</div>
+        <div class="rung-arrow">+</div>
+        <div class="rung-block" style="background: rgba(247, 147, 26, 0.1); color: #f7931a; border: 1px solid rgba(247, 147, 26, 0.2);">SIG (cosigner)</div>
+        <div class="rung-arrow">&rarr;</div>
+        <div class="rung-output">EMERGENCY &middot; vout 1</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-text" style="margin-top: 8px;"><strong>HYSTERESIS_FEE</strong> checks the transaction's fee rate (total fee / weight in sat/vB) falls within the band [5, 50]. <strong>AMOUNT_LOCK</strong> checks the output value is between 10,000 and 100,000 sats. Both are TX-structure constraints &mdash; evaluated from the transaction itself, requiring no witness data.</p>
+</div>
+
+<!-- Transaction Pair -->
+<div class="doc-section">
+  <div class="section-label">Transactions</div>
+
+  <div class="tx-pair">
+    <div class="tx-box">
+      <div class="tx-box-label"><span class="arrow-right">&#9654;</span> Funding Transaction</div>
+      <div class="tx-field">
+        <div class="tx-field-name">TXID</div>
+        <div class="tx-field-value txid">6a900a575495e95544dbf874a9064c1c8ea69746d584ee0fb6bd86021b5e4c58</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Version</div>
+        <div class="tx-field-value">4 (RUNG_TX)</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Size</div>
+        <div class="tx-field-value">364 bytes &middot; 281 vB</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Outputs</div>
+        <div class="tx-field-value">3 &mdash; vout 0: SEND (50,000 sats), vout 1: EMERGENCY (30,000 sats), vout 2: change (49.99 BTC)</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Confirmations</div>
+        <div class="tx-field-value highlight">1</div>
+      </div>
+    </div>
+
+    <div class="tx-box">
+      <div class="tx-box-label"><span class="arrow-left">&#9664;</span> Spending Transaction (Fee-Gated Send)</div>
+      <div class="tx-field">
+        <div class="tx-field-name">TXID</div>
+        <div class="tx-field-value txid">6d257b0b07ad51c89f371e9534b9a8570a9e35faf942c88acdce69c33360a4e8</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Version</div>
+        <div class="tx-field-value">4 (RUNG_TX)</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Size</div>
+        <div class="tx-field-value">221 bytes &middot; 135 vB</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Fee Rate</div>
+        <div class="tx-field-value highlight">~7.4 sat/vB (within 5&ndash;50 band)</div>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-name">Confirmations</div>
+        <div class="tx-field-value highlight">1</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Witness Breakdown -->
+<div class="doc-section">
+  <div class="section-label">Spending Witness Breakdown</div>
+  <p class="section-text">The SEND path witness contains three block entries. The SIG block provides the owner's public key and Schnorr signature. HYSTERESIS_FEE and AMOUNT_LOCK are TX-structure blocks &mdash; they require no witness data and are evaluated purely from the transaction's fee and output amounts.</p>
+
+  <div class="witness-bar">
+    <div class="witness-seg w-overhead" style="flex: 3;" title="Framing: rung count + block count">FRM</div>
+    <div class="witness-seg w-pubkey" style="flex: 33;" title="Owner pubkey: 33 bytes">33B pubkey</div>
+    <div class="witness-seg w-sig" style="flex: 64;" title="Schnorr signature: 64 bytes">64B signature</div>
+    <div class="witness-seg w-fee" style="flex: 1;" title="HYSTERESIS_FEE: no witness data">H</div>
+    <div class="witness-seg w-amount" style="flex: 1;" title="AMOUNT_LOCK: no witness data">A</div>
+    <div class="witness-seg w-overhead" style="flex: 9;" title="Trailing framing + coil">TAIL</div>
+  </div>
+  <div class="witness-legend">
+    <div class="witness-legend-item"><div class="witness-legend-dot" style="background: #f7931a;"></div> Pubkey (33B)</div>
+    <div class="witness-legend-item"><div class="witness-legend-dot" style="background: #00ff88;"></div> Signature (64B)</div>
+    <div class="witness-legend-item"><div class="witness-legend-dot" style="background: #a855f7;"></div> HYSTERESIS_FEE (0B)</div>
+    <div class="witness-legend-item"><div class="witness-legend-dot" style="background: #ff6b9d;"></div> AMOUNT_LOCK (0B)</div>
+    <div class="witness-legend-item"><div class="witness-legend-dot" style="background: #4a4a4a;"></div> Framing (12B)</div>
+  </div>
+</div>
+
+<!-- Verification -->
+<div class="doc-section">
+  <div class="section-label">Verification</div>
+  <p class="section-text">The evaluator checks all three blocks. The SIG block verifies the signature. HYSTERESIS_FEE computes the fee rate from the transaction and checks the band. AMOUNT_LOCK checks the output value range.</p>
+
+  <div class="verify-grid">
+    <div class="verify-item">
+      <div class="verify-label">SIG Block</div>
+      <div class="verify-value">Schnorr</div>
+      <div class="verify-check">PUBKEY_COMMIT match + valid sig</div>
+    </div>
+    <div class="verify-item">
+      <div class="verify-label">HYSTERESIS_FEE</div>
+      <div class="verify-value">5&ndash;50 sat/vB</div>
+      <div class="verify-check">~7.4 sat/vB in band</div>
+    </div>
+    <div class="verify-item">
+      <div class="verify-label">AMOUNT_LOCK</div>
+      <div class="verify-value">10k&ndash;100k sats</div>
+      <div class="verify-check">49,000 sats in range</div>
+    </div>
+    <div class="verify-item">
+      <div class="verify-label">Witness Parse</div>
+      <div class="verify-value">111 / 111</div>
+      <div class="verify-check">All bytes consumed</div>
+    </div>
+    <div class="verify-item">
+      <div class="verify-label">Spending Path</div>
+      <div class="verify-value">SEND</div>
+      <div class="verify-check">Rung 0 (fee-gated)</div>
+    </div>
+    <div class="verify-item">
+      <div class="verify-label">Block Accepted</div>
+      <div class="verify-value">Confirmed</div>
+      <div class="verify-check">Spend valid</div>
+    </div>
+  </div>
+</div>
+
+<!-- How It Works -->
+<div class="doc-section">
+  <div class="section-label">How Fee-Gated Covenants Work</div>
+
+  <div class="eval-box">
+    <div class="eval-step">
+      <div class="eval-step-num">1.</div>
+      <div class="eval-step-text">The funding transaction creates two outputs. Vout 0 (SEND) contains three blocks: <span class="eval-keyword">SIG</span> for authentication, <span class="eval-keyword">HYSTERESIS_FEE</span> constraining the fee rate to 5&ndash;50 sat/vB, and <span class="eval-keyword">AMOUNT_LOCK</span> constraining the output to 10,000&ndash;100,000 sats. Vout 1 (EMERGENCY) requires two signatures with no constraints.</div>
+    </div>
+    <div class="eval-step">
+      <div class="eval-step-num">2.</div>
+      <div class="eval-step-text">To spend via the SEND path, the owner signs the transaction. The evaluator computes <code>fee_rate = total_fee / tx_weight_vB</code> and checks it falls within the HYSTERESIS_FEE band. It also checks the output amount is within the AMOUNT_LOCK range. Both are <em>introspection constraints</em> &mdash; no witness data needed.</div>
+    </div>
+    <div class="eval-step">
+      <div class="eval-step-num">3.</div>
+      <div class="eval-step-text">If fees spike above 50 sat/vB (e.g. during congestion), the SEND path is blocked &mdash; preventing panic-spending at inflated rates. The AMOUNT_LOCK prevents dust outputs and ensures meaningful value transfer.</div>
+    </div>
+    <div class="eval-step">
+      <div class="eval-step-num">4.</div>
+      <div class="eval-step-text">The EMERGENCY path on vout 1 bypasses all constraints: the owner + cosigner can spend regardless of fee rate or amount. This is the escape hatch for genuine emergencies when fee conditions cannot be met.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Comparison -->
+<div class="doc-section">
+  <div class="section-label">Comparison</div>
+  <table class="field-table">
+    <thead>
+      <tr><th>Approach</th><th>Fee Control</th><th>Amount Control</th><th>Override</th><th>Complexity</th></tr>
+    </thead>
+    <tbody>
+      <tr style="background: rgba(168, 85, 247, 0.04);">
+        <td class="field-name" style="color: #a855f7;">Ladder Fee-Gated</td>
+        <td>HYSTERESIS_FEE (on-chain)</td>
+        <td>AMOUNT_LOCK (on-chain)</td>
+        <td>Dual-SIG emergency path</td>
+        <td>3 block types</td>
+      </tr>
+      <tr>
+        <td class="field-name">Wallet Fee Limits</td>
+        <td>Software-enforced (bypassable)</td>
+        <td>Software-enforced</td>
+        <td>Disable in settings</td>
+        <td>No on-chain enforcement</td>
+      </tr>
+      <tr>
+        <td class="field-name">Custodial Controls</td>
+        <td>Exchange-side rate limiting</td>
+        <td>Withdrawal limits</td>
+        <td>Support ticket</td>
+        <td>Requires trusted custodian</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Full JSON -->
+<div class="doc-section">
+  <div class="section-label">Funding Transaction JSON</div>
+  <div class="json-block">
+    <pre>{
+  <span class="json-key">"txid"</span>: <span class="json-str">"6a900a575495e95544dbf874a9064c1c8ea69746d584ee0fb6bd86021b5e4c58"</span>,
+  <span class="json-key">"hash"</span>: <span class="json-str">"477a2bff725094ac47389231d62630d1221e8340413fd3a2db8774dcbc74fbd1"</span>,
+  <span class="json-key">"version"</span>: <span class="json-num">4</span>,
+  <span class="json-key">"size"</span>: <span class="json-num">364</span>,
+  <span class="json-key">"vsize"</span>: <span class="json-num">281</span>,
+  <span class="json-key">"weight"</span>: <span class="json-num">1123</span>,
+  <span class="json-key">"locktime"</span>: <span class="json-num">0</span>,
+  <span class="json-key">"vin"</span>: [
+    {
+      <span class="json-key">"txid"</span>: <span class="json-str">"bc009beb50c6944e144f53e0dfa20fefb6f38ec46c7e4ad460cf191dc7a06f9c"</span>,
+      <span class="json-key">"vout"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"scriptSig"</span>: { <span class="json-key">"asm"</span>: <span class="json-str">""</span>, <span class="json-key">"hex"</span>: <span class="json-str">""</span> },
+      <span class="json-key">"txinwitness"</span>: [
+        <span class="json-str">"0101002102f36a324bdf0c9650cab2ca4765eed685ce250f2f2d5c288da9115c592451bcb340d6a9e0b01f635d964636f2bdffe400d8f513cac7f73f25397f2025780a72a2440727047e769f22c839271dbedf67a5974303b92e02579a301d4cea82b868e4460101010000"</span>
+      ],
+      <span class="json-key">"sequence"</span>: <span class="json-num">4294967294</span>
+    }
+  ],
+  <span class="json-key">"vout"</span>: [
+    {
+      <span class="json-key">"value"</span>: <span class="json-num">0.00050000</span>,
+      <span class="json-key">"n"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"scriptPubKey"</span>: {
+        <span class="json-key">"hex"</span>: <span class="json-str">"c1010300f8460c1048dc595603d6c47f9742e93e01ebc0d7e0dff6d5a6bb12261c3edcf1011902086408050cfd8813fea08601000101010000"</span>,
+        <span class="json-key">"type"</span>: <span class="json-str">"rung_conditions"</span>
+      }
+    },
+    {
+      <span class="json-key">"value"</span>: <span class="json-num">0.00030000</span>,
+      <span class="json-key">"n"</span>: <span class="json-num">1</span>,
+      <span class="json-key">"scriptPubKey"</span>: {
+        <span class="json-key">"hex"</span>: <span class="json-str">"c1010200f8460c1048dc595603d6c47f9742e93e01ebc0d7e0dff6d5a6bb12261c3edcf10100f8460c1048dc595603d6c47f9742e93e01ebc0d7e0dff6d5a6bb12261c3edcf1010101010000"</span>,
+        <span class="json-key">"type"</span>: <span class="json-str">"rung_conditions"</span>
+      }
+    },
+    {
+      <span class="json-key">"value"</span>: <span class="json-num">49.99918850</span>,
+      <span class="json-key">"n"</span>: <span class="json-num">2</span>,
+      <span class="json-key">"scriptPubKey"</span>: {
+        <span class="json-key">"hex"</span>: <span class="json-str">"c1010100f8460c1048dc595603d6c47f9742e93e01ebc0d7e0dff6d5a6bb12261c3edcf1010101010000"</span>,
+        <span class="json-key">"type"</span>: <span class="json-str">"rung_conditions"</span>
+      }
+    }
+  ],
+  <span class="json-key">"blockhash"</span>: <span class="json-str">"1f06a3af0e99f7bad8c7f388c59fa981a5f6073cd797dde653b8a0de14d746b9"</span>,
+  <span class="json-key">"confirmations"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"time"</span>: <span class="json-num">1773269344</span>,
+  <span class="json-key">"blocktime"</span>: <span class="json-num">1773269344</span>
+}</pre>
+  </div>
+</div>
+
+<div class="doc-section">
+  <div class="section-label">Spending Transaction JSON (Fee-Gated Send)</div>
+  <div class="json-block">
+    <pre>{
+  <span class="json-key">"txid"</span>: <span class="json-str">"6d257b0b07ad51c89f371e9534b9a8570a9e35faf942c88acdce69c33360a4e8"</span>,
+  <span class="json-key">"hash"</span>: <span class="json-str">"59dfe0c1f375e2ef12d6ec2357874df5b4dccd4627a1f9e9f09969d349d43231"</span>,
+  <span class="json-key">"version"</span>: <span class="json-num">4</span>,
+  <span class="json-key">"size"</span>: <span class="json-num">221</span>,
+  <span class="json-key">"vsize"</span>: <span class="json-num">135</span>,
+  <span class="json-key">"weight"</span>: <span class="json-num">539</span>,
+  <span class="json-key">"locktime"</span>: <span class="json-num">0</span>,
+  <span class="json-key">"vin"</span>: [
+    {
+      <span class="json-key">"txid"</span>: <span class="json-str">"6a900a575495e95544dbf874a9064c1c8ea69746d584ee0fb6bd86021b5e4c58"</span>,
+      <span class="json-key">"vout"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"scriptSig"</span>: { <span class="json-key">"asm"</span>: <span class="json-str">""</span>, <span class="json-key">"hex"</span>: <span class="json-str">""</span> },
+      <span class="json-key">"txinwitness"</span>: [
+        <span class="json-str">"0103002102f36a324bdf0c9650cab2ca4765eed685ce250f2f2d5c288da9115c592451bcb340a657fc561cde681120cc679f76c0334665bdd81a927895624507802147a46346ce8e1840d79eb34eb37dbae9e63510ef4aedaa8e43e7abb2576c17a2b432b32f19000c000101010000"</span>
+      ],
+      <span class="json-key">"sequence"</span>: <span class="json-num">4294967294</span>
+    }
+  ],
+  <span class="json-key">"vout"</span>: [
+    {
+      <span class="json-key">"value"</span>: <span class="json-num">0.00049000</span>,
+      <span class="json-key">"n"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"scriptPubKey"</span>: {
+        <span class="json-key">"hex"</span>: <span class="json-str">"c10101800100010220f8460c1048dc595603d6c47f9742e93e01ebc0d7e0dff6d5a6bb12261c3edcf10101010000"</span>,
+        <span class="json-key">"type"</span>: <span class="json-str">"rung_conditions"</span>
+      }
+    }
+  ],
+  <span class="json-key">"blockhash"</span>: <span class="json-str">"2576d9d687c8081676a87cd6125e4cecc7422e561eb9d7c37d619263780d2d6c"</span>,
+  <span class="json-key">"confirmations"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"time"</span>: <span class="json-num">1773269380</span>,
+  <span class="json-key">"blocktime"</span>: <span class="json-num">1773269380</span>
+}</pre>
+  </div>
+</div>
+
+<!-- Nav -->
+<div class="doc-nav">
+  <span onclick="if(window.parent !== window) window.parent.location.hash='TX_INDEX'; else window.location.href='../index.html#TX_INDEX';">&#8592; All Transaction Examples</span>
+  <span></span>
+</div>
+
+</div>
+</body>
+</html>

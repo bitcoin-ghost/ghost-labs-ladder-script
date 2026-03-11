@@ -463,6 +463,13 @@
         txs: [
           { file: 'payment-channel', name: 'Payment Channel (Cooperative Close)', desc: 'Lightning-style channel with dual-SIG cooperative close, CSV_TIME-gated force close, and CTV template constraints. Exercises the happy path.', date: '2026-03-11', scheme: 'SCHNORR' },
         ]
+      },
+      {
+        name: 'Governance', cls: 'cov',
+        intro: 'Fee-gated and value-constrained spending policies for treasury governance and protocol parameter enforcement.',
+        txs: [
+          { file: 'fee-gated-covenant', name: 'Fee-Gated Covenant', desc: 'Treasury governance pattern enforcing fee-rate bounds (HYSTERESIS_FEE 5–50 sat/vB) and output value range (AMOUNT_LOCK 10k–100k sats). Dual-SIG emergency bypass.', date: '2026-03-11', scheme: 'HYSTERESIS_FEE' },
+        ]
       }
     ];
 
