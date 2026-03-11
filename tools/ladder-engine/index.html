@@ -7469,18 +7469,23 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
         const bv = { ...block.values };
         if (PUBKEY_FIELD_TYPES.includes(block.type) && bv.pubkey && oldToNew.has(bv.pubkey)) {
           bv.pubkey = oldToNew.get(bv.pubkey);
+          bv.scheme = fundScheme;
         } else if (PUBKEY_FIELD_TYPES.includes(block.type) && !bv.pubkey && emptyKeyMap.has(`${ri}:${bi}`)) {
           bv.pubkey = emptyKeyMap.get(`${ri}:${bi}`);
+          bv.scheme = fundScheme;
         } else if (NAMED_PUBKEY_FIELDS[block.type]) {
           for (const fname of NAMED_PUBKEY_FIELDS[block.type]) {
             if (bv[fname] && oldToNew.has(bv[fname])) bv[fname] = oldToNew.get(bv[fname]);
           }
         } else if ((block.type === 'MULTISIG' || block.type === 'TIMELOCKED_MULTISIG') && bv.pubkeys) {
           bv.pubkeys = bv.pubkeys.split(',').map(k => k.trim()).filter(Boolean).map(k => oldToNew.get(k) || k).join(', ');
+          bv.scheme = fundScheme;
         } else if (block.type === 'MUSIG_THRESHOLD' && bv.agg_pubkey && oldToNew.has(bv.agg_pubkey)) {
           bv.agg_pubkey = oldToNew.get(bv.agg_pubkey);
+          bv.scheme = fundScheme;
         } else if (SIGNING_KEY_TYPES.includes(block.type) && bv.signing_key && oldToNew.has(bv.signing_key)) {
           bv.signing_key = oldToNew.get(bv.signing_key);
+          bv.scheme = fundScheme;
         }
         const hr = hashReplacements.get(`${ri}:${bi}`);
         if (hr && bv.hash) bv.hash = hr.hash;
