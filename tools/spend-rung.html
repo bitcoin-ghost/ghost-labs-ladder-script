@@ -425,21 +425,59 @@ async function handleSpend() {
     const conditionKeys = rec.conditionKeys || [];
     if (conditionKeys.length === 0) throw new Error('No signing keys found. Provide keys manually.');
 
-    // Detect how many signers are needed from stored rung conditions
-    let numSignersNeeded = 1;
-    let conditionType = 'SIG';
-    if (rec.rungs && rec.rungs.length > 0) {
-      for (const b of (rec.rungs[0].blocks || [])) {
-        if (b.type === 'MULTISIG' || b.type === 'TIMELOCKED_MULTISIG') {
-          conditionType = b.type;
-          numSignersNeeded = parseInt(b.values?.threshold) || 2;
-          log('Detected ' + b.type + ' (threshold=' + numSignersNeeded + ')');
-          break;
+    // Build blocks-based signer format from stored rung conditions
+    // signrungtx expects: { input, blocks: [{ type, privkey/privkeys }] }
+    const rungBlocks = (rec.rungs && rec.rungs[0]?.blocks) || [];
+    const signerBlocks = [];
+    let keysUsed = 0;
+
+    for (const b of rungBlocks) {
+      if (b.type === 'SIG') {
+        const key = conditionKeys[keysUsed];
+        if (!key) throw new Error('Not enough keys for SIG block.');
+        if (isPQ) {
+          signerBlocks.push({ type: 'SIG', pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
+        } else {
+          signerBlocks.push({ type: 'SIG', privkey: key.privkey });
+        }
+        keysUsed++;
+      } else if (b.type === 'MULTISIG' || b.type === 'TIMELOCKED_MULTISIG') {
+        const threshold = parseInt(b.values?.threshold) || 2;
+        if (keysUsed + threshold > conditionKeys.length) {
+          throw new Error(b.type + ' requires ' + threshold + ' keys but only ' + (conditionKeys.length - keysUsed) + ' available.');
+        }
+        const privkeys = [];
+        for (let si = 0; si < threshold; si++) {
+          privkeys.push(conditionKeys[keysUsed + si].privkey);
+        }
+        if (isPQ) {
+          signerBlocks.push({
+            type: b.type, scheme,
+            pq_privkeys: privkeys,
+            pq_pubkeys: conditionKeys.slice(keysUsed, keysUsed + threshold).map(k => k.pubkey),
+          });
+        } else {
+          signerBlocks.push({ type: b.type, privkeys });
+        }
+        log('Detected ' + b.type + ' (threshold=' + threshold + ')');
+        keysUsed += threshold;
+      } else if (b.type === 'HASH_PREIMAGE' || b.type === 'HASH160_PREIMAGE') {
+        const preimages = rec.preimages || [];
+        if (preimages.length > 0) {
+          signerBlocks.push({ type: b.type, preimage: preimages[0]?.preimage || preimages[0] });
         }
       }
     }
-    if (numSignersNeeded > conditionKeys.length) {
-      throw new Error(conditionType + ' requires ' + numSignersNeeded + ' signers but only ' + conditionKeys.length + ' key(s) stored.');
+
+    // Fallback: simple SIG if no blocks detected
+    if (signerBlocks.length === 0 && conditionKeys.length > 0) {
+      const key = conditionKeys[0];
+      if (isPQ) {
+        signerBlocks.push({ type: 'SIG', pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
+      } else {
+        signerBlocks.push({ type: 'SIG', privkey: key.privkey });
+      }
+      keysUsed = 1;
     }
 
     const spendInputs = [{ txid, vout }];
@@ -447,7 +485,6 @@ async function handleSpend() {
     const walletKey = rec.walletKey || await apiCall('/api/ladder/wallet/keypair');
     if (!walletKey) throw new Error('Failed to generate wallet keypair.');
 
-    // Create the spending tx with a simple SIG output condition
     const createPayload = {
       inputs: spendInputs,
       outputs: [{
@@ -458,25 +495,15 @@ async function handleSpend() {
     const createResult = await apiCall('/api/ladder/create', createPayload);
     if (!createResult || !createResult.hex) throw new Error('Failed to create spending tx');
 
-    // Build signers array based on condition type
-    log('Signing with ' + numSignersNeeded + ' ' + scheme + ' key(s)...');
-    const signers = [];
-    for (let si = 0; si < numSignersNeeded; si++) {
-      const key = conditionKeys[si];
-      if (isPQ) {
-        signers.push({ input: 0, pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
-      } else {
-        signers.push({ input: 0, privkey: key.privkey });
-      }
-    }
+    log('Signing with ' + keysUsed + ' ' + scheme + ' key(s)...');
     const signPayload = {
       hex: createResult.hex,
-      signers,
+      signers: [{ input: 0, blocks: signerBlocks }],
       spent_outputs: [{ amount: utxoOutput.value, scriptPubKey: utxoOutput.scriptPubKey?.hex || '' }],
     };
     const signResult = await apiCall('/api/ladder/sign', signPayload);
     if (!signResult || !signResult.hex) throw new Error('Signing failed');
-    log(numSignersNeeded + ' signature(s) applied (' + scheme + ')', 'ok');
+    log(keysUsed + ' signature(s) applied (' + scheme + ')', 'ok');
 
     log('Broadcasting...');
     const broadcastResult = await apiCall('/api/ladder/broadcast', { hex: signResult.hex });

@@ -8004,23 +8004,60 @@ function SpendPanel({ onViewAsLadder }) {
       const conditionKeys = rec.conditionKeys || [];
       if (conditionKeys.length === 0) throw new Error('No signing keys found. This record has no stored keys.');
 
-      // Detect how many signers are needed from the stored rung conditions
-      let numSignersNeeded = 1;
-      let conditionType = 'SIG';
-      if (rec.rungs && rec.rungs.length > 0) {
-        const firstRung = rec.rungs[0];
-        const blocks = firstRung.blocks || [];
-        for (const b of blocks) {
-          if (b.type === 'MULTISIG' || b.type === 'TIMELOCKED_MULTISIG') {
-            conditionType = b.type;
-            numSignersNeeded = parseInt(b.values?.threshold) || 2;
-            addLog('Detected ' + b.type + ' (threshold=' + numSignersNeeded + ')', 'info');
-            break;
+      // Analyze stored rung conditions to build the correct signer format
+      // signrungtx expects: { input, blocks: [{ type, privkey/privkeys }] }
+      const rungBlocks = (rec.rungs && rec.rungs[0]?.blocks) || [];
+      const signerBlocks = [];
+      let keysUsed = 0;
+
+      for (const b of rungBlocks) {
+        if (b.type === 'SIG') {
+          const key = conditionKeys[keysUsed];
+          if (!key) throw new Error('Not enough keys for SIG block (need key #' + (keysUsed + 1) + ').');
+          if (isPQ) {
+            signerBlocks.push({ type: 'SIG', pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
+          } else {
+            signerBlocks.push({ type: 'SIG', privkey: key.privkey });
+          }
+          keysUsed++;
+        } else if (b.type === 'MULTISIG' || b.type === 'TIMELOCKED_MULTISIG') {
+          const threshold = parseInt(b.values?.threshold) || 2;
+          if (keysUsed + threshold > conditionKeys.length) {
+            throw new Error(b.type + ' requires ' + threshold + ' keys but only ' + (conditionKeys.length - keysUsed) + ' available.');
+          }
+          const privkeys = [];
+          for (let si = 0; si < threshold; si++) {
+            privkeys.push(conditionKeys[keysUsed + si].privkey);
+          }
+          if (isPQ) {
+            signerBlocks.push({
+              type: b.type, scheme,
+              pq_privkeys: privkeys,
+              pq_pubkeys: conditionKeys.slice(keysUsed, keysUsed + threshold).map(k => k.pubkey),
+            });
+          } else {
+            signerBlocks.push({ type: b.type, privkeys });
+          }
+          addLog('Detected ' + b.type + ' (threshold=' + threshold + ', providing ' + threshold + ' keys)', 'info');
+          keysUsed += threshold;
+        } else if (b.type === 'HASH_PREIMAGE' || b.type === 'HASH160_PREIMAGE') {
+          // Preimage blocks — check if we have stored preimages
+          const preimages = rec.preimages || [];
+          if (preimages.length > 0) {
+            signerBlocks.push({ type: b.type, preimage: preimages[0]?.preimage || preimages[0] });
           }
         }
+        // Other block types (CSV, CLTV, etc.) don't need signing data
       }
-      if (numSignersNeeded > conditionKeys.length) {
-        throw new Error(conditionType + ' requires ' + numSignersNeeded + ' signers but only ' + conditionKeys.length + ' key(s) stored.');
+
+      // Fallback: if no blocks detected, use simple SIG format
+      if (signerBlocks.length === 0 && conditionKeys.length > 0) {
+        const key = conditionKeys[0];
+        if (isPQ) {
+          signerBlocks.push({ type: 'SIG', pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
+        } else {
+          signerBlocks.push({ type: 'SIG', privkey: key.privkey });
+        }
       }
 
       // Get a wallet key for the output condition
@@ -8042,25 +8079,16 @@ function SpendPanel({ onViewAsLadder }) {
       if (!createResult || !createResult.hex) throw new Error('Failed to create spending tx.');
       addLog('Unsigned tx created (' + (createResult.hex.length / 2) + ' bytes)', 'ok');
 
-      // 5. Sign — build signers array based on condition type
-      addLog('Signing with ' + numSignersNeeded + ' ' + scheme + ' key(s)...');
-      const signers = [];
-      for (let si = 0; si < numSignersNeeded; si++) {
-        const key = conditionKeys[si];
-        if (isPQ) {
-          signers.push({ input: 0, pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
-        } else {
-          signers.push({ input: 0, privkey: key.privkey });
-        }
-      }
+      // 5. Sign using blocks-based signer format
+      addLog('Signing with ' + keysUsed + ' ' + scheme + ' key(s)...');
       const signPayload = {
         hex: createResult.hex,
-        signers,
+        signers: [{ input: 0, blocks: signerBlocks }],
         spent_outputs: [{ amount: utxoOutput.value, scriptPubKey: utxoOutput.scriptPubKey?.hex || '' }],
       };
       const signResult = await apiCall('/api/ladder/sign', signPayload, true);
       if (!signResult || !signResult.hex) throw new Error('Signing failed.');
-      addLog(numSignersNeeded + ' signature(s) applied (' + scheme + ')', 'ok');
+      addLog(keysUsed + ' signature(s) applied (' + scheme + ')', 'ok');
 
       // 6. Broadcast
       addLog('Broadcasting...');
