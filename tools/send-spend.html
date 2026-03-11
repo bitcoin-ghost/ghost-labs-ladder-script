@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Send &amp; Spend | Ghost Labs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --black: #050505; --darker: #0a0a0a; --dark: #0f0f0f;
+      --gray-900: #141414; --gray-800: #1a1a1a; --gray-700: #242424;
+      --gray-600: #333333; --gray-500: #4a4a4a; --gray-400: #666666;
+      --gray-300: #888888; --gray-200: #aaaaaa; --gray-100: #cccccc;
+      --white: #f0f0f0;
+      --orange: #f7931a; --orange-light: #ffb347;
+      --cyan: #00d4ff; --green: #00ff88; --red: #ff4444;
+      --font-display: 'Outfit', system-ui, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font-display); background: var(--black); color: var(--gray-100); line-height: 1.6; }
+    ::selection { background: var(--orange); color: var(--black); }
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+
+    /* Nav */
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 16px 0; background: rgba(5, 5, 5, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid var(--gray-800); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+    .logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--white); }
+    .logo-icon { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; }
+    .logo-icon img { width: 100%; height: 100%; object-fit: contain; }
+    .logo-text { font-weight: 700; font-size: 20px; }
+    .logo-text span { color: var(--orange); }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-links > a, .nav-dropdown > a { color: var(--gray-300); text-decoration: none; padding: 8px 16px; font-size: 14px; font-weight: 500; border-radius: 8px; transition: all 0.2s; }
+    .nav-links > a:hover, .nav-dropdown > a:hover { color: var(--white); background: var(--gray-800); }
+    .nav-links > a.active, .nav-dropdown > a.active { color: var(--orange); }
+    .nav-dropdown { position: relative; }
+    .nav-dropdown-menu { position: absolute; top: 100%; left: 0; background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 8px; padding: 8px; min-width: 160px; opacity: 0; visibility: hidden; transform: translateY(-8px); transition: all 0.2s; }
+    .nav-dropdown:hover .nav-dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+    .nav-dropdown-menu a { display: block; padding: 10px 16px; color: var(--gray-300); text-decoration: none; font-size: 14px; border-radius: 6px; }
+    .nav-dropdown-menu a:hover { background: var(--gray-800); color: var(--white); }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; font-family: var(--font-display); font-size: 14px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer; }
+    .btn-primary { background: var(--orange); color: var(--black); }
+    .btn-primary:hover { background: var(--orange-light); }
+    .btn-secondary { background: var(--gray-800); color: var(--white); }
+    .btn-secondary:hover { background: var(--gray-700); }
+    .btn-ghost { background: transparent; color: var(--gray-300); padding: 8px 12px; }
+    .btn-ghost:hover { color: var(--white); }
+
+    /* Page Header */
+    .page-header { padding: 140px 0 48px; text-align: center; background: linear-gradient(180deg, var(--gray-900) 0%, var(--black) 100%); }
+    .page-title { font-size: clamp(40px, 6vw, 64px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; }
+    .page-title span { background: linear-gradient(135deg, var(--orange), var(--orange-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .page-subtitle { font-size: 20px; color: var(--gray-400); max-width: 650px; margin: 0 auto 24px; font-family: var(--font-mono); }
+    .page-badge { display: inline-block; font-size: 12px; font-family: var(--font-mono); font-weight: 600; color: var(--green); background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); padding: 4px 14px; border-radius: 100px; letter-spacing: 0.08em; }
+
+    /* Sections */
+    section { padding: 80px 0; border-bottom: 1px solid var(--gray-800); }
+    .section-num { font-size: 12px; font-family: var(--font-mono); color: var(--orange); margin-bottom: 8px; }
+    .section-title { font-size: 28px; font-weight: 700; margin-bottom: 16px; }
+    .section-content { font-size: 16px; color: var(--gray-300); line-height: 1.8; }
+    .section-content p { margin-bottom: 20px; }
+
+    /* Transaction Record */
+    .tx-record { background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 16px; margin-top: 32px; overflow: hidden; transition: border-color 0.3s; }
+    .tx-record:hover { border-color: var(--gray-600); }
+    .tx-record-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 28px; border-bottom: 1px solid var(--gray-800); flex-wrap: wrap; gap: 12px; }
+    .tx-record-title { font-size: 20px; font-weight: 700; color: var(--white); }
+    .tx-record-date { font-size: 13px; font-family: var(--font-mono); color: var(--gray-400); }
+    .tx-record-body { padding: 28px; }
+
+    .tx-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+    .tx-box { background: var(--black); border: 1px solid var(--gray-800); border-radius: 12px; padding: 20px; }
+    .tx-box-label { font-size: 11px; font-family: var(--font-mono); font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .tx-box-label .arrow-right { color: var(--orange); }
+    .tx-box-label .arrow-left { color: var(--cyan); }
+    .tx-field { margin-bottom: 10px; }
+    .tx-field:last-child { margin-bottom: 0; }
+    .tx-field-name { font-size: 12px; font-family: var(--font-mono); color: var(--gray-400); margin-bottom: 2px; }
+    .tx-field-value { font-size: 14px; font-family: var(--font-mono); color: var(--gray-100); word-break: break-all; }
+    .tx-field-value.txid { font-size: 12px; color: var(--orange); }
+    .tx-field-value.highlight { color: var(--green); }
+    .tx-field-value.cyan { color: var(--cyan); }
+
+    /* Verification Grid */
+    .verify-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 20px; }
+    .verify-item { background: var(--black); border: 1px solid var(--gray-800); border-radius: 10px; padding: 16px; text-align: center; }
+    .verify-item.pass { border-color: rgba(0, 255, 136, 0.3); }
+    .verify-label { font-size: 11px; font-family: var(--font-mono); color: var(--gray-400); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+    .verify-value { font-size: 18px; font-family: var(--font-mono); font-weight: 600; color: var(--white); }
+    .verify-value.ok { color: var(--green); }
+    .verify-check { font-size: 12px; font-family: var(--font-mono); color: var(--green); margin-top: 6px; }
+
+    /* Scheme badge */
+    .scheme-badge { display: inline-block; font-size: 11px; font-family: var(--font-mono); font-weight: 600; padding: 3px 10px; border-radius: 6px; letter-spacing: 0.5px; }
+    .scheme-badge.pq { background: rgba(0, 212, 255, 0.12); color: var(--cyan); border: 1px solid rgba(0, 212, 255, 0.3); }
+    .scheme-badge.classical { background: rgba(247, 147, 26, 0.12); color: var(--orange); border: 1px solid rgba(247, 147, 26, 0.3); }
+
+    /* Witness breakdown */
+    .witness-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0 8px; }
+    .witness-seg { display: flex; align-items: center; justify-content: center; font-size: 10px; font-family: var(--font-mono); font-weight: 600; color: var(--black); }
+    .witness-seg.scheme { background: var(--cyan); }
+    .witness-seg.pubkey { background: var(--orange); }
+    .witness-seg.sig { background: var(--green); }
+    .witness-seg.overhead { background: var(--gray-500); }
+    .witness-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
+    .witness-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--font-mono); color: var(--gray-300); }
+    .witness-legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    /* How It Works */
+    .flow-container { margin: 40px 0; }
+    .flow-step { display: flex; gap: 24px; margin-bottom: 24px; padding: 24px; background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 12px; }
+    .flow-num { width: 48px; height: 48px; background: var(--orange); color: var(--black); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; flex-shrink: 0; }
+    .flow-content h4 { font-size: 16px; font-weight: 600; color: var(--white); margin-bottom: 8px; }
+    .flow-content p { font-size: 14px; color: var(--gray-400); margin: 0; }
+
+    /* Footer */
+    footer { border-top: 1px solid var(--gray-800); padding: 40px 24px; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .footer-left { display: flex; align-items: center; gap: 32px; }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { color: var(--gray-400); text-decoration: none; font-size: 14px; }
+    .footer-links a:hover { color: var(--white); }
+    .footer-right { font-size: 13px; color: var(--gray-500); }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .tx-pair { grid-template-columns: 1fr; }
+      .tx-record-header { flex-direction: column; align-items: flex-start; }
+      .flow-step { flex-direction: column; gap: 16px; }
+    }
+    @media (max-width: 600px) {
+      .footer-inner { flex-direction: column; gap: 24px; text-align: center; }
+      .footer-left { flex-direction: column; gap: 16px; }
+      .verify-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-inner">
+      <a href="../index.html" class="logo">
+        <div class="logo-icon"><img src="../logo.png" alt="Bitcoin Ghost"></div>
+        <div class="logo-text">Bitcoin<span>Ghost</span></div>
+      </a>
+      <div class="nav-links">
+        <a href="../index.html">Home</a>
+        <a href="../network.html">Network</a>
+        <div class="nav-dropdown">
+          <a href="../pool.html">Pool</a>
+          <div class="nav-dropdown-menu">
+            <a href="../pool.html">Connect</a>
+            <a href="../pool-stats.html">Statistics</a>
+            <a href="../node-finder.html">Node Finder</a>
+          </div>
+        </div>
+        <a href="../how-it-works.html">How It Works</a>
+        <a href="../economics.html">Economics</a>
+        <a href="../ghost-labs.html" class="active">Labs</a>
+        <a href="../docs/index.html">Docs</a>
+      </div>
+      <div class="nav-right">
+        <a href="https://github.com/bitcoin-ghost" class="btn btn-ghost" target="_blank">
+          <svg style="width:20px;height:20px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+        <a href="../get-started.html" class="btn btn-primary">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="page-header">
+    <div class="container">
+      <h1 class="page-title"><span>Send &amp; Spend</span></h1>
+      <p class="page-subtitle">Provable Ladder Script transactions on regtest</p>
+      <div class="page-badge">VERIFIED ON-CHAIN</div>
+    </div>
+  </header>
+
+  <!-- About -->
+  <section id="about">
+    <div class="container">
+      <div class="section-num">// 01</div>
+      <h2 class="section-title">What Is This</h2>
+      <div class="section-content">
+        <p>Every transaction format needs proof that it works end-to-end: fund a UTXO with spending conditions, then spend it by satisfying those conditions. This page documents proven Ladder Script transaction round-trips &mdash; real outputs that were created, confirmed, and then successfully spent on a live network.</p>
+        <p>Each record shows both the funding and spending transaction, the witness data, and cryptographic verification that the spending conditions were correctly evaluated.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PQ Verification Record -->
+  <section id="records">
+    <div class="container">
+      <div class="section-num">// 02</div>
+      <h2 class="section-title">Transaction Records</h2>
+
+      <div class="tx-record" id="falcon512-roundtrip">
+        <div class="tx-record-header">
+          <div>
+            <div class="tx-record-title">Falcon-512 PQ Round-Trip</div>
+            <div style="margin-top: 6px;">
+              <span class="scheme-badge pq">FALCON-512</span>
+              <span style="font-size: 13px; font-family: var(--font-mono); color: var(--gray-400); margin-left: 12px;">Post-quantum signature &mdash; first proven spend</span>
+            </div>
+          </div>
+          <div class="tx-record-date">2026-03-10</div>
+        </div>
+
+        <div class="tx-record-body">
+          <!-- Funding + Spending TX pair -->
+          <div class="tx-pair">
+            <div class="tx-box">
+              <div class="tx-box-label"><span class="arrow-right">&#9654;</span> Funding Transaction</div>
+              <div class="tx-field">
+                <div class="tx-field-name">TXID</div>
+                <div class="tx-field-value txid">b3241e42ef929147b4e6b82519425ced84be427b55136aa56a83a7a47d34d1f9</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Version</div>
+                <div class="tx-field-value">4 (RUNG_TX)</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Size</div>
+                <div class="tx-field-value">213 bytes / 130 vB</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Output</div>
+                <div class="tx-field-value">Rung conditions with PUBKEY_COMMIT (SHA-256 of 897-byte Falcon-512 public key)</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Confirmations</div>
+                <div class="tx-field-value highlight">2</div>
+              </div>
+            </div>
+
+            <div class="tx-box">
+              <div class="tx-box-label"><span class="arrow-left">&#9664;</span> Spending Transaction</div>
+              <div class="tx-field">
+                <div class="tx-field-name">TXID</div>
+                <div class="tx-field-value txid">946558852cab148220a0d2d02555916006f264170c4ab60cb4ea6f9cad602884</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Version</div>
+                <div class="tx-field-value">4 (RUNG_TX)</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Size</div>
+                <div class="tx-field-value">1,656 bytes / 476 vB</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Witness</div>
+                <div class="tx-field-value">1,568 bytes (Falcon-512 ladder witness)</div>
+              </div>
+              <div class="tx-field">
+                <div class="tx-field-name">Confirmations</div>
+                <div class="tx-field-value highlight">1</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Witness Breakdown Bar -->
+          <div style="margin-bottom: 24px;">
+            <div class="tx-field-name" style="margin-bottom: 4px;">WITNESS BREAKDOWN (1,568 bytes)</div>
+            <div class="witness-bar">
+              <div class="witness-seg scheme" style="flex: 1;" title="Scheme byte: 0x10 (FALCON-512)">0x10</div>
+              <div class="witness-seg pubkey" style="flex: 897;" title="Public key: 897 bytes">897B key</div>
+              <div class="witness-seg sig" style="flex: 657;" title="Signature: 657 bytes">657B sig</div>
+              <div class="witness-seg overhead" style="flex: 13;" title="Framing overhead: 13 bytes"></div>
+            </div>
+            <div class="witness-legend">
+              <div class="witness-legend-item"><div class="witness-legend-dot" style="background: var(--cyan);"></div> Scheme (1B)</div>
+              <div class="witness-legend-item"><div class="witness-legend-dot" style="background: var(--orange);"></div> Public Key (897B)</div>
+              <div class="witness-legend-item"><div class="witness-legend-dot" style="background: var(--green);"></div> Signature (657B)</div>
+              <div class="witness-legend-item"><div class="witness-legend-dot" style="background: var(--gray-500);"></div> Framing (13B)</div>
+            </div>
+          </div>
+
+          <!-- Verification Checks -->
+          <div class="tx-field-name" style="margin-bottom: 4px;">CRYPTOGRAPHIC VERIFICATION</div>
+          <div class="verify-grid">
+            <div class="verify-item pass">
+              <div class="verify-label">Public Key</div>
+              <div class="verify-value ok">897 bytes</div>
+              <div class="verify-check">Falcon-512 exact</div>
+            </div>
+            <div class="verify-item pass">
+              <div class="verify-label">Signature</div>
+              <div class="verify-value ok">657 bytes</div>
+              <div class="verify-check">Falcon-512 range (625&ndash;809B)</div>
+            </div>
+            <div class="verify-item pass">
+              <div class="verify-label">PUBKEY_COMMIT</div>
+              <div class="verify-value ok">Verified</div>
+              <div class="verify-check">SHA256(key) == conditions</div>
+            </div>
+            <div class="verify-item pass">
+              <div class="verify-label">Witness Parse</div>
+              <div class="verify-value ok">1568 / 1568</div>
+              <div class="verify-check">All bytes consumed</div>
+            </div>
+            <div class="verify-item pass">
+              <div class="verify-label">Scheme Byte</div>
+              <div class="verify-value ok">0x10</div>
+              <div class="verify-check">FALCON_512 correct</div>
+            </div>
+            <div class="verify-item pass">
+              <div class="verify-label">Spend Result</div>
+              <div class="verify-value ok">Confirmed</div>
+              <div class="verify-check">Block accepted</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section id="how" style="border-bottom: none;">
+    <div class="container">
+      <div class="section-num">// 03</div>
+      <h2 class="section-title">How A Round-Trip Works</h2>
+      <div class="section-content">
+        <p>Each record proves the full lifecycle of a Ladder Script UTXO &mdash; from creation to redemption.</p>
+      </div>
+
+      <div class="flow-container">
+        <div class="flow-step">
+          <div class="flow-num">1</div>
+          <div class="flow-content">
+            <h4>Create Conditions</h4>
+            <p>Design spending conditions using Ladder Script blocks &mdash; signatures, timelocks, hash preimages, covenants, or any combination. Each block is typed and deterministic.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">2</div>
+          <div class="flow-content">
+            <h4>Fund the Output</h4>
+            <p>Build a v4 RUNG_TX transaction that creates an output with the specified rung conditions. The conditions are serialized and committed in the output. For PQ schemes, only a 32-byte PUBKEY_COMMIT is stored on-chain.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">3</div>
+          <div class="flow-content">
+            <h4>Spend the UTXO</h4>
+            <p>Construct a spending transaction that provides a ladder witness satisfying the conditions. The evaluator checks each block in each rung &mdash; first satisfied rung wins (OR logic), all blocks within a rung must pass (AND logic).</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-num">4</div>
+          <div class="flow-content">
+            <h4>Verify On-Chain</h4>
+            <p>The spending transaction is broadcast, validated by consensus, and confirmed in a block. The full witness is parseable and every cryptographic check can be independently verified.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-left">
+        <a href="../index.html" class="logo">
+          <div class="logo-icon"><img src="../logo.png" alt="Bitcoin Ghost"></div>
+          <div class="logo-text">Bitcoin<span>Ghost</span></div>
+        </a>
+        <div class="footer-links">
+          <a href="https://github.com/bitcoin-ghost" target="_blank">GitHub</a>
+          <a href="../docs/index.html">Docs</a>
+          <a href="../economics.html">Economics</a>
+        </div>
+      </div>
+      <div class="footer-right">
+        &copy; 2026 Bitcoin Ghost. Open source under MIT License.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
