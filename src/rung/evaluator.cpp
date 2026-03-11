@@ -2985,7 +2985,7 @@ bool VerifyRungTx(const CTransaction& tx,
             return false;
         }
     } else {
-        // Bootstrap spend: v3 tx spending a v1/v2 UTXO
+        // Bootstrap spend: v4 tx spending a v1/v2 UTXO
         RungConditions empty_conditions;
         LadderSignatureChecker ladder_checker(checker, empty_conditions, txdata, tx, nIn);
         if (!EvalLadder(witness_ladder, ladder_checker, SigVersion::LADDER, execdata, eval_ctx)) {

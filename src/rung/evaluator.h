@@ -185,7 +185,7 @@ bool EvalLadder(const LadderWitness& ladder,
 /** Compute the BIP-119 CTV template hash for a transaction at a given input index. */
 uint256 ComputeCTVHash(const CTransaction& tx, uint32_t input_index);
 
-/** Top-level verification entry point for v3 RUNG_TX transactions. */
+/** Top-level verification entry point for v4 RUNG_TX transactions. */
 bool VerifyRungTx(const CTransaction& tx,
                   unsigned int nIn,
                   const CTxOut& spent_output,

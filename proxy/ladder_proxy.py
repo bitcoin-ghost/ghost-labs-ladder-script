@@ -6,7 +6,7 @@ Builder. Runs on the same VM as ghostd, proxying browser requests to localhost
 RPC with rate limiting and input validation.
 
 Endpoints:
-  POST /api/ladder/create     - createrungtx (build v3 tx from JSON)
+  POST /api/ladder/create     - createrungtx (build v4 tx from JSON)
   POST /api/ladder/sign       - signrungtx (sign with wallet keys)
   POST /api/ladder/broadcast   - sendrawtransaction (push to signet)
   POST /api/ladder/decode      - decoderung (decode ladder hex)
@@ -287,7 +287,7 @@ async def status():
 
 @app.post("/api/ladder/create")
 async def create_rungtx(request: Request):
-    """Build a v3 ladder transaction from JSON spec."""
+    """Build a v4 ladder transaction from JSON spec."""
     body = await request.body()
     if len(body) > MAX_JSON_SIZE:
         raise HTTPException(400, "Request too large.")
@@ -317,7 +317,7 @@ async def create_rungtx(request: Request):
 
 @app.post("/api/ladder/sign")
 async def sign_rungtx(request: Request):
-    """Sign a v3 ladder transaction."""
+    """Sign a v4 ladder transaction."""
     body = await request.body()
     if len(body) > MAX_JSON_SIZE:
         raise HTTPException(400, "Request too large.")
@@ -540,6 +540,29 @@ async def blocks_recent():
             "txids": block.get("tx", []),
         })
     return blocks
+
+
+@app.post("/api/ladder/pq/keypair")
+async def pq_keypair(request: Request):
+    """Generate a post-quantum keypair for the specified scheme."""
+    body = await request.body()
+    try:
+        data = json.loads(body) if body else {}
+    except json.JSONDecodeError:
+        data = {}
+
+    scheme = data.get("scheme", "FALCON512")
+    valid_schemes = {"FALCON512", "FALCON1024", "DILITHIUM3", "SPHINCS_SHA"}
+    if scheme not in valid_schemes:
+        raise HTTPException(400, f"Invalid PQ scheme. Use one of: {', '.join(sorted(valid_schemes))}")
+
+    result = await rpc_call("generatepqkeypair", [scheme])
+    # Compute pubkey_commit (SHA-256 of raw pubkey bytes)
+    pubkey_hex = result.get("pubkey", "")
+    if pubkey_hex:
+        commit = hashlib.sha256(bytes.fromhex(pubkey_hex)).hexdigest()
+        result["pubkey_commit"] = commit
+    return result
 
 
 @app.post("/api/ladder/mine")

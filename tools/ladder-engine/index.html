@@ -3473,7 +3473,11 @@ function toNumericHex(val) {
 // Export a single block to wire format (shared by both export functions)
 function isCompactSigEligible(rung) {
   const nonRefBlocks = rung.blocks.filter(b => b.type !== 'OUTPUT_REF');
-  return nonRefBlocks.length === 1 && nonRefBlocks[0].type === 'SIG';
+  if (nonRefBlocks.length !== 1 || nonRefBlocks[0].type !== 'SIG') return false;
+  // PQ schemes must use full block encoding, not compact
+  const scheme = nonRefBlocks[0].values?.scheme || rung.output?.scheme || 'SCHNORR';
+  if (scheme !== 'SCHNORR' && scheme !== 'ECDSA') return false;
+  return true;
 }
 
 function exportCompactSig(rung) {
@@ -3481,7 +3485,7 @@ function exportCompactSig(rung) {
   return {
     compact_type: 'COMPACT_SIG',
     pubkey_commit: sigBlock.values.pubkey || '',
-    scheme: sigBlock.values.scheme || 'SCHNORR'
+    scheme: sigBlock.values.scheme || rung.output?.scheme || 'SCHNORR'
   };
 }
 
@@ -3568,8 +3572,9 @@ function exportCreateRungtx(rungs, txOutputs, txInputs, locktime) {
   });
 
   // Build outputs — each output gets its conditions from assigned rungs
+  // In v4 RUNG_TX, every output MUST have at least one condition — skip empty ones
   const outputs = txOutputs
-    .filter(o => o.address || parseInt(o.amount) > 0)
+    .filter(o => rungsByOutput.has(o.id))
     .map(o => {
       const assignedRungs = rungsByOutput.get(o.id) || [];
       const amt = parseInt(o.amount) || 0;
@@ -4265,6 +4270,7 @@ function BlockModal({ block, onChange, onClose, rungs }) {
                       onChange={(e) => onChange(block.id, field.name, e.target.value)}
                     >
                       <option value="">SCHNORR (default)</option>
+                      <option value="ECDSA">ECDSA</option>
                       <option value="FALCON512">FALCON-512 (PQ)</option>
                       <option value="FALCON1024">FALCON-1024 (PQ)</option>
                       <option value="DILITHIUM3">DILITHIUM3 (PQ)</option>
@@ -4654,7 +4660,7 @@ function RungView({ rung, rungIndex, rungCount, selectedBlock, selectedCoil, sel
   );
 }
 
-function LadderView({ rungs, selectedBlock, selectedCoil, selectedInput, mode, simState, onSelectBlock, onSelectCoil, onSelectInput, onDeleteBlock, onDeleteRung, onDropBlock, onAddRung, onAddRungWithBlock, onAddChangeRung, onRungLabelChange, onReorderBlock, onMoveRung, onMoveBlockCrossRung, txOutputs, txInputs, fullscreen, onToggleFullscreen, scanPhase, scanStep, scanResults, scanSpeed, onScanStart, onScanPause, onScanResume, onScanStepFwd, onScanStepBack, onScanReset, onScanSpeedChange, scanIdx, scanTotal, spentRungs, forcedBlocks, onForceBlock, onExecuteRung, onResetSim, onStartScanFrom, simActiveRungId, simActiveStep, simStepResults, onStepBlock, tips, onNameChange, onExpandBlock, onBlockContextMenu, renamingBlockId, onClearRenaming, onClear, onInputContextMenu, onRungChange, renamingInputId, onClearRenamingInput, onDeselect, onOutputContextMenu, onJustifyLeft }) {
+function LadderView({ rungs, selectedBlock, selectedCoil, selectedInput, mode, simState, onSelectBlock, onSelectCoil, onSelectInput, onDeleteBlock, onDeleteRung, onDropBlock, onAddRung, onAddRungWithBlock, onAddChangeRung, onRungLabelChange, onReorderBlock, onMoveRung, onMoveBlockCrossRung, txOutputs, txInputs, fullscreen, onToggleFullscreen, scanPhase, scanStep, scanResults, scanSpeed, onScanStart, onScanPause, onScanResume, onScanStepFwd, onScanStepBack, onScanReset, onScanSpeedChange, scanIdx, scanTotal, spentRungs, forcedBlocks, onForceBlock, onExecuteRung, onResetSim, onStartScanFrom, simActiveRungId, simActiveStep, simStepResults, onStepBlock, tips, onNameChange, onExpandBlock, onBlockContextMenu, renamingBlockId, onClearRenaming, onClear, onInputContextMenu, onRungChange, renamingInputId, onClearRenamingInput, onDeselect, onOutputContextMenu, onJustifyLeft, onFillAllTestData }) {
   const simMode = mode === 'simulate' || mode === 'watch';
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -4766,6 +4772,7 @@ function LadderView({ rungs, selectedBlock, selectedCoil, selectedInput, mode, s
         <div style={{ flex: 1 }} />
         {!simMode && <button className="ladder-toolbar-btn" onClick={onAddRung}>+ RUNG</button>}
         {!simMode && <button className="ladder-toolbar-btn" onClick={onAddChangeRung} style={{ color: 'var(--green-bright)', borderColor: 'var(--green-dim)' }} title="Add a compact SIG change output rung">+ CHANGE</button>}
+        {!simMode && <button className="ladder-toolbar-btn" onClick={onFillAllTestData} style={{ color: 'var(--cyan)', borderColor: 'rgba(0,212,255,0.3)' }} title="Fill all blocks with valid test data">FILL TEST DATA</button>}
         {!simMode && <button className="ladder-toolbar-btn" onClick={onClear} style={{ color: 'var(--red)', borderColor: 'var(--red-dim)' }} title="Clear all rungs and start fresh">CLEAR</button>}
         <button className="ladder-toolbar-btn" onClick={onToggleFullscreen} title={fullscreen ? 'Exit fullscreen (F11)' : 'Fullscreen (F11)'}>{fullscreen ? '⊡' : '⊞'}</button>
       </div>
@@ -4991,6 +4998,7 @@ function PropertiesPanel({ block, onChange, rungs, onExpand }) {
                     onChange={(e) => onChange(block.id, field.name, e.target.value)}
                   >
                     <option value="">SCHNORR (default)</option>
+                    <option value="ECDSA">ECDSA</option>
                     <option value="FALCON512">FALCON-512 (PQ)</option>
                     <option value="FALCON1024">FALCON-1024 (PQ)</option>
                     <option value="DILITHIUM3">DILITHIUM3 (PQ)</option>
@@ -5435,7 +5443,9 @@ function HighlightedJson({ rungs, txOutputs, txInputs, locktime, spentRungs, sim
 
     // Build rung→output/condition mapping
     // For each filtered output, find its assigned rungs (same order as exportCreateRungtx)
-    const filteredOutputs = txOutputs.filter(o => o.address || parseInt(o.amount) > 0);
+    const rungsByOutputHL = new Map();
+    rungs.forEach(r => { if (r.output.type !== 'relay' && r.output.txOutputId != null) { const k = r.output.txOutputId; if (!rungsByOutputHL.has(k)) rungsByOutputHL.set(k, []); rungsByOutputHL.get(k).push(r); }});
+    const filteredOutputs = txOutputs.filter(o => rungsByOutputHL.has(o.id));
     const rungCondMap = []; // { rungId, outputIdx, conditionIdx, blockCount, blocks: [{ blockId }] }
     filteredOutputs.forEach((txOut, outIdx) => {
       const assignedRungs = rungs.filter(r => r.output.txOutputId === txOut.id);
@@ -6815,7 +6825,7 @@ function decodedToBuilderRungs(data) {
     });
     return { rungs, txInputs, txOutputs };
   }
-  // Format 4: raw tx with version 4 — { version: 3, vin, vout[].rung_conditions }
+  // Format 4: raw tx with version 4 — { version: 4, vin, vout[].rung_conditions }
   if (data.version === 4 && data.vout) {
     const txInputs = (data.vin || []).map(v => ({ id: uid(), txid: v.txid || '', vout: v.vout || 0, sequence: v.sequence !== undefined ? String(v.sequence) : '' }));
     const txOutputs = [];
@@ -6936,6 +6946,7 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
   const [showTxJson, setShowTxJson] = useState(true);
   const [funded, setFunded] = useState(false);
   const [signingData, setSigningData] = useState(null); // { keypairs, spentOutputs }
+  const [fundScheme, setFundScheme] = useState('SCHNORR'); // scheme for output conditions
   const [copiedKey, setCopiedKey] = useState(null);
 
   const copyWithFeedback = (text, key) => {
@@ -6956,7 +6967,10 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
       if (!r.ok) throw new Error(data.detail?.rpc_error || data.detail || `HTTP ${r.status}`);
       return data;
     } catch (e) {
-      if (!silent) setError(e.message);
+      const msg = e.message === 'Failed to fetch'
+        ? 'Signet proxy unreachable — check that the ladder-script proxy is running on ' + SIGNET_API
+        : e.message;
+      if (!silent) setError(msg);
       return null;
     } finally {
       setLoading('');
@@ -7032,11 +7046,11 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
 
     // Bootstrap signing: the wallet UTXOs are standard wpkh outputs, not ladder outputs.
     // The ladder conditions define the new OUTPUT spending rules (already encoded by createrungtx).
-    // For INPUT signing, we just need a simple SIG block per input using a wallet private key.
-    const firstKey = signingData.keypairs[0];
+    // For INPUT signing, we use the standard wallet key (even when outputs use PQ schemes).
+    const inputKey = signingData.walletKey || signingData.keypairs[0];
     const signers = signingData.selectedUtxos.map((u, inputIdx) => ({
       input: inputIdx,
-      privkey: firstKey.privkey,
+      privkey: inputKey.privkey,
     }));
 
     // Build spent_outputs
@@ -7102,11 +7116,17 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
     if (confirmed.length === 0) { setError('No confirmed UTXOs. Mine a block first.'); return; }
 
     // 2. Count how many unique pubkeys we need (across all SIG/MULTISIG blocks)
+    // Also track SIG blocks with EMPTY pubkeys — these still need keys generated
     const pubkeyFields = [];
+    const emptyPubkeySigs = []; // SIG blocks that have no pubkey yet
     rungs.forEach((rung, ri) => {
       rung.blocks.forEach((block, bi) => {
-        if (block.type === 'SIG' && block.values.pubkey) {
-          pubkeyFields.push({ ri, bi, field: 'pubkey', multi: false });
+        if (block.type === 'SIG') {
+          if (block.values.pubkey) {
+            pubkeyFields.push({ ri, bi, field: 'pubkey', multi: false });
+          } else {
+            emptyPubkeySigs.push({ ri, bi });
+          }
         } else if ((block.type === 'MULTISIG' || block.type === 'TIMELOCKED_MULTISIG') && block.values.pubkeys) {
           pubkeyFields.push({ ri, bi, field: 'pubkeys', multi: true });
         } else if (block.type === 'MUSIG_THRESHOLD' && block.values.agg_pubkey) {
@@ -7117,7 +7137,8 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
       });
     });
 
-    // 3. Generate enough wallet keypairs for all unique pubkeys needed
+    // 3. Generate enough keypairs for all unique pubkeys needed (+ empty SIG blocks)
+    const isPQ = fundScheme !== 'SCHNORR' && fundScheme !== 'ECDSA';
     const allPubkeysNeeded = new Set();
     pubkeyFields.forEach(pf => {
       const block = rungs[pf.ri].blocks[pf.bi];
@@ -7128,44 +7149,91 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
         allPubkeysNeeded.add(block.values[pf.field]);
       }
     });
+    // Each empty SIG block needs its own keypair
+    const numEmptyKeys = emptyPubkeySigs.length;
 
-    const numKeypairs = Math.max(allPubkeysNeeded.size, 1);
+    const numKeypairs = Math.max(allPubkeysNeeded.size + numEmptyKeys, 1);
     const keypairs = [];
     for (let i = 0; i < numKeypairs; i++) {
-      const kp = await apiCall('/api/ladder/wallet/keypair');
-      if (!kp) { setError('Failed to generate wallet keypair.'); return; }
-      keypairs.push(kp);
+      if (isPQ) {
+        const kp = await apiCall('/api/ladder/pq/keypair', { scheme: fundScheme });
+        if (!kp) { setError('Failed to generate PQ keypair. Check liboqs support.'); return; }
+        keypairs.push(kp);
+      } else {
+        const kp = await apiCall('/api/ladder/wallet/keypair');
+        if (!kp) { setError('Failed to generate wallet keypair.'); return; }
+        keypairs.push(kp);
+      }
     }
+    // Also generate a standard wallet keypair for input signing (inputs are always standard p2wpkh)
+    const walletKey = isPQ ? await apiCall('/api/ladder/wallet/keypair') : keypairs[0];
+    if (!walletKey) { setError('Failed to generate wallet keypair for input signing.'); return; }
 
-    // 4. Map old fake pubkeys to new wallet pubkeys
-    const oldToNew = new Map();
+    // 4. Map old fake pubkeys to new pubkeys (+ commit hashes for PQ)
+    const oldToNew = new Map(); // oldKey -> newPubkey
     const oldKeys = [...allPubkeysNeeded];
     oldKeys.forEach((oldKey, i) => {
-      oldToNew.set(oldKey, keypairs[i % keypairs.length].pubkey);
+      const kp = keypairs[i % keypairs.length];
+      oldToNew.set(oldKey, kp.pubkey);
+    });
+    // Map empty SIG blocks to their assigned keypairs (keyed by "ri:bi")
+    const emptyKeyMap = new Map();
+    emptyPubkeySigs.forEach((entry, i) => {
+      const kp = keypairs[(allPubkeysNeeded.size + i) % keypairs.length];
+      emptyKeyMap.set(`${entry.ri}:${entry.bi}`, kp.pubkey);
     });
 
-    // 5. Replace pubkeys in rungs
+    // 5. Replace pubkeys in rungs + set scheme on signature blocks
     setRungs(prev => prev.map((rung, ri) => ({
       ...rung,
       blocks: rung.blocks.map((block, bi) => {
         const vals = { ...block.values };
         if (block.type === 'SIG' && vals.pubkey && oldToNew.has(vals.pubkey)) {
           vals.pubkey = oldToNew.get(vals.pubkey);
+          vals.scheme = fundScheme;
+        } else if (block.type === 'SIG' && !vals.pubkey && emptyKeyMap.has(`${ri}:${bi}`)) {
+          // Empty pubkey SIG block — assign generated key
+          vals.pubkey = emptyKeyMap.get(`${ri}:${bi}`);
+          vals.scheme = fundScheme;
         } else if ((block.type === 'MULTISIG' || block.type === 'TIMELOCKED_MULTISIG') && vals.pubkeys) {
           const keys = vals.pubkeys.split(',').map(k => k.trim()).filter(Boolean);
           vals.pubkeys = keys.map(k => oldToNew.get(k) || k).join(', ');
+          vals.scheme = fundScheme;
         } else if (block.type === 'MUSIG_THRESHOLD' && vals.agg_pubkey && oldToNew.has(vals.agg_pubkey)) {
           vals.agg_pubkey = oldToNew.get(vals.agg_pubkey);
+          vals.scheme = fundScheme;
         } else if (block.type === 'ADAPTOR_SIG' && vals.signing_key && oldToNew.has(vals.signing_key)) {
           vals.signing_key = oldToNew.get(vals.signing_key);
+          vals.scheme = fundScheme;
         }
         return { ...block, values: vals };
       }),
+      // Also set the coil scheme for COMPACT_SIG outputs
+      output: rung.output.type !== 'relay' ? { ...rung.output, scheme: fundScheme } : rung.output,
     })));
 
-    // 6. Select UTXOs for inputs
-    const outputCount = Math.max(txOutputs.filter(o => parseInt(o.amount) > 0 || o.address).length, 1);
-    const totalOutputSats = txOutputs.reduce((sum, o) => sum + (parseInt(o.amount) || 0), 0);
+    // 6. Select UTXOs for inputs — only keep outputs that have rung conditions assigned
+    // Build rung→output map (same as exportCreateRungtx) to identify orphaned outputs
+    const rungsByOutputFund = new Map();
+    rungs.forEach(r => {
+      if (r.output.type === 'relay') return;
+      if (r.output.txOutputId != null) {
+        if (!rungsByOutputFund.has(r.output.txOutputId)) rungsByOutputFund.set(r.output.txOutputId, []);
+        rungsByOutputFund.get(r.output.txOutputId).push(r);
+      }
+    });
+    // Remove orphaned outputs (no conditions — invalid in v4 RUNG_TX)
+    const validTxOutputs = txOutputs.filter(o => rungsByOutputFund.has(o.id));
+    if (validTxOutputs.length === 0) {
+      setError('No outputs have rung conditions assigned. Go to BUILD and assign rungs to outputs.');
+      return;
+    }
+    if (validTxOutputs.length < txOutputs.length) {
+      // Clean up orphaned outputs from state
+      setTxOutputs(validTxOutputs);
+    }
+    const outputCount = validTxOutputs.length;
+    const totalOutputSats = validTxOutputs.reduce((sum, o) => sum + (parseInt(o.amount) || 0), 0);
     const feeSats = 1000;
     const needSats = totalOutputSats > 0 ? totalOutputSats + feeSats : 0;
 
@@ -7178,25 +7246,50 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
       if (needSats === 0 && selected.length >= 1) break;
     }
 
-    // 7. Generate fresh addresses for outputs
+    // 7. Generate fresh addresses for outputs (only valid outputs with conditions)
     const newOutputs = [];
+    // First pass: preserve existing amounts, track how much is spoken for
+    let allocatedSats = 0;
+    let zeroAmountIndices = [];
     for (let i = 0; i < outputCount; i++) {
       const addrData = await apiCall('/api/ladder/wallet/address');
       if (!addrData) { setError('Failed to generate address.'); return; }
-      const existingAmt = parseInt(txOutputs[i]?.amount) || 0;
+      const existingAmt = parseInt(validTxOutputs[i]?.amount) || 0;
       newOutputs.push({
-        id: txOutputs[i]?.id || uid(),
+        id: validTxOutputs[i]?.id || uid(),
         address: addrData.address,
-        amount: existingAmt > 0 ? existingAmt : Math.floor((selectedTotal - feeSats) / outputCount),
+        amount: existingAmt,
       });
+      if (existingAmt > 0) {
+        allocatedSats += existingAmt;
+      } else {
+        zeroAmountIndices.push(i);
+      }
+    }
+    // Second pass: distribute remaining sats to zero-amount outputs (change outputs)
+    const remainingSats = selectedTotal - feeSats - allocatedSats;
+    if (zeroAmountIndices.length > 0 && remainingSats > 0) {
+      const perZero = Math.floor(remainingSats / zeroAmountIndices.length);
+      zeroAmountIndices.forEach(idx => { newOutputs[idx].amount = perZero; });
+    } else if (zeroAmountIndices.length > 0) {
+      // Not enough funds — give each zero-output a minimal amount
+      const perAll = Math.floor((selectedTotal - feeSats) / outputCount);
+      newOutputs.forEach(o => { o.amount = perAll; });
     }
 
     // Scale down if needed
     let totalNewOutputSats = newOutputs.reduce((s, o) => s + o.amount, 0);
     if (totalNewOutputSats + feeSats > selectedTotal) {
-      const available = selectedTotal - feeSats;
-      const perOutput = Math.floor(available / newOutputs.length);
-      newOutputs.forEach(o => { o.amount = perOutput; });
+      const overshoot = totalNewOutputSats + feeSats - selectedTotal;
+      // Reduce from change outputs first, then proportionally
+      if (zeroAmountIndices.length > 0) {
+        const reduceEach = Math.ceil(overshoot / zeroAmountIndices.length);
+        zeroAmountIndices.forEach(idx => { newOutputs[idx].amount = Math.max(546, newOutputs[idx].amount - reduceEach); });
+      } else {
+        const available = selectedTotal - feeSats;
+        const perOutput = Math.floor(available / newOutputs.length);
+        newOutputs.forEach(o => { o.amount = perOutput; });
+      }
       totalNewOutputSats = newOutputs.reduce((s, o) => s + o.amount, 0);
     }
 
@@ -7212,19 +7305,44 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
     // 9. Store signing data for handleSign
     setSigningData({
       keypairs,
+      walletKey, // standard secp256k1 key for input signing (inputs are always standard p2wpkh)
       oldToNew,
       spentOutputs,
       selectedUtxos: selected,
+      scheme: fundScheme,
     });
 
     // 10. Update engine state
-    setTxInputs(selected.map(u => ({
+    const newInputs = selected.map(u => ({
       id: uid(),
       txid: u.txid,
       vout: u.vout,
       sequence: '',
-    })));
+    }));
+    setTxInputs(newInputs);
     setTxOutputs(newOutputs);
+
+    // 11. Verify rung→output assignments are still valid after output replacement
+    const newOutputIds = new Set(newOutputs.map(o => o.id));
+    setRungs(prev => {
+      // Check if any rung points to an output that no longer exists
+      const needsFix = prev.some(r => r.output.txOutputId != null && !newOutputIds.has(r.output.txOutputId));
+      if (!needsFix) return prev;
+      // Find orphaned rungs and unassigned outputs
+      const assignedOutputIds = new Set(prev.filter(r => r.output.txOutputId != null && newOutputIds.has(r.output.txOutputId)).map(r => r.output.txOutputId));
+      const unassignedOutputs = newOutputs.filter(o => !assignedOutputIds.has(o.id));
+      let nextUnassigned = 0;
+      return prev.map(r => {
+        if (r.output.txOutputId != null && !newOutputIds.has(r.output.txOutputId)) {
+          // This rung's output was lost — reassign to next available unassigned output
+          if (nextUnassigned < unassignedOutputs.length) {
+            const newOut = unassignedOutputs[nextUnassigned++];
+            return { ...r, output: { ...r.output, txOutputId: newOut.id } };
+          }
+        }
+        return r;
+      });
+    });
     setTxHex('');
     setSignedHex('');
     setTxid('');
@@ -7359,12 +7477,20 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
         const hasOutputs = txJson.outputs && txJson.outputs.length > 0;
         const hasFakeInputs = (txJson.inputs && txJson.inputs.some(i => !(/^[0-9a-f]{64}$/i.test(i.txid)))) ||
           (txOutputs.some(o => o.address && !o.address.startsWith('bcrt1')));
+        const droppedOutputs = txOutputs.filter(o => (o.address || parseInt(o.amount) > 0) && !rungs.some(r => r.output.type !== 'relay' && r.output.txOutputId === o.id));
         return (<>
+        {/* DROPPED OUTPUT WARNING */}
+        {droppedOutputs.length > 0 && (
+          <div style={{ marginBottom: 12, padding: '10px 16px', background: 'rgba(255,68,68,0.1)', border: '1px solid var(--red)', fontSize: 11, color: '#ff6666', lineHeight: 1.6 }}>
+            <strong>WARNING:</strong> {droppedOutputs.length} output(s) have no conditions assigned and will be excluded from the transaction. In a v4 RUNG_TX, every output must have at least one rung condition. Go to BUILD and assign rungs to all outputs.
+            {droppedOutputs.map((o, i) => <div key={i} style={{ marginTop: 4, fontSize: 10, color: '#ff9999' }}>• {o.address ? o.address.substring(0, 20) + '...' : '(no addr)'} — {(parseInt(o.amount) || 0).toLocaleString()} sats — NO CONDITIONS</div>)}
+          </div>
+        )}
         {/* FUNDED SUCCESS BANNER */}
         {funded && (
           <div style={{ marginBottom: 12, padding: '10px 16px', background: 'var(--green-dim)', border: '1px solid var(--green)', display: 'flex', alignItems: 'center', gap: 10, animation: 'fadeIn 0.3s' }}>
             <span style={{ color: 'var(--green-bright)', fontSize: 18 }}>&#x2713;</span>
-            <span style={{ color: 'var(--green-bright)', fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>Funded — inputs and outputs replaced with real wallet data</span>
+            <span style={{ color: 'var(--green-bright)', fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>Funded — inputs and outputs replaced with real wallet data{signingData?.scheme && signingData.scheme !== 'SCHNORR' ? ` [${signingData.scheme}]` : ''}</span>
           </div>
         )}
         {/* INPUTS / OUTPUTS GRID */}
@@ -7379,11 +7505,24 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
                 {' / '}
                 {rungs.length + ' rung' + (rungs.length !== 1 ? 's' : '')}
               </span>
-              {online && (
+              {online && (<>
+                <select
+                  style={{ padding: '3px 6px', fontSize: 9, fontFamily: 'var(--font-mono)', background: 'var(--bg-primary)', color: fundScheme !== 'SCHNORR' && fundScheme !== 'ECDSA' ? 'var(--cyan)' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                  value={fundScheme}
+                  onChange={(e) => setFundScheme(e.target.value)}
+                  title="Signature scheme for output conditions"
+                >
+                  <option value="SCHNORR">SCHNORR</option>
+                  <option value="ECDSA">ECDSA</option>
+                  <option value="FALCON512">FALCON-512</option>
+                  <option value="FALCON1024">FALCON-1024</option>
+                  <option value="DILITHIUM3">DILITHIUM-3</option>
+                  <option value="SPHINCS_SHA">SPHINCS+</option>
+                </select>
                 <button style={{ ...sty.btn, ...(hasFakeInputs || !hasInputs ? sty.btnPrimary : sty.btnDefault), padding: '4px 10px', fontSize: 10 }} onClick={handleFundFromWallet} disabled={loading}>
                   {loading === '/api/ladder/wallet/utxos' ? 'LOADING...' : 'FUND FROM WALLET'}
                 </button>
-              )}
+              </>)}
             </div>
           </div>
           {hasFakeInputs && online && !funded && (
@@ -7409,7 +7548,7 @@ function SignetPanel({ rungs, setRungs, txOutputs, txInputs, locktime, onViewAsL
             </div>
             <div>
               <div style={{ fontSize: 10, color: 'var(--amber)', fontWeight: 600, letterSpacing: 1, marginBottom: 4 }}>OUTPUTS</div>
-              {txOutputs.filter(o => o.address || parseInt(o.amount) > 0).map((out, i) => (
+              {txOutputs.filter(o => rungs.some(r => r.output.type !== 'relay' && r.output.txOutputId === o.id)).map((out, i) => (
                 <div key={i} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', padding: '4px 6px', marginBottom: 2, background: 'var(--bg-primary)', border: '1px solid var(--border)' }}>
                   <span style={{ color: 'var(--text-dim)' }}>#{i} </span>
                   <span style={{ color: out.address && !out.address.startsWith('bcrt1') ? 'var(--amber)' : 'inherit' }}>{out.address ? out.address.substring(0, 16) + '...' : '(no addr)'}</span>
@@ -8066,6 +8205,17 @@ function App() {
     });
   }, []);
 
+  const handleFillAllTestData = useCallback(() => {
+    setRungs(prev => prev.map(rung => ({
+      ...rung,
+      blocks: rung.blocks.map(block => {
+        const testVals = generateTestData(block.type);
+        if (!testVals || Object.keys(testVals).length === 0) return block;
+        return { ...block, values: { ...block.values, ...testVals } };
+      }),
+    })));
+  }, []);
+
   const handleDropBlock = useCallback((rungId, blockType, slotIdx) => {
     setRungs(prev => prev.map(r => {
       if (r.id !== rungId) return r;
@@ -8172,15 +8322,35 @@ function App() {
   }, []);
 
   const handleOutputChange = useCallback((rungId, field, value) => {
-    setRungs(prev => prev.map(r => {
-      if (r.id !== rungId) return r;
-      const newOutput = { ...r.output, [field]: value };
-      // Relay coils don't map to TX outputs — clear assignment when switching to relay
-      if (field === 'type' && value === 'relay') {
-        newOutput.txOutputId = null;
+    setRungs(prev => {
+      const updatedRungs = prev.map(r => {
+        if (r.id !== rungId) return r;
+        const newOutput = { ...r.output, [field]: value };
+        // Relay coils don't map to TX outputs — clear assignment when switching to relay
+        if (field === 'type' && value === 'relay') {
+          newOutput.txOutputId = null;
+        }
+        return { ...r, output: newOutput };
+      });
+
+      // Auto-cleanup orphaned outputs when txOutputId changes
+      if (field === 'txOutputId') {
+        const oldRung = prev.find(r => r.id === rungId);
+        const oldOutputId = oldRung?.output?.txOutputId;
+        if (oldOutputId != null && oldOutputId !== value) {
+          // Check if any other rung still references the old output
+          const stillReferenced = updatedRungs.some(r =>
+            r.output.type !== 'relay' && r.output.txOutputId === oldOutputId
+          );
+          if (!stillReferenced) {
+            // Remove the orphaned output (it would be dropped from export anyway — v4 RUNG_TX requires conditions)
+            setTxOutputs(prevOutputs => prevOutputs.filter(o => o.id !== oldOutputId));
+          }
+        }
       }
-      return { ...r, output: newOutput };
-    }));
+
+      return updatedRungs;
+    });
   }, []);
 
   const handleRungLabelChange = useCallback((rungId, label) => {
@@ -8670,7 +8840,7 @@ ${ladderRows.map(r => `
               bytes.forEach((b, i) => { val |= parseInt(b, 16) << (i * 8); });
               block.values[f.name] = String(val);
             } else if (f.dataType === 'SCHEME' && fieldData.hex) {
-              const schemeRevMap = { '10': 'FALCON512', '11': 'FALCON1024', '12': 'DILITHIUM3' };
+              const schemeRevMap = { '01': 'SCHNORR', '02': 'ECDSA', '10': 'FALCON512', '11': 'FALCON1024', '12': 'DILITHIUM3', '13': 'SPHINCS_SHA' };
               block.values[f.name] = schemeRevMap[fieldData.hex] || '';
             } else if (fieldData.hex) {
               block.values[f.name] = fieldData.hex;
@@ -8884,6 +9054,7 @@ ${ladderRows.map(r => `
           onClearRenamingInput={() => setRenamingInputId(null)}
           onDeselect={handleDeselect}
           onOutputContextMenu={handleOutputContextMenu}
+          onFillAllTestData={handleFillAllTestData}
           onJustifyLeft={() => setRungs(prev => prev.map(r => ({
             ...r,
             blocks: r.blocks.map((b, i) => ({ ...b, slot: i }))

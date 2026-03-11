@@ -95,7 +95,7 @@ bool IsStatefulBlockType(uint16_t block_type)
 
 bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
 {
-    // Validate v3 output scriptPubKeys as rung conditions
+    // Validate v4 output scriptPubKeys as rung conditions
     for (size_t i = 0; i < tx.vout.size(); ++i) {
         const auto& scriptPubKey = tx.vout[i].scriptPubKey;
         // Allow OP_RETURN data outputs

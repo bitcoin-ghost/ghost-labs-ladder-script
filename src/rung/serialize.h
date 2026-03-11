@@ -44,7 +44,7 @@ enum class SerializationContext : uint8_t {
  *  Performs full type and size validation during deserialization.
  *  Returns false with error message on any malformed data.
  *
- *  Wire format (v3 — micro-header + varint NUMERIC + implicit fields):
+ *  Wire format (v4 — micro-header + varint NUMERIC + implicit fields):
  *    [n_rungs: varint]
  *    for each rung:
  *      [n_blocks: varint]

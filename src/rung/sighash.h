@@ -19,7 +19,7 @@ namespace rung {
 /** Tagged hash writer for LadderSighash, pre-fed with the tag. */
 extern const HashWriter HASHER_LADDERSIGHASH;
 
-/** Compute the signature hash for a v3 RUNG_TX input.
+/** Compute the signature hash for a v4 RUNG_TX input.
  *
  *  Similar to BIP341 sighash but without annex/tapscript/codeseparator extensions.
  *  Uses tagged hash: TaggedHash("LadderSighash").

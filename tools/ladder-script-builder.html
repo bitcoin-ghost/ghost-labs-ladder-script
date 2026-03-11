@@ -1787,7 +1787,7 @@ async function refreshExplorer() {
       html += '</div>';
       html += '<div class="explorer-block-txs">';
       for (const tx of block.tx) {
-        const isV3 = tx.version === 3;
+        const isV3 = tx.version === 4;
         html += '<div class="explorer-tx">';
         if (isV3) html += '<span class="v3-badge">RUNG</span>';
         html += `<span class="txid">${tx.txid.slice(0, 24)}...</span>`;

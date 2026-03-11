@@ -308,8 +308,8 @@
       <p class="page-subtitle">Typed structured transaction conditions for Bitcoin. A declarative block model replacing opcode-based Script.</p>
       <div class="signet-badge"><div class="dot"></div>Active — Signet Testing</div>
       <div class="hero-ctas">
-        <a href="ladder-engine.html" class="btn btn-primary">Open Builder</a>
-        <a href="docs/#BIP-XXXX" class="btn btn-secondary">Read the BIP</a>
+        <a href="engine/index.html" class="btn btn-primary">Open Builder</a>
+        <a href="docs/#BIP" class="btn btn-secondary">Read the BIP</a>
         <a href="docs/#SUMMARY" class="btn btn-secondary">Documentation</a>
         <a href="docs/#BLOCKS" class="btn btn-secondary">Block Reference</a>
         <a href="https://github.com/bitcoin-ghost/ghost-labs-ladder-script" class="btn btn-ghost" target="_blank">
@@ -328,7 +328,7 @@
       <div class="section-content">
         <p>Ladder Script introduces <strong>transaction version 4</strong> (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">RUNG_TX</code>) to Bitcoin. Instead of writing opcode sequences on an untyped stack, you declare spending conditions as named, typed function blocks organized into rungs. The result is a transaction format where every byte has a declared type, every condition is a named block with validated fields, and evaluation is deterministic with bounded execution time.</p>
         <p><strong>Zero-spam conditions.</strong> Bitcoin Script allows arbitrary data pushes &mdash; 32 bytes of anything can be a key, a hash, or a JPEG shard. Ladder Script makes this structurally impossible. With MLSC (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>), conditions are never stored in the output or UTXO set &mdash; only a 32-byte Merkle root. Fake conditions produce unspendable outputs, and since unspendable outputs are never spent, the fake data is never revealed on-chain. The spam kills itself. Raw public keys are witness-only; conditions use PUBKEY_COMMIT (SHA-256 of the key). Every witness field must cryptographically verify against its condition counterpart.</p>
-        <p><strong>Post-quantum ready.</strong> FALCON-512, FALCON-1024, and Dilithium3 are native. The SCHEME field routes any SIG block to classical or post-quantum verification without changing the wire format. PUBKEY_COMMIT lets you lock funds to a 32-byte hash of a 1,793-byte PQ key today &mdash; reveal the full key only at spend time. COSIGN lets a single PQ-secured UTXO guard unlimited classical UTXOs.</p>
+        <p><strong>Post-quantum ready.</strong> FALCON-512, FALCON-1024, Dilithium3, and SPHINCS+ are native. The SCHEME field routes any SIG block to classical or post-quantum verification without changing the wire format. PUBKEY_COMMIT lets you lock funds to a 32-byte hash of a 1,793-byte PQ key today &mdash; reveal the full key only at spend time. COSIGN lets a single PQ-secured UTXO guard unlimited classical UTXOs.</p>
         <p><strong>Programmable money.</strong> Covenants, recursive conditions, rate limiters, state machines, sequenced approvals, fee-band gating, adaptor signatures, and protocol anchoring &mdash; all as composable typed blocks within the same wire format. No new opcodes, no Script gymnastics. The PLC family alone brings decades of proven industrial automation patterns to Bitcoin transaction logic. The possibilities are endless.</p>
       </div>
     </div>
@@ -456,7 +456,7 @@
       <div class="explainer">
         <div class="explainer-text">
           <h4>Typed Fields, No Free-Form Data</h4>
-          <p>In Bitcoin Script, a 32-byte push could be a public key, a hash, a preimage, or arbitrary data. Ladder Script restricts conditions to typed fields: PUBKEY_COMMIT, HASH256, HASH160, NUMERIC, SCHEME, and SPEND_INDEX &mdash; all fixed-size hashes or bounded integers with enforced size constraints.</p>
+          <p>In Bitcoin Script, a 32-byte push could be a public key, a hash, a preimage, or arbitrary data. Ladder Script restricts conditions to typed fields: PUBKEY_COMMIT, HASH256, HASH160, NUMERIC, SCHEME, and SPEND_INDEX &mdash; all fixed-size hashes or bounded integers with enforced size constraints. SCHEME routes signatures to classical (Schnorr, ECDSA) or post-quantum (FALCON-512, FALCON-1024, Dilithium3, SPHINCS+) verification.</p>
           <p>PUBKEY, SIGNATURE, and PREIMAGE are witness-only &mdash; they cannot appear in locking conditions. Raw public keys are provided at spend time and must SHA-256 hash-match the corresponding PUBKEY_COMMIT. With MLSC (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>), conditions never enter the UTXO set at all &mdash; only a 32-byte Merkle root. Fake conditions produce unspendable outputs whose data is never revealed on-chain.</p>
           <p>Static analysis requires only parsing, not execution simulation. Every field in a Ladder Script witness can be identified, validated, and displayed without running any code.</p>
         </div>
@@ -475,7 +475,9 @@
 <span class="jk">SIGNATURE</span>    <span class="jc">// 1-50,000 bytes (witness only)</span>
 <span class="jk">SPEND_INDEX</span>  <span class="jc">// 4 bytes        (uint32 LE)</span>
 <span class="jk">NUMERIC</span>      <span class="jc">// 1-4 bytes      (uint32 LE)</span>
-<span class="jk">SCHEME</span>       <span class="jc">// 1 byte         (sig scheme selector)</span></pre>
+<span class="jk">SCHEME</span>       <span class="jc">// 1 byte         (sig scheme: 01=Schnorr, 02=ECDSA,</span>
+             <span class="jc">//                  10=FALCON-512, 11=FALCON-1024,</span>
+             <span class="jc">//                  12=Dilithium3, 13=SPHINCS+)</span></pre>
             </div>
           </div>
         </div>
@@ -512,6 +514,7 @@
                        <span class="jc">// 897B FALCON-512</span>
                        <span class="jc">// 1,793B FALCON-1024</span>
                        <span class="jc">// 1,952B Dilithium3</span>
+                       <span class="jc">// 64B SPHINCS+</span>
 
 <span class="jc">// Evaluator checks:</span>
 <span class="jn">1.</span> SHA256(witness.PUBKEY) == conditions.PUBKEY_COMMIT
@@ -524,7 +527,7 @@
       <div class="callout">
         <div class="callout-title">Why This Matters</div>
         <div class="callout-content">
-          <strong>Post-quantum readiness</strong> &mdash; Lock funds to a 32-byte hash of a 1,793-byte FALCON-1024 key today. The UTXO set stays small. The large key only appears in the witness (which gets the segwit discount) at spend time.<br><br>
+          <strong>Post-quantum readiness</strong> &mdash; Lock funds to a 32-byte hash of a 1,793-byte FALCON-1024 or 1,952-byte Dilithium3 key today. The UTXO set stays small. The large key only appears in the witness (which gets the segwit discount) at spend time.<br><br>
           <strong>Spam resistance</strong> &mdash; PUBKEY_COMMIT is a fixed 32-byte hash. Witness keys must SHA-256 match their condition commitment or the evaluator rejects the spend. With MLSC, conditions never reach the UTXO set &mdash; only a 32-byte Merkle root. Fake data in unspendable outputs is never revealed on-chain.<br><br>
           <strong>Uniform UTXO size</strong> &mdash; Whether your key is 33 bytes (Schnorr) or 1,952 bytes (Dilithium3), the UTXO entry is always 32 bytes. UTXO set bloat from large keys is eliminated entirely.
         </div>
@@ -734,7 +737,7 @@
             <div class="family-name">Signature</div>
             <div class="family-range">0x0001-0x00FF</div>
           </div>
-          <div class="family-desc">Identity verification with native post-quantum support via SCHEME field routing to FALCON-512/1024 or Dilithium3.</div>
+          <div class="family-desc">Identity verification with native post-quantum support via SCHEME field routing to FALCON-512/1024, Dilithium3, or SPHINCS+.</div>
           <div class="family-blocks">
             <span class="family-block">SIG</span>
             <span class="family-block">MULTISIG</span>
@@ -1003,7 +1006,7 @@
         </div>
         <div class="use-case">
           <div class="use-case-title">Post-Quantum Migration</div>
-          <div class="use-case-desc">PUBKEY_COMMIT reduces 897-byte PQ keys to 32-byte UTXO commitments. COSIGN lets a single PQ anchor guard unlimited classical UTXOs.</div>
+          <div class="use-case-desc">PUBKEY_COMMIT reduces PQ keys (897–2,420 bytes) to 32-byte UTXO commitments. COSIGN lets a single PQ anchor guard unlimited classical UTXOs. Four PQ schemes: FALCON-512, FALCON-1024, Dilithium3, SPHINCS+.</div>
           <div class="use-case-tag">Signature Family</div>
         </div>
         <div class="use-case">
@@ -1161,7 +1164,7 @@
       </div>
 
       <div style="text-align: center; margin-top: 32px;">
-        <a href="ladder-engine.html" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Launch Builder</a>
+        <a href="engine/index.html" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Launch Builder</a>
       </div>
 
       <script>
@@ -1204,7 +1207,7 @@
 
       <div class="example-grid">
 
-        <a href="ladder-engine.html?example=0" class="example-card">
+        <a href="engine/index.html?example=0" class="example-card">
           <div class="example-title">2-OF-3 MULTISIG VAULT</div>
           <div class="example-desc">Corporate treasury with 2-of-3 multisig spending and a time-locked recovery path using a single backup key after 1 year.</div>
           <div class="example-rungs">
@@ -1226,7 +1229,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=1" class="example-card">
+        <a href="engine/index.html?example=1" class="example-card">
           <div class="example-title">ATOMIC SWAP (HTLC)</div>
           <div class="example-desc">Cross-chain atomic swap via hash time-locked contract. Alice claims with preimage; Bob recovers after 144 blocks.</div>
           <div class="example-rungs">
@@ -1249,7 +1252,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=2" class="example-card">
+        <a href="engine/index.html?example=2" class="example-card">
           <div class="example-title">ADAPTOR SIG SWAP</div>
           <div class="example-desc">Schnorr adaptor signature atomic swap. On-chain adapted sig reveals the adaptor secret for the counterparty.</div>
           <div class="example-rungs">
@@ -1272,7 +1275,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=3" class="example-card">
+        <a href="engine/index.html?example=3" class="example-card">
           <div class="example-title">DCA COVENANT CHAIN</div>
           <div class="example-desc">Dollar-cost averaging covenant. Splits UTXO into a buy output each spend, counting down 12 purchases with recursive state.</div>
           <div class="example-rungs">
@@ -1296,7 +1299,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=4" class="example-card">
+        <a href="engine/index.html?example=4" class="example-card">
           <div class="example-title">VAULT WITH UNVAULT + CLAWBACK</div>
           <div class="example-desc">Bitcoin vault pattern: normal spend requires unvault delay (24h). Emergency clawback to cold key at any time.</div>
           <div class="example-rungs">
@@ -1319,7 +1322,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=5" class="example-card">
+        <a href="engine/index.html?example=5" class="example-card">
           <div class="example-title">RATE-LIMITED WALLET</div>
           <div class="example-desc">Daily spending cap of 50,000 sats with accumulator. Refills over 144 blocks. Two-key override for full sweep.</div>
           <div class="example-rungs">
@@ -1343,7 +1346,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=6" class="example-card">
+        <a href="engine/index.html?example=6" class="example-card">
           <div class="example-title">DEAD MAN'S SWITCH (INHERITANCE)</div>
           <div class="example-desc">Owner must sign within ~6 months to keep funds. On timeout, heir can claim. Resets each spend via latch.</div>
           <div class="example-rungs">
@@ -1367,7 +1370,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=7" class="example-card">
+        <a href="engine/index.html?example=7" class="example-card">
           <div class="example-title">ESCROW WITH ORACLE</div>
           <div class="example-desc">Buyer/seller escrow. Either party + oracle can release. Joint buyer+seller can settle directly without oracle.</div>
           <div class="example-rungs">
@@ -1400,7 +1403,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=8" class="example-card">
+        <a href="engine/index.html?example=8" class="example-card">
           <div class="example-title">PAYMENT CHANNEL</div>
           <div class="example-desc">Lightning-style payment channel. Cooperative close with both sigs, or unilateral close after 1-day CSV timeout.</div>
           <div class="example-rungs">
@@ -1433,7 +1436,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=9" class="example-card">
+        <a href="engine/index.html?example=9" class="example-card">
           <div class="example-title">SEQUENCED PAYOUT</div>
           <div class="example-desc">Multi-stage project payout. Funds release in 5 sequential milestones. Each milestone requires oracle + recipient sig.</div>
           <div class="example-rungs">
@@ -1459,7 +1462,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=10" class="example-card">
+        <a href="engine/index.html?example=10" class="example-card">
           <div class="example-title">FEE-GATED COVENANT</div>
           <div class="example-desc">Covenant that only allows spending when fees are 5-50 sat/vB. Prevents panic-spending during fee spikes.</div>
           <div class="example-rungs">
@@ -1483,7 +1486,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=11" class="example-card">
+        <a href="engine/index.html?example=11" class="example-card">
           <div class="example-title">ONE-SHOT TRIGGER + LATCH</div>
           <div class="example-desc">Single-use authorization: ONE_SHOT fires once, latching the output. The latch can only be reset by a separate key.</div>
           <div class="example-rungs">
@@ -1513,7 +1516,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=12" class="example-card">
+        <a href="engine/index.html?example=12" class="example-card">
           <div class="example-title">RECURSIVE SPLIT (TREE)</div>
           <div class="example-desc">Binary split covenant: UTXO splits into 2 equal children on each spend, up to 4 levels deep.</div>
           <div class="example-rungs">
@@ -1538,7 +1541,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=13" class="example-card">
+        <a href="engine/index.html?example=13" class="example-card">
           <div class="example-title">BLOCK-HEIGHT TIMELOCK + COMPARE</div>
           <div class="example-desc">Funds locked until block 900,000. After unlock, output amount must exceed 10,000 sats. CLTV + COMPARE combo.</div>
           <div class="example-rungs">
@@ -1554,7 +1557,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=14" class="example-card">
+        <a href="engine/index.html?example=14" class="example-card">
           <div class="example-title">COUNTER-UP SUBSCRIPTION</div>
           <div class="example-desc">Recurring subscription: counter increments each payment (max 24). Amount-locked to fixed payment size. Auto-renews via recursion.</div>
           <div class="example-rungs">
@@ -1587,7 +1590,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=15" class="example-card">
+        <a href="engine/index.html?example=15" class="example-card">
           <div class="example-title">QUANTUM-SAFE VAULT</div>
           <div class="example-desc">Post-quantum vault using FALCON-512 hot spend and Dilithium3 cold recovery after 1-year CSV. Hybrid classical+PQ path.</div>
           <div class="example-rungs">
@@ -1618,7 +1621,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=16" class="example-card">
+        <a href="engine/index.html?example=16" class="example-card">
           <div class="example-title">QUANTUM VAULT + CHILDREN</div>
           <div class="example-desc">PQ-secured parent vault that splits into child UTXOs via RECURSE_SPLIT. Each child inherits Falcon-512 protection.</div>
           <div class="example-rungs">
@@ -1659,7 +1662,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=17" class="example-card">
+        <a href="engine/index.html?example=17" class="example-card">
           <div class="example-title">MULTI-INPUT CONSOLIDATION</div>
           <div class="example-desc">Consolidates 3 UTXOs into a single output. Demonstrates multi-input rung assignment with CTV template commitment.</div>
           <div class="example-rungs">
@@ -1675,7 +1678,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=18" class="example-card">
+        <a href="engine/index.html?example=18" class="example-card">
           <div class="example-title">MUSIG_THRESHOLD TREASURY</div>
           <div class="example-desc">3-of-5 corporate treasury using MuSig2/FROST. On-chain looks identical to single-sig. Time-locked backup key for recovery.</div>
           <div class="example-rungs">
@@ -1697,7 +1700,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=19" class="example-card">
+        <a href="engine/index.html?example=19" class="example-card">
           <div class="example-title">PTLC PAYMENT CHANNEL</div>
           <div class="example-desc">Scriptless payment channel. Cooperative close via MuSig, unilateral close with PTLC adaptor sig + CSV timeout.</div>
           <div class="example-rungs">
@@ -1718,7 +1721,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=20" class="example-card">
+        <a href="engine/index.html?example=20" class="example-card">
           <div class="example-title">CLTV_SIG VESTING SCHEDULE</div>
           <div class="example-desc">Quarterly vesting unlocks at specific block heights using CLTV_SIG compound blocks with amount locks.</div>
           <div class="example-rungs">
@@ -1740,7 +1743,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=21" class="example-card">
+        <a href="engine/index.html?example=21" class="example-card">
           <div class="example-title">TIMELOCKED_MULTISIG VAULT</div>
           <div class="example-desc">Hot wallet spend, 2-of-3 board recovery after 1-week cooling period, emergency cold key sweep.</div>
           <div class="example-rungs">
@@ -1770,7 +1773,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=22" class="example-card">
+        <a href="engine/index.html?example=22" class="example-card">
           <div class="example-title">HTLC COMPACT SWAP</div>
           <div class="example-desc">Atomic swap using the HTLC compound block &mdash; hash + timelock + sig in a single block. Saves 16 bytes over decomposed blocks.</div>
           <div class="example-rungs">
@@ -1791,7 +1794,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=23" class="example-card">
+        <a href="engine/index.html?example=23" class="example-card">
           <div class="example-title">HASH_SIG ATOMIC CLAIM</div>
           <div class="example-desc">Preimage reveal + signature in one compound block. Ideal for atomic swap claim paths with hash verification and authorization together.</div>
           <div class="example-rungs">
@@ -1813,7 +1816,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=24" class="example-card">
+        <a href="engine/index.html?example=24" class="example-card">
           <div class="example-title">GOVERNANCE-GATED TREASURY</div>
           <div class="example-desc">Treasury restricted by governance: spending windows, I/O fanout limits, weight cap, and anti-siphon ratio enforcement.</div>
           <div class="example-rungs">
@@ -1839,7 +1842,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=25" class="example-card">
+        <a href="engine/index.html?example=25" class="example-card">
           <div class="example-title">ACCUMULATOR ALLOWLIST</div>
           <div class="example-desc">Merkle set membership proof. Destination must be in a pre-committed allowlist. Combines with SIG and AMOUNT_LOCK for full access control.</div>
           <div class="example-rungs">
@@ -1862,7 +1865,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=26" class="example-card">
+        <a href="engine/index.html?example=26" class="example-card">
           <div class="example-title">CLTV_TIME CALENDAR LOCK</div>
           <div class="example-desc">Date-locked payment using absolute Unix timestamp. Funds locked until January 1, 2027. HASH160 preimage adds shared-secret gate.</div>
           <div class="example-rungs">
@@ -1886,7 +1889,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=27" class="example-card">
+        <a href="engine/index.html?example=27" class="example-card">
           <div class="example-title">TIMER WATCHDOG</div>
           <div class="example-desc">Continuous timer requires N consecutive blocks of activity. Off-delay holds authorization after trigger. Tagged hash proves attestation.</div>
           <div class="example-rungs">
@@ -1918,7 +1921,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=28" class="example-card">
+        <a href="engine/index.html?example=28" class="example-card">
           <div class="example-title">PRESET COUNTER BOARD VOTE</div>
           <div class="example-desc">Multi-party approval accumulator. Counter tracks board approvals; once preset reached, funds release. Value band limits payout size.</div>
           <div class="example-rungs">
@@ -1950,7 +1953,7 @@
           </div>
         </a>
 
-        <a href="ladder-engine.html?example=29" class="example-card">
+        <a href="engine/index.html?example=29" class="example-card">
           <div class="example-title">ANCHORED CHANNEL + RECURSE_UNTIL</div>
           <div class="example-desc">Lightning channel with anchor binding and recursive state until target block height. Bounds protocol lifetime on-chain.</div>
           <div class="example-rungs">
@@ -2000,7 +2003,7 @@
         <a href="docs/#SUMMARY" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Read the Documentation</a>
         <a href="docs/#MERKLE-UTXO-SPEC" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">MLSC Specification</a>
         <a href="docs/#BLOCKS" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Block Reference</a>
-        <a href="ladder-engine.html" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Open Builder</a>
+        <a href="engine/index.html" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Open Builder</a>
       </div>
     </div>
   </section>

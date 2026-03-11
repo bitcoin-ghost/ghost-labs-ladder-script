@@ -560,7 +560,7 @@ static RPCHelpMan validateladder()
 {
     return RPCHelpMan{
         "validateladder",
-        "Validate a raw v3 RUNG_TX transaction's ladder witnesses.\n"
+        "Validate a raw v4 RUNG_TX transaction's ladder witnesses.\n"
         "Checks that all input witnesses are valid ladder witnesses\n"
         "and pass policy rules.\n",
         {
@@ -600,7 +600,7 @@ static RPCHelpMan validateladder()
 
     if (tx.version != CTransaction::RUNG_TX_VERSION) {
         result.pushKV("valid", false);
-        result.pushKV("error", "Not a v3 RUNG_TX (version=" + std::to_string(tx.version) + ")");
+        result.pushKV("error", "Not a v4 RUNG_TX (version=" + std::to_string(tx.version) + ")");
         result.pushKV("inputs", UniValue(UniValue::VARR));
         return result;
     }
@@ -746,7 +746,7 @@ static RPCHelpMan createrungtx()
 {
     return RPCHelpMan{
         "createrungtx",
-        "Create an unsigned v3 RUNG_TX transaction with rung condition outputs.\n"
+        "Create an unsigned v4 RUNG_TX transaction with rung condition outputs.\n"
         "Inputs are outpoints to spend. Outputs specify rung conditions and amounts.\n",
         {
             {"inputs", RPCArg::Type::ARR, RPCArg::Optional::NO, "Transaction inputs",
@@ -1293,12 +1293,12 @@ static RPCHelpMan signrungtx()
 {
     return RPCHelpMan{
         "signrungtx",
-        "Sign a v3 RUNG_TX transaction's inputs.\n"
+        "Sign a v4 RUNG_TX transaction's inputs.\n"
         "Supports two formats:\n"
         "  Legacy: [{\"privkey\":\"cVt...\",\"input\":0}] — single SIG block\n"
         "  Full:   [{\"input\":0,\"blocks\":[{\"type\":\"SIG\",\"privkey\":\"cVt...\"},...]}] — any block types\n",
         {
-            {"hex", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The unsigned v3 transaction hex"},
+            {"hex", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The unsigned v4 transaction hex"},
             {"signers", RPCArg::Type::ARR, RPCArg::Optional::NO, "Per-input signing specifications",
                 {
                     {"signer", RPCArg::Type::OBJ, RPCArg::Optional::NO, "A signing spec",
@@ -1423,7 +1423,7 @@ static RPCHelpMan signrungtx()
     }
 
     if (mtx.version != CTransaction::RUNG_TX_VERSION) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Transaction is not v3 RUNG_TX");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Transaction is not v4 RUNG_TX");
     }
 
     const UniValue& signers_arr = request.params[1].get_array();
@@ -1816,7 +1816,7 @@ static RPCHelpMan computectvhash()
 {
     return RPCHelpMan{
         "computectvhash",
-        "Compute the BIP-119 CTV template hash for a v3 RUNG_TX transaction.\n"
+        "Compute the BIP-119 CTV template hash for a v4 RUNG_TX transaction.\n"
         "The hash commits to the transaction's version, locktime, inputs, outputs, and input index.\n"
         "Use this to create CTV conditions that constrain how an output can be spent.\n",
         {
