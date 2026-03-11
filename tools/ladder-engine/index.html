@@ -8001,8 +8001,27 @@ function SpendPanel({ onViewAsLadder }) {
 
       addLog('Building spending tx (' + sendSats.toLocaleString() + ' sats after ' + feeSats + ' fee)...');
 
-      const conditionKey = rec.conditionKeys && rec.conditionKeys[0];
-      if (!conditionKey) throw new Error('No signing key found. This record has no stored keys.');
+      const conditionKeys = rec.conditionKeys || [];
+      if (conditionKeys.length === 0) throw new Error('No signing keys found. This record has no stored keys.');
+
+      // Detect how many signers are needed from the stored rung conditions
+      let numSignersNeeded = 1;
+      let conditionType = 'SIG';
+      if (rec.rungs && rec.rungs.length > 0) {
+        const firstRung = rec.rungs[0];
+        const blocks = firstRung.blocks || [];
+        for (const b of blocks) {
+          if (b.type === 'MULTISIG' || b.type === 'TIMELOCKED_MULTISIG') {
+            conditionType = b.type;
+            numSignersNeeded = parseInt(b.values?.threshold) || 2;
+            addLog('Detected ' + b.type + ' (threshold=' + numSignersNeeded + ')', 'info');
+            break;
+          }
+        }
+      }
+      if (numSignersNeeded > conditionKeys.length) {
+        throw new Error(conditionType + ' requires ' + numSignersNeeded + ' signers but only ' + conditionKeys.length + ' key(s) stored.');
+      }
 
       // Get a wallet key for the output condition
       const walletKey = rec.walletKey || await apiCall('/api/ladder/wallet/keypair', undefined, true);
@@ -8023,25 +8042,40 @@ function SpendPanel({ onViewAsLadder }) {
       if (!createResult || !createResult.hex) throw new Error('Failed to create spending tx.');
       addLog('Unsigned tx created (' + (createResult.hex.length / 2) + ' bytes)', 'ok');
 
-      // 5. Sign
-      addLog('Signing with ' + scheme + ' key...');
-      const signPayload = isPQ ? {
+      // 5. Sign — build signers array based on condition type
+      addLog('Signing with ' + numSignersNeeded + ' ' + scheme + ' key(s)...');
+      const signers = [];
+      for (let si = 0; si < numSignersNeeded; si++) {
+        const key = conditionKeys[si];
+        if (isPQ) {
+          signers.push({ input: 0, pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
+        } else {
+          signers.push({ input: 0, privkey: key.privkey });
+        }
+      }
+      const signPayload = {
         hex: createResult.hex,
-        signers: [{ input: 0, pq_privkey: conditionKey.privkey, pq_pubkey: conditionKey.pubkey, scheme }],
-        spent_outputs: [{ amount: utxoOutput.value, scriptPubKey: utxoOutput.scriptPubKey?.hex || '' }],
-      } : {
-        hex: createResult.hex,
-        signers: [{ input: 0, privkey: conditionKey.privkey }],
+        signers,
         spent_outputs: [{ amount: utxoOutput.value, scriptPubKey: utxoOutput.scriptPubKey?.hex || '' }],
       };
       const signResult = await apiCall('/api/ladder/sign', signPayload, true);
-      if (!signResult || !signResult.hex) throw new Error('Signing failed.' + (signResult?.error ? ' ' + signResult.error : ''));
-      addLog('Signature applied (' + scheme + ')', 'ok');
+      if (!signResult || !signResult.hex) throw new Error('Signing failed.');
+      addLog(numSignersNeeded + ' signature(s) applied (' + scheme + ')', 'ok');
 
       // 6. Broadcast
       addLog('Broadcasting...');
-      const bcResult = await apiCall('/api/ladder/broadcast', { hex: signResult.hex }, true);
-      if (!bcResult || !bcResult.txid) throw new Error('Broadcast failed.' + (bcResult?.error ? ' ' + bcResult.error : ''));
+      let bcResult;
+      try {
+        const r = await fetch(SIGNET_API + '/api/ladder/broadcast', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hex: signResult.hex }),
+        });
+        bcResult = await r.json();
+        if (!r.ok) throw new Error(bcResult.detail?.rpc_error || bcResult.detail || 'HTTP ' + r.status);
+      } catch (e) {
+        throw new Error('Broadcast failed: ' + e.message);
+      }
+      if (!bcResult.txid) throw new Error('Broadcast failed: no txid returned.');
       addLog('Broadcast! TXID: ' + bcResult.txid, 'ok');
 
       // 7. Mine confirmation

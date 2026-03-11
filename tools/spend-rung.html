@@ -422,103 +422,73 @@ async function handleSpend() {
     // We need to use the proxy's create endpoint, but spending a RUNG output is different
     // from creating one. We use decoderawtransaction-level signing via signrungtx.
 
-    // Build a raw v4 tx spending txid:vout → destAddr
-    // The simplest approach: use signrungtx which handles witness construction
-    const conditionKey = rec.conditionKeys && rec.conditionKeys[0];
-    if (!conditionKey) throw new Error('No signing key found. Provide a private key manually.');
+    const conditionKeys = rec.conditionKeys || [];
+    if (conditionKeys.length === 0) throw new Error('No signing keys found. Provide keys manually.');
 
-    // Build the spending tx via createrawtransaction-style
-    // We construct it as a v4 transaction manually via the proxy
+    // Detect how many signers are needed from stored rung conditions
+    let numSignersNeeded = 1;
+    let conditionType = 'SIG';
+    if (rec.rungs && rec.rungs.length > 0) {
+      for (const b of (rec.rungs[0].blocks || [])) {
+        if (b.type === 'MULTISIG' || b.type === 'TIMELOCKED_MULTISIG') {
+          conditionType = b.type;
+          numSignersNeeded = parseInt(b.values?.threshold) || 2;
+          log('Detected ' + b.type + ' (threshold=' + numSignersNeeded + ')');
+          break;
+        }
+      }
+    }
+    if (numSignersNeeded > conditionKeys.length) {
+      throw new Error(conditionType + ' requires ' + numSignersNeeded + ' signers but only ' + conditionKeys.length + ' key(s) stored.');
+    }
+
     const spendInputs = [{ txid, vout }];
     const spendAmount = sendSats / 1e8;
+    const walletKey = rec.walletKey || await apiCall('/api/ladder/wallet/keypair');
+    if (!walletKey) throw new Error('Failed to generate wallet keypair.');
 
-    // For the output: standard P2WPKH (no conditions needed — it's the destination, not a RUNG output)
-    // But createrungtx requires conditions on outputs. Instead, we use the raw signing path.
+    // Create the spending tx with a simple SIG output condition
+    const createPayload = {
+      inputs: spendInputs,
+      outputs: [{
+        amount: spendAmount,
+        conditions: [{ blocks: [{ type: 'SIG', fields: [{ type: 'PUBKEY', hex: walletKey.pubkey }] }] }],
+      }],
+    };
+    const createResult = await apiCall('/api/ladder/create', createPayload);
+    if (!createResult || !createResult.hex) throw new Error('Failed to create spending tx');
 
-    log('Signing with ' + scheme + ' key...');
-
-    // Use the signrungtx RPC approach
-    if (isPQ) {
-      // PQ signing: need to construct the tx hex first, then sign with pq keys
-      // Create a minimal v4 tx: 1 input (the RUNG UTXO) → 1 output (P2WPKH dest)
-      // Use createrungtx with a SIG condition on the output, then signrungtx
-      const walletKey = rec.walletKey || await apiCall('/api/ladder/wallet/keypair');
-
-      // Create the spending tx with a simple SIG output condition
-      const createPayload = {
-        inputs: spendInputs,
-        outputs: [{
-          amount: spendAmount,
-          conditions: [{ blocks: [{ type: 'SIG', fields: [{ type: 'PUBKEY', hex: walletKey.pubkey }] }] }],
-        }],
-      };
-      const createResult = await apiCall('/api/ladder/create', createPayload);
-      if (!createResult || !createResult.hex) throw new Error('Failed to create spending tx');
-
-      // Sign with PQ key for the rung input
-      const signPayload = {
-        hex: createResult.hex,
-        signers: [{
-          input: 0,
-          pq_privkey: conditionKey.privkey,
-          pq_pubkey: conditionKey.pubkey,
-          scheme: scheme,
-        }],
-        spent_outputs: [{ amount: utxoOutput.value, scriptPubKey: utxoOutput.scriptPubKey?.hex || '' }],
-      };
-      const signResult = await apiCall('/api/ladder/sign', signPayload);
-      if (!signResult || !signResult.hex) throw new Error('PQ signing failed');
-      log('PQ signature applied (' + scheme + ')', 'ok');
-
-      // Broadcast
-      log('Broadcasting...');
-      const broadcastResult = await apiCall('/api/ladder/broadcast', { hex: signResult.hex });
-      if (!broadcastResult || !broadcastResult.txid) throw new Error('Broadcast failed: ' + (broadcastResult?.error || 'unknown'));
-      const spendTxid = broadcastResult.txid;
-      log('Broadcast! TXID: ' + spendTxid, 'ok');
-
-      log('Mining confirmation...');
-      await apiCall('/api/ladder/mine', { blocks: 1 });
-      log('Confirmed!', 'ok');
-
-      renderSpendResult(spendTxid, sendSats, scheme);
-
-    } else {
-      // Classical signing
-      const walletKey = rec.walletKey || conditionKey;
-
-      const createPayload = {
-        inputs: spendInputs,
-        outputs: [{
-          amount: spendAmount,
-          conditions: [{ blocks: [{ type: 'SIG', fields: [{ type: 'PUBKEY', hex: walletKey.pubkey }] }] }],
-        }],
-      };
-      const createResult = await apiCall('/api/ladder/create', createPayload);
-      if (!createResult || !createResult.hex) throw new Error('Failed to create spending tx');
-
-      // Sign with the condition key for the rung input
-      const signPayload = {
-        hex: createResult.hex,
-        signers: [{ input: 0, privkey: conditionKey.privkey }],
-        spent_outputs: [{ amount: utxoOutput.value, scriptPubKey: utxoOutput.scriptPubKey?.hex || '' }],
-      };
-      const signResult = await apiCall('/api/ladder/sign', signPayload);
-      if (!signResult || !signResult.hex) throw new Error('Signing failed');
-      log('Signature applied (Schnorr)', 'ok');
-
-      log('Broadcasting...');
-      const broadcastResult = await apiCall('/api/ladder/broadcast', { hex: signResult.hex });
-      if (!broadcastResult || !broadcastResult.txid) throw new Error('Broadcast failed');
-      const spendTxid = broadcastResult.txid;
-      log('Broadcast! TXID: ' + spendTxid, 'ok');
-
-      log('Mining confirmation...');
-      await apiCall('/api/ladder/mine', { blocks: 1 });
-      log('Confirmed!', 'ok');
-
-      renderSpendResult(spendTxid, sendSats, scheme);
+    // Build signers array based on condition type
+    log('Signing with ' + numSignersNeeded + ' ' + scheme + ' key(s)...');
+    const signers = [];
+    for (let si = 0; si < numSignersNeeded; si++) {
+      const key = conditionKeys[si];
+      if (isPQ) {
+        signers.push({ input: 0, pq_privkey: key.privkey, pq_pubkey: key.pubkey, scheme });
+      } else {
+        signers.push({ input: 0, privkey: key.privkey });
+      }
     }
+    const signPayload = {
+      hex: createResult.hex,
+      signers,
+      spent_outputs: [{ amount: utxoOutput.value, scriptPubKey: utxoOutput.scriptPubKey?.hex || '' }],
+    };
+    const signResult = await apiCall('/api/ladder/sign', signPayload);
+    if (!signResult || !signResult.hex) throw new Error('Signing failed');
+    log(numSignersNeeded + ' signature(s) applied (' + scheme + ')', 'ok');
+
+    log('Broadcasting...');
+    const broadcastResult = await apiCall('/api/ladder/broadcast', { hex: signResult.hex });
+    if (!broadcastResult || !broadcastResult.txid) throw new Error('Broadcast failed: ' + (broadcastResult?.error || 'unknown'));
+    const spendTxid = broadcastResult.txid;
+    log('Broadcast! TXID: ' + spendTxid, 'ok');
+
+    log('Mining confirmation...');
+    await apiCall('/api/ladder/mine', { blocks: 1 });
+    log('Confirmed!', 'ok');
+
+    renderSpendResult(spendTxid, sendSats, scheme);
 
   } catch (e) {
     log('ERROR: ' + e.message, 'err');
