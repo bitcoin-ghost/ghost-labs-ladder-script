@@ -7498,13 +7498,19 @@ function planFund(rungs, txOutputs, options) {
   }
 
   // ── 4. Fee estimate + output minimum enforcement ──
+  // PQ witness sizes: Falcon-512 ~897B, Falcon-1024 ~1793B, Dilithium3 ~3293B, SPHINCS ~49856B
+  // Fee accounts for witness weight (segwit: witness bytes / 4 in vB)
   const isPQ = scheme !== 'SCHNORR' && scheme !== 'ECDSA';
+  const pqWitnessExtra = { FALCON512: 900, FALCON1024: 1800, DILITHIUM3: 3300, SPHINCS_SHA: 50000 };
+  const witnessBytes = pqWitnessExtra[scheme] || 0;
   const outputCount = validTxOutputs.length;
   const numBlocks = rungs.reduce((s, r) => s + r.blocks.length, 0);
-  const feeSats = Math.max(1000, 200 + 150 * (outputCount + 1) + 100 * numBlocks + (isPQ ? 2000 : 0));
+  const baseFee = 200 + 150 * (outputCount + 1) + 100 * numBlocks;
+  const feeSats = Math.max(1000, baseFee + Math.ceil(witnessBytes / 4));
 
   // Ensure output amounts are sufficient for their rung constraints
-  const spendFeeEstimate = 1000;
+  // Spend fee must also account for PQ witness size
+  const spendFeeEstimate = Math.max(1000, Math.ceil(witnessBytes / 4) + 500);
   console.log('%c[planFund] rungsByOutput keys:', 'color: yellow', [...rungsByOutput.keys()]);
   console.log('%c[planFund] validTxOutputs ids:', 'color: yellow', validTxOutputs.map(o => o.id));
   for (const txOut of validTxOutputs) {
@@ -9258,7 +9264,10 @@ function SpendPanel() {
       }
 
       // 4. Build the spending transaction
-      const feeSats = isPQ ? 3000 : 1000;
+      // PQ witness: Falcon-512 ~900B, Falcon-1024 ~1800B, Dilithium3 ~3300B, SPHINCS ~50000B
+      const pqWitnessMap = { FALCON512: 900, FALCON1024: 1800, DILITHIUM3: 3300, SPHINCS_SHA: 50000 };
+      const witnessOverhead = pqWitnessMap[scheme] || 0;
+      const feeSats = Math.max(1000, 500 + Math.ceil(witnessOverhead / 4));
       const sendSats = utxoAmountSats - feeSats;
       if (sendSats < 546) throw new Error('UTXO too small to spend after fees (' + utxoAmountSats + ' sats, fee ' + feeSats + ')');
 
