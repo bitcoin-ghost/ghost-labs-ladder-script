@@ -16,6 +16,77 @@ import json, sys, time, struct, hashlib, argparse, traceback, copy
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
+# Pure-Python RIPEMD-160 (OpenSSL 3.0+ disables it)
+def _ripemd160(data: bytes) -> bytes:
+    """RIPEMD-160 hash, pure Python fallback when hashlib doesn't support it."""
+    try:
+        return hashlib.new('ripemd160', data).digest()
+    except ValueError:
+        pass
+    # Pure Python implementation
+    def _f(x, y, z, i):
+        if i == 0: return x ^ y ^ z
+        if i == 1: return (x & y) | (~x & z)
+        if i == 2: return (x | ~y) ^ z
+        if i == 3: return (x & z) | (y & ~z)
+        return x ^ (y | ~z)
+    def _rol(x, n):
+        return ((x << n) | (x >> (32 - n))) & 0xFFFFFFFF
+    _K  = [0x00000000, 0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xA953FD4E]
+    _KP = [0x50A28BE6, 0x5C4DD124, 0x6D703EF3, 0x7A6D76E9, 0x00000000]
+    _R  = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
+           7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8,
+           3,10,14,4,9,15,8,1,2,7,0,6,13,11,5,12,
+           1,9,11,10,0,8,12,4,13,3,7,15,14,5,6,2,
+           4,0,5,9,7,12,2,10,14,1,3,8,11,6,15,13]
+    _RP = [5,14,7,0,9,2,11,4,13,6,15,8,1,10,3,12,
+           6,11,3,7,0,13,5,10,14,15,8,12,4,9,1,2,
+           15,5,1,3,7,14,6,9,11,8,12,2,10,0,4,13,
+           8,6,4,1,3,11,15,0,5,12,2,13,9,7,10,14,
+           12,15,10,4,1,5,8,7,6,2,13,14,0,3,9,11]
+    _S  = [11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8,
+           7,6,8,13,11,9,7,15,7,12,15,9,11,7,13,12,
+           11,13,6,7,14,9,13,15,14,8,13,6,5,12,7,5,
+           11,12,14,15,14,15,9,8,9,14,5,6,8,6,5,12,
+           9,15,5,11,6,8,13,12,5,12,13,14,11,8,5,6]
+    _SP = [8,9,9,11,13,15,15,5,7,7,8,11,14,14,12,6,
+           9,13,15,7,12,8,9,11,7,7,12,7,6,15,13,11,
+           9,7,15,11,8,6,6,14,12,13,5,14,13,13,7,5,
+           15,5,8,11,14,14,6,14,6,9,12,9,12,5,15,8,
+           8,5,12,9,12,5,14,6,8,13,6,5,15,13,11,11]
+    msg = bytearray(data)
+    orig_len = len(msg)
+    msg.append(0x80)
+    while len(msg) % 64 != 56:
+        msg.append(0)
+    msg += struct.pack('<Q', orig_len * 8)
+    h0, h1, h2, h3, h4 = 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0
+    MK = 0xFFFFFFFF
+    for i in range(0, len(msg), 64):
+        X = list(struct.unpack('<16I', msg[i:i+64]))
+        a, b, c, d, e = h0, h1, h2, h3, h4
+        ap, bp, cp, dp, ep = h0, h1, h2, h3, h4
+        for j in range(80):
+            rnd = j >> 4
+            t = (a + _f(b, c, d, rnd) + X[_R[j]] + _K[rnd]) & MK
+            t = (_rol(t, _S[j]) + e) & MK
+            a, e, d, c, b = e, d, _rol(c, 10), b, t
+            rnd = j >> 4
+            t = (ap + _f(bp, cp, dp, 4 - rnd) + X[_RP[j]] + _KP[rnd]) & MK
+            t = (_rol(t, _SP[j]) + ep) & MK
+            ap, ep, dp, cp, bp = ep, dp, _rol(cp, 10), bp, t
+        t = (h1 + c + dp) & MK
+        h1 = (h2 + d + ep) & MK
+        h2 = (h3 + e + ap) & MK
+        h3 = (h4 + a + bp) & MK
+        h4 = (h0 + b + cp) & MK
+        h0 = t
+    return struct.pack('<5I', h0, h1, h2, h3, h4)
+
+def hash160(data: bytes) -> bytes:
+    """HASH160 = RIPEMD160(SHA256(data))"""
+    return _ripemd160(hashlib.sha256(data).digest())
+
 API = "http://localhost:8801"
 
 # ═══════════════════════════════════════════════════════════════
@@ -332,9 +403,8 @@ BLOCK_FIELDS = {
         {"name": "merkle_leaves", "dataType": "HASH256", "multi": True, "noWire": True},
     ],
     "P2PK_LEGACY": [
-        {"name": "pubkey_commit", "dataType": "HASH256"},
+        {"name": "pubkey", "dataType": "PUBKEY"},
         {"name": "scheme", "dataType": "SCHEME", "optional": True},
-        {"name": "pubkey", "dataType": "PUBKEY", "noWire": True},
     ],
     "P2PKH_LEGACY": [
         {"name": "hash160", "dataType": "HASH160"},
@@ -351,9 +421,8 @@ BLOCK_FIELDS = {
         {"name": "hash256", "dataType": "HASH256"},
     ],
     "P2TR_LEGACY": [
-        {"name": "pubkey_commit", "dataType": "HASH256"},
+        {"name": "pubkey", "dataType": "PUBKEY"},
         {"name": "scheme", "dataType": "SCHEME", "optional": True},
-        {"name": "pubkey", "dataType": "PUBKEY", "noWire": True},
     ],
     "P2TR_SCRIPT_LEGACY": [
         {"name": "hash256", "dataType": "HASH256"},
@@ -1175,14 +1244,11 @@ def fund_preset(preset, verbose=True):
                 vals["hash"] = hr["hash"]
 
             # Compute derived hashes for legacy block types
-            if btype in ("P2PK_LEGACY", "P2TR_LEGACY"):
+            # P2PK/P2TR: PUBKEY sent directly, RPC auto-converts to PUBKEY_COMMIT
+            if btype in ("P2PKH_LEGACY", "P2WPKH_LEGACY"):
                 pk_hex = vals.get("pubkey", "")
                 if pk_hex:
-                    vals["pubkey_commit"] = hashlib.sha256(bytes.fromhex(pk_hex)).digest().hex()
-            elif btype in ("P2PKH_LEGACY", "P2WPKH_LEGACY"):
-                pk_hex = vals.get("pubkey", "")
-                if pk_hex:
-                    vals["hash160"] = hashlib.new('ripemd160', hashlib.sha256(bytes.fromhex(pk_hex)).digest()).digest().hex()
+                    vals["hash160"] = hash160(bytes.fromhex(pk_hex)).hex()
 
             block["values"] = vals
 
