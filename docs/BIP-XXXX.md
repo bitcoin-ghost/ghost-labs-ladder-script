@@ -576,6 +576,27 @@ The following RPCs are provided for wallet and application integration:
 
 **Policy vs. consensus limits.** MAX_RUNGS, MAX_BLOCKS_PER_RUNG, and MAX_FIELDS_PER_BLOCK are enforced at both policy and consensus layers. The MAX_LADDER_WITNESS_SIZE limit at 10,000 bytes accommodates post-quantum signatures (Dilithium3 at 3,293 bytes) with headroom for multi-block rungs while preventing witness bloat attacks.
 
+## Implications for External Protocol Layers
+
+Ladder Script's typed field system and native programmability have significant implications for the ecosystem of external protocols and meta-protocols that have emerged to work around Bitcoin Script's limitations.
+
+### Data Embedding Protocols
+
+Protocols that exploit Script's arbitrary data push capability to embed non-financial data in the UTXO set or witness — including Inscriptions (Ordinals), BRC-20 tokens, and similar constructions — are structurally incompatible with Ladder Script. In a RUNG_TX, every byte of witness data belongs to a declared data type with enforced size constraints. There are no arbitrary `OP_PUSH` operations, no `OP_FALSE OP_IF` envelopes, and no unused script branches where data can be smuggled. The Legacy block family (0x0900–0x0907) extends this protection to wrapped legacy transaction types, closing the taproot script-path vector that Inscriptions currently exploit.
+
+### Programmability Layers
+
+Several projects have built programmability layers on top of Bitcoin because Script cannot express the conditions they need:
+
+- **BitVM** uses fraud proofs and challenge-response protocols to simulate arbitrary computation, requiring complex off-chain coordination because Script lacks native state and introspection.
+- **Citrea** and similar rollup/sidechain constructions move execution off-chain and post commitments to Bitcoin, partly because expressing complex spending conditions in Script is infeasible.
+- **Ark** introduces virtual UTXOs and a coordinator model to improve payment throughput, working around Script's limited composability.
+- **OP_NET** and similar meta-protocol token layers encode state transitions in witness data because Script cannot enforce token semantics natively.
+
+Ladder Script addresses the underlying limitations that motivated these constructions. Covenants, recursive state machines, programmable logic controllers, governance constraints, and stateful conditions are all expressed natively as typed blocks within the consensus layer. This does not necessarily eliminate the need for every external protocol — some serve purposes beyond programmability (e.g., privacy, throughput scaling) — but it does mean that applications which were forced off-chain solely due to Script's expressiveness limitations can now be built directly on layer 1.
+
+The practical consequence is that users, wallets, and applications gain access to these capabilities without trusting external coordinators, virtual machines, or meta-protocol indexers. The security model is Bitcoin's own: conditions are verified by every full node as part of consensus, not by an external system that may have different trust assumptions.
+
 ## Examples
 
 The following examples demonstrate common spending patterns expressed as Ladder Script conditions. Each example shows the rung/block structure, the RPC JSON for `createrungtx`, and the resulting conditions layout.
@@ -881,6 +902,16 @@ Post-quantum signature verification uses the Open Quantum Safe project's liboqs 
 - **Algorithm stability.** FALCON and Dilithium are NIST-standardised (FIPS 204, FIPS 206). The verification equations are fixed by the standard.
 
 If liboqs proves insufficient for consensus use, the PQ verification functions can be replaced with in-tree implementations without changing the wire format or evaluation semantics.
+
+**Scheme swappability.** The PQ architecture is designed for algorithm agility. Adding or replacing a signature scheme requires only:
+
+1. A new `RungScheme` enum value (single byte in the SCHEME field)
+2. A verification function in `pq_verify.cpp`
+3. Key generation support in the `pqkeygen` RPC
+
+No changes to the wire format, serialization, evaluation framework, sighash computation, or any existing block type. The SIG block's SCHEME field routes to the appropriate verifier at evaluation time. If NIST revises or deprecates a standard (e.g., replaces FALCON with a variant), a new scheme can be added in a soft fork while existing schemes continue to function. Users with funds locked under the old scheme can still spend them; new UTXOs can use the updated scheme.
+
+This means the quantum migration path is not a one-time event but a continuous capability. A user can lock funds to FALCON-512 today, and if a stronger scheme is standardised later, spend via the FALCON path and re-lock to the new scheme — all within the existing block type system.
 
 ### 0xc1 Prefix Collision Analysis
 

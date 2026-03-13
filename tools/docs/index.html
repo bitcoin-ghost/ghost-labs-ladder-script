@@ -102,7 +102,20 @@
       transition: all 0.2s;
       cursor: pointer;
     }
-    .block-ref-card:hover { border-color: var(--orange); transform: translateY(-2px); }
+    .block-ref-card:hover { transform: translateY(-2px); }
+    .block-ref-card:not([data-family-color]):hover { border-color: var(--orange); }
+    .block-ref-card[data-family-color]:hover { border-color: var(--family-color) !important; background: color-mix(in srgb, var(--family-color) 6%, var(--gray-900)); }
+    .block-ref-card.fam-signature { --family-color: #e6a817; }
+    .block-ref-card.fam-timelock { --family-color: #39a5b7; }
+    .block-ref-card.fam-hash { --family-color: #b070b0; }
+    .block-ref-card.fam-covenant { --family-color: #e06c75; }
+    .block-ref-card.fam-anchor { --family-color: #56b6c2; }
+    .block-ref-card.fam-recursion { --family-color: #e5c07b; }
+    .block-ref-card.fam-plc { --family-color: #98c379; }
+    .block-ref-card.fam-compound { --family-color: #f59e0b; }
+    .block-ref-card.fam-governance { --family-color: #8b5cf6; }
+    .block-ref-card.fam-legacy { --family-color: #e91e90; }
+    .block-ref-card.fam-compact { --family-color: #98c379; }
     .block-ref-code { font-size: 10px; font-family: var(--font-mono); color: var(--gray-500); letter-spacing: 1.5px; margin-bottom: 2px; }
     .block-ref-name { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 6px; letter-spacing: 0.5px; }
     .block-ref-desc { font-size: 13px; color: var(--gray-400); line-height: 1.5; }
@@ -546,7 +559,7 @@
         html += '<p class="family-intro">' + cat.intro + '</p>';
         html += '<div class="block-ref-grid">';
         for (const tx of cat.txs) {
-          html += '<div class="block-ref-card" onclick="loadTx(\'' + tx.file + '\', \'' + tx.name.replace(/'/g, "\\'") + '\')" style="cursor:pointer; border-color: ' + cat.color + '20;">';
+          html += '<div class="block-ref-card" data-family-color onclick="loadTx(\'' + tx.file + '\', \'' + tx.name.replace(/'/g, "\\'") + '\')" style="cursor:pointer; border-color: ' + cat.color + '20; --family-color: ' + cat.color + ';">';
           html += '<div class="block-ref-code" style="color: ' + cat.color + ';">' + tx.scheme + '</div>';
           html += '<div class="block-ref-name">' + tx.name + '</div>';
           html += '<div class="block-ref-desc">' + tx.desc + '</div>';
@@ -628,8 +641,8 @@
         html += `<p class="family-intro">${family.intro}</p>`;
         html += `<div class="block-ref-grid">`;
         for (const block of family.blocks) {
-          html += `<div class="block-ref-card" data-block-file="${block.file}" onclick="loadBlock('${block.file}', '${block.name}')">`;
-          html += `<div class="block-ref-code">${block.code}</div>`;
+          html += `<div class="block-ref-card fam-${family.cls}" data-family-color data-block-file="${block.file}" onclick="loadBlock('${block.file}', '${block.name}')">`;
+          html += `<div class="block-ref-code" style="color: var(--family-color);">${block.code}</div>`;
           html += `<div class="block-ref-name">${block.name}</div>`;
           html += `<div class="block-ref-desc">${block.desc}</div>`;
           html += `<div class="block-ref-badge badge-${family.cls}">${family.name.replace(' Family', '')}</div>`;
