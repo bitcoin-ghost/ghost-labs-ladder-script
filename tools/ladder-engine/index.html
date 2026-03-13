@@ -167,7 +167,7 @@ body {
 /* Main Content */
 .main-content {
   display: grid;
-  grid-template-columns: 180px 1fr 260px;
+  grid-template-columns: 180px 1fr auto;
   overflow: hidden;
 }
 
@@ -841,6 +841,22 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 200px;
+  position: relative;
+}
+.right-panel-resize {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 10;
+}
+.right-panel-resize:hover,
+.right-panel-resize.dragging {
+  background: var(--amber);
+  opacity: 0.3;
 }
 
 .panel-tab-bar {
@@ -871,7 +887,9 @@ body {
 .panel-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 10px;
+  word-break: break-word;
 }
 
 /* Properties */
@@ -6445,7 +6463,7 @@ const FAKE = {
 const EXAMPLES = [
   {
     title: '2-of-3 MULTISIG VAULT',
-    desc: 'Corporate treasury with 2-of-3 multisig spending and a time-locked recovery path using a single backup key after 1 year.',
+    desc: 'Corporate treasury with 2-of-3 multisig spending and a time-locked recovery path using a single backup key after 1 year.\n\nSPEND: Any 2 of 3 directors sign to release funds.\nRECOVER: After ~1 year (52,560 blocks), a backup key can sweep.',
     tags: [['MULTISIG', 'sig'], ['CSV', 'time'], ['SIG', 'sig']],
     rungs: [
       { label: 'SPEND', blocks: [
@@ -6465,7 +6483,7 @@ const EXAMPLES = [
   },
   {
     title: 'ATOMIC SWAP (HTLC)',
-    desc: 'Cross-chain atomic swap via hash time-locked contract. Alice claims with preimage; Bob recovers after 144 blocks if unclaimed.',
+    desc: 'Cross-chain atomic swap via hash time-locked contract. Alice claims with preimage; Bob recovers after 144 blocks if unclaimed.\n\nCLAIM: Alice reveals the SHA-256 preimage and signs to claim.\nREFUND: After 144 blocks (~1 day), Bob can reclaim with his key.',
     tags: [['HASH_PRE', 'hash'], ['SIG', 'sig'], ['CSV', 'time']],
     rungs: [
       { label: 'CLAIM', blocks: [
@@ -6486,7 +6504,7 @@ const EXAMPLES = [
   },
   {
     title: 'ADAPTOR SIG SWAP',
-    desc: 'Schnorr adaptor signature atomic swap. On-chain adapted sig reveals the adaptor secret for the counterparty to claim.',
+    desc: 'Schnorr adaptor signature atomic swap. On-chain adapted sig reveals the adaptor secret for the counterparty to claim.\n\nEXECUTE: Adapted Schnorr signature — broadcasting reveals the secret.\nCANCEL: After 288 blocks, both parties must co-sign to cancel.',
     tags: [['ADAPTOR_SIG', 'sig'], ['SIG', 'sig'], ['CSV', 'time']],
     rungs: [
       { label: 'EXECUTE', blocks: [
@@ -6507,7 +6525,7 @@ const EXAMPLES = [
   },
   {
     title: 'DCA COVENANT CHAIN',
-    desc: 'Dollar-cost averaging covenant. Splits UTXO into a buy output each spend, counting down 12 purchases with recursive state.',
+    desc: 'Dollar-cost averaging covenant. Splits UTXO into a buy output each spend, counting down 12 purchases with recursive state.\n\nBUY: Key holder signs, amount-locked output created, counter decrements via RECURSE_MODIFIED. Repeats up to 12 times.\nSWEEP: When counter reaches 0, remaining balance is swept freely.',
     tags: [['CTR_DN', 'plc'], ['AMT_LOCK', 'cov'], ['REC_MOD', 'rec'], ['RECURSE', 'rec']],
     rungs: [
       { label: 'BUY', blocks: [
@@ -6529,7 +6547,7 @@ const EXAMPLES = [
   },
   {
     title: 'VAULT WITH UNVAULT + CLAWBACK',
-    desc: 'Bitcoin vault pattern: hot key spends after CSV delay, recovery key sweeps immediately. VAULT_LOCK is self-contained (sig + delay check).',
+    desc: 'Bitcoin vault pattern: hot key spends after CSV delay, recovery key sweeps immediately. VAULT_LOCK is self-contained (sig + delay check).\n\nUNVAULT: Hot key signs, then waits 10 blocks before funds release.\nCLAWBACK: Cold key can immediately sweep — cancels any pending unvault.',
     tags: [['VAULT', 'cov']],
     rungs: [
       { label: 'UNVAULT', blocks: [
@@ -6548,7 +6566,7 @@ const EXAMPLES = [
   },
   {
     title: 'RATE-LIMITED WALLET',
-    desc: 'Daily spending cap of 50,000 sats with 200,000 sat accumulator. Refills over 144 blocks. Key holder signs each spend.',
+    desc: 'Daily spending cap of 50,000 sats with 200,000 sat accumulator. Refills over 144 blocks. Key holder signs each spend.\n\nDAY_SPEND: Single key signs, rate limiter enforces max 50k sats/block with 200k accumulator refilling over 144 blocks.\nOVERRIDE: Two keys co-sign to bypass the rate limit entirely.',
     tags: [['RATE_LIM', 'plc'], ['SIG', 'sig'], ['AMT_LOCK', 'cov']],
     rungs: [
       { label: 'DAY_SPEND', blocks: [
@@ -6569,7 +6587,7 @@ const EXAMPLES = [
   },
   {
     title: 'DEAD MAN\'S SWITCH (INHERITANCE)',
-    desc: 'Owner must sign within 26,000 blocks (~6 months) to keep funds. On timeout, heir can claim. Resets each spend via latch.',
+    desc: 'Owner must sign within 26,000 blocks (~6 months) to keep funds. On timeout, heir can claim. Resets each spend via latch.\n\nALIVE: Owner signs + resets the latch + re-encumbers with RECURSE_SAME. Each sign proves the owner is active.\nINHERIT: After 26,000 blocks of inactivity, heir key can claim.',
     tags: [['LATCH_S', 'plc'], ['CSV', 'time'], ['SIG', 'sig'], ['TMR_CONT', 'plc']],
     rungs: [
       { label: 'ALIVE', blocks: [
@@ -6591,7 +6609,7 @@ const EXAMPLES = [
   },
   {
     title: 'ESCROW WITH ORACLE',
-    desc: 'Buyer/seller escrow. Either party + oracle can release. Joint buyer+seller can settle directly without oracle.',
+    desc: 'Buyer/seller escrow. Either party + oracle can release. Joint buyer+seller can settle directly without oracle.\n\nRELEASE: Seller signs + oracle attests to release funds to seller.\nDISPUTE: Buyer signs + oracle attests to return funds to buyer.\nSETTLE: Both parties co-sign to settle without oracle involvement.',
     tags: [['SIG', 'sig'], ['COSIGN', 'plc'], ['A_ORACLE', 'cov']],
     rungs: [
       { label: 'RELEASE', blocks: [
@@ -6619,7 +6637,7 @@ const EXAMPLES = [
   },
   {
     title: 'PAYMENT CHANNEL',
-    desc: 'Lightning-style payment channel. Cooperative close with both sigs, or unilateral close after 1-day CSV timeout.',
+    desc: 'Lightning-style payment channel. Cooperative close with both sigs, or unilateral close after 1-day CSV timeout.\n\nCOOP: Both Alice and Bob sign to close the channel cooperatively.\nFORCE_A: Alice signs + waits 1 day + CTV commits to final balances.\nFORCE_B: Bob signs + waits 1 day + CTV commits to final balances.',
     tags: [['SIG', 'sig'], ['CSV_TIME', 'time'], ['CTV', 'cov']],
     rungs: [
       { label: 'COOP', blocks: [
@@ -6647,7 +6665,7 @@ const EXAMPLES = [
   },
   {
     title: 'SEQUENCED PAYOUT',
-    desc: 'Multi-stage project payout. Funds release in 5 sequential milestones. Each milestone requires oracle + recipient sig.',
+    desc: 'Multi-stage project payout. Funds release in 5 sequential milestones. Each milestone requires oracle + recipient sig.\n\nMILE: Oracle attests milestone complete, recipient signs, amount-locked payout created. Sequencer advances via RECURSE_MODIFIED.\nCANCEL: Both parties co-sign to cancel and refund remaining balance.',
     tags: [['SEQ', 'plc'], ['SIG', 'sig'], ['REC_MOD', 'rec'], ['A_ORACLE', 'cov']],
     rungs: [
       { label: 'MILE', blocks: [
@@ -6671,7 +6689,7 @@ const EXAMPLES = [
   },
   {
     title: 'FEE-GATED COVENANT',
-    desc: 'Covenant that only allows spending when fees are between 5-50 sat/vB. Prevents panic-spending during fee spikes.',
+    desc: 'Covenant that only allows spending when fees are between 5-50 sat/vB. Prevents panic-spending during fee spikes.\n\nSEND: Key signs, fee-gate enforces 5-50 sat/vB band, amount-locked.\nEMERG: Two keys co-sign to bypass the fee gate entirely.',
     tags: [['HYST_FEE', 'plc'], ['SIG', 'sig'], ['REC_SAME', 'rec']],
     rungs: [
       { label: 'SEND', blocks: [
@@ -6693,7 +6711,7 @@ const EXAMPLES = [
   },
   {
     title: 'ONE-SHOT TRIGGER + LATCH',
-    desc: 'Single-use authorization: ONE_SHOT fires once, latching the output. The latch can only be reset by a separate key.',
+    desc: 'Single-use authorization: ONE_SHOT fires once, latching the output. The latch can only be reset by a separate key.\n\nFIRE: Key signs + ONE_SHOT triggers (can only fire once).\nEXEC: Second key executes the latched action.\nRESET: Admin key resets the latch after a 6-block delay.',
     tags: [['ONE_SHOT', 'plc'], ['LATCH_S', 'plc'], ['LATCH_R', 'plc'], ['SIG', 'sig']],
     rungs: [
       { label: 'FIRE', blocks: [
@@ -6718,7 +6736,7 @@ const EXAMPLES = [
   },
   {
     title: 'RECURSIVE SPLIT (TREE)',
-    desc: 'Binary split covenant: UTXO splits into 2 equal children on each spend, up to 3 levels deep. Each child inherits the same conditions with max_splits decremented.',
+    desc: 'Binary split covenant: UTXO splits into 2 equal children on each spend, up to 3 levels deep. Each child inherits the same conditions with max_splits decremented.\n\nSPLIT: Key signs, UTXO splits into 2 equal outputs. Each child re-encumbers with same conditions, max_splits decremented. Min 2,000 sats per leaf.',
     tags: [['REC_SPLIT', 'rec'], ['SIG', 'sig']],
     rungs: [
       { label: 'SPLIT', blocks: [
@@ -6734,7 +6752,7 @@ const EXAMPLES = [
   },
   {
     title: 'BLOCK-HEIGHT TIMELOCK + COMPARE',
-    desc: 'Funds locked until block 900,000. After unlock, output amount must be > 10,000 sats. CLTV + COMPARE combo.',
+    desc: 'Funds locked until block 900,000. After unlock, output amount must be > 10,000 sats. CLTV + COMPARE combo.\n\nSPEND: CLTV enforces block 900,000 minimum, key signs, COMPARE ensures output > 10,000 sats.',
     tags: [['CLTV', 'time'], ['COMPARE', 'plc'], ['SIG', 'sig']],
     rungs: [
       { label: 'SPEND', blocks: [
@@ -6751,7 +6769,7 @@ const EXAMPLES = [
   },
   {
     title: 'COUNTER-UP SUBSCRIPTION',
-    desc: 'Recurring subscription: counter increments each payment (max 24). Amount-locked to fixed payment size. Auto-renews via recursion.',
+    desc: 'Recurring subscription: counter increments each payment (max 24). Amount-locked to fixed payment size. Auto-renews via recursion.\n\nPAY: Subscriber signs, counter increments, 25k sats paid out, remainder re-encumbered via RECURSE_MODIFIED.\nCANCEL: Both parties co-sign to cancel early.\nEXPIRE: When counter reaches 24, subscriber sweeps the remainder.',
     tags: [['CTR_UP', 'plc'], ['AMT_LOCK', 'cov'], ['REC_MOD', 'rec'], ['SIG', 'sig']],
     rungs: [
       { label: 'PAY', blocks: [
@@ -6779,7 +6797,7 @@ const EXAMPLES = [
   },
   {
     title: 'QUANTUM-SAFE VAULT',
-    desc: 'Post-quantum secured vault using FALCON-512 signatures. Hot spend via Falcon, cold recovery via Dilithium3 after 1-year CSV. Quantum-resistant key commitment.',
+    desc: 'Post-quantum secured vault using FALCON-512 signatures. Hot spend via Falcon, cold recovery via Dilithium3 after 1-year CSV. Quantum-resistant key commitment.\n\nPQ_SPEND: Falcon-512 signature with amount lock — quantum-safe daily operations.\nPQ_RECOVER: After 1 year, Dilithium3 key recovers funds.\nHYBRID: Both Falcon-512 + classical Schnorr required — belt-and-suspenders.',
     tags: [['FALCON', 'sig'], ['DILITHIUM', 'sig'], ['CSV', 'time'], ['PQ', 'hash']],
     rungs: [
       { label: 'PQ_SPEND', blocks: [
@@ -6805,7 +6823,7 @@ const EXAMPLES = [
   },
   {
     title: 'QUANTUM VAULT + CHILDREN',
-    desc: 'PQ-secured parent vault that splits into child UTXOs via RECURSE_SPLIT. Each child inherits Falcon-512 protection. Emergency multisig and CSV timeout sweep.',
+    desc: 'PQ-secured parent vault that splits into child UTXOs via RECURSE_SPLIT. Each child inherits Falcon-512 protection. Emergency multisig and CSV timeout sweep.\n\nPQ_SPLIT: Falcon-512 signs, UTXO splits into children (max 3 levels, min 10k sats).\nPQ_CHILD: Individual child spend with Falcon-512 + amount lock.\nPQ_EMERG: 2-of-2 PQ multisig emergency sweep.\nSWEEP: After 30 days, Dilithium3 backup key recovers.',
     tags: [['FALCON', 'sig'], ['REC_SPLIT', 'rec'], ['AMT_LOCK', 'cov'], ['MULTISIG', 'sig']],
     rungs: [
       { label: 'PQ_SPLIT', blocks: [
@@ -6835,7 +6853,7 @@ const EXAMPLES = [
   },
   {
     title: 'MULTI-INPUT CONSOLIDATION',
-    desc: 'Consolidates 3 UTXOs into a single output. Demonstrates multi-input rung assignment with separate signing keys per input.',
+    desc: 'Consolidates 3 UTXOs into a single output. Demonstrates multi-input rung assignment with separate signing keys per input.\n\nMERGE: Key signs all 3 inputs, amount-locked output, CTV commits to exact spend template. All inputs share the same rung.',
     tags: [['SIG', 'sig'], ['CTV', 'cov'], ['AMT_LOCK', 'cov']],
     rungs: [
       { label: 'MERGE', blocks: [
@@ -6856,7 +6874,7 @@ const EXAMPLES = [
   },
   {
     title: 'MUSIG_THRESHOLD TREASURY',
-    desc: 'Corporate 3-of-5 treasury using MuSig2/FROST aggregate signatures. On-chain looks identical to single-sig (~131 bytes). Recovery path via time-locked backup key.',
+    desc: 'Corporate 3-of-5 treasury using MuSig2/FROST aggregate signatures. On-chain looks identical to single-sig (~131 bytes). Recovery path via time-locked backup key.\n\nSPEND: 3-of-5 MuSig threshold produces a single aggregate signature.\nRECOVER: After 1 year, backup key can sweep — protects against key loss.',
     tags: [['MUSIG_THR', 'sig'], ['CSV', 'time'], ['SIG', 'sig']],
     rungs: [
       { label: 'SPEND', blocks: [
@@ -6876,7 +6894,7 @@ const EXAMPLES = [
   },
   {
     title: 'PTLC PAYMENT CHANNEL',
-    desc: 'Scriptless payment channel using Point Time Locked Contracts. Cooperative close via MuSig, unilateral close reveals adaptor secret after CSV timeout.',
+    desc: 'Scriptless payment channel using Point Time Locked Contracts. Cooperative close via MuSig, unilateral close reveals adaptor secret after CSV timeout.\n\nCOOP: 2-of-2 MuSig aggregate close — both parties agree on final state.\nFORCE: PTLC adaptor sig + 144-block CSV delay — broadcasting reveals the adaptor secret.',
     tags: [['MUSIG_THR', 'sig'], ['PTLC', 'sig'], ['CSV', 'time']],
     rungs: [
       { label: 'COOP', blocks: [
@@ -6895,7 +6913,7 @@ const EXAMPLES = [
   },
   {
     title: 'CLTV_SIG VESTING SCHEDULE',
-    desc: 'Time-locked payouts at specific block heights. Employee vesting with quarterly unlocks using CLTV_SIG compound blocks.',
+    desc: 'Time-locked payouts at specific block heights. Employee vesting with quarterly unlocks using CLTV_SIG compound blocks.\n\nQ1: First quarter vesting — CLTV_SIG unlocks at block 860000 with AMOUNT_LOCK capping payout at 250k sats.\nQ2: Second quarter — same pattern at block 873000, another 250k sats.\nFULL: Final vesting — CLTV_SIG at block 900000 releases the remaining balance with no amount cap.',
     tags: [['CLTV_SIG', 'sig'], ['AMT_LOCK', 'cov']],
     rungs: [
       { label: 'Q1', blocks: [
@@ -6920,7 +6938,7 @@ const EXAMPLES = [
   },
   {
     title: 'TIMELOCKED_MULTISIG VAULT RECOVERY',
-    desc: 'Hot wallet spend, timelocked 2-of-3 recovery, and emergency cold key. The TIMELOCKED_MULTISIG recovery path requires board quorum after 1-week cooling period.',
+    desc: 'Hot wallet spend, timelocked 2-of-3 recovery, and emergency cold key. The TIMELOCKED_MULTISIG recovery path requires board quorum after 1-week cooling period.\n\nHOT: Daily spending — single SIG with AMOUNT_LOCK capping at 1M sats.\nBOARD: Recovery path — TIMELOCKED_MULTISIG requires 2-of-3 board keys after 1008-block (~1 week) delay.\nCOLD: Emergency sweep — CSV enforces ~1 year delay, then cold key SIG can move all funds.',
     tags: [['SIG', 'sig'], ['TL_MULTI', 'sig'], ['CSV', 'time']],
     rungs: [
       { label: 'HOT', blocks: [
@@ -6946,7 +6964,7 @@ const EXAMPLES = [
 
   {
     title: 'HTLC COMPACT SWAP',
-    desc: 'Atomic swap using the HTLC compound block — hash + timelock + sig in a single block. Saves 16 bytes over decomposed blocks.',
+    desc: 'Atomic swap using the HTLC compound block — hash + timelock + sig in a single block. Saves 16 bytes over decomposed blocks.\n\nCLAIM: Alice claims with HTLC — reveals hash preimage, provides signature, within 144-block window.\nREFUND: Bob recovers with TIMELOCKED_SIG after 288 blocks if Alice never claims.',
     tags: [['HTLC', 'compound'], ['SIG', 'sig']],
     rungs: [
       { label: 'CLAIM', blocks: [
@@ -6966,7 +6984,7 @@ const EXAMPLES = [
 
   {
     title: 'HASH_SIG ATOMIC CLAIM',
-    desc: 'Preimage reveal + signature in one compound block. Ideal for atomic swap claim paths where you need hash verification and authorization together.',
+    desc: 'Preimage reveal + signature in one compound block. Ideal for atomic swap claim paths where you need hash verification and authorization together.\n\nCLAIM: HASH_SIG compound — reveal preimage matching hash commitment and sign in one block.\nREFUND: CSV enforces 432-block delay, then sender SIG can reclaim funds.',
     tags: [['HASH_SIG', 'compound'], ['CSV', 'time'], ['SIG', 'sig']],
     rungs: [
       { label: 'CLAIM', blocks: [
@@ -6987,7 +7005,7 @@ const EXAMPLES = [
 
   {
     title: 'GOVERNANCE-GATED TREASURY',
-    desc: 'Treasury output restricted by governance constraints. Spending windows, I/O fanout limits, weight cap, and anti-siphon ratio enforcement.',
+    desc: 'Treasury output restricted by governance constraints. Spending windows, I/O fanout limits, weight cap, and anti-siphon ratio enforcement.\n\nGOVERNED: SIG + 5 governance blocks — EPOCH_GATE limits spend to a 144-block window per 2016-block epoch, INPUT/OUTPUT_COUNT caps I/O fanout, WEIGHT_LIMIT prevents bloated txs, RELATIVE_VALUE enforces 90% minimum change-back (anti-siphon).\nOVERRIDE: 3-of-4 MULTISIG board override bypasses all governance constraints.',
     tags: [['EPOCH', 'gov'], ['IN_COUNT', 'gov'], ['OUT_COUNT', 'gov'], ['WT_LIMIT', 'gov'], ['REL_VAL', 'gov'], ['SIG', 'sig']],
     rungs: [
       { label: 'GOVERNED', blocks: [
@@ -7012,7 +7030,7 @@ const EXAMPLES = [
 
   {
     title: 'ACCUMULATOR ALLOWLIST',
-    desc: 'Merkle set membership proof. Spending transaction must prove the destination is in a pre-committed allowlist. Combines with SIG and AMOUNT_LOCK for full access control. Root auto-computed from leaves at fund time.',
+    desc: 'Merkle set membership proof. Spending transaction must prove the destination is in a pre-committed allowlist. Combines with SIG and AMOUNT_LOCK for full access control. Root auto-computed from leaves at fund time.\n\nSEND: SIG authorizes, ACCUMULATOR verifies destination is in the allowlist Merkle tree, AMOUNT_LOCK bounds payout between 10k–5M sats.\nADMIN: 2-of-3 MULTISIG admin sweep bypasses the allowlist.',
     tags: [['ACCUM', 'gov'], ['SIG', 'sig'], ['AMT_LOCK', 'cov']],
     rungs: [
       { label: 'SEND', blocks: [
@@ -7034,7 +7052,7 @@ const EXAMPLES = [
 
   {
     title: 'CLTV_TIME CALENDAR LOCK',
-    desc: 'Date-locked payment using absolute Unix timestamp. Funds cannot move until January 1, 2027. HASH160 preimage adds a shared-secret gate.',
+    desc: 'Date-locked payment using absolute Unix timestamp. Funds cannot move until January 1, 2027. HASH160 preimage adds a shared-secret gate.\n\nUNLOCK: CLTV_TIME enforces Jan 1 2027 timestamp, HASH160_PREIMAGE requires shared-secret reveal, SIG authorizes.\nCANCEL: Two SIG blocks — both parties must cooperate to cancel before the date.',
     tags: [['CLTV_TIME', 'time'], ['HASH160', 'hash'], ['SIG', 'sig']],
     rungs: [
       { label: 'UNLOCK', blocks: [
@@ -7057,7 +7075,7 @@ const EXAMPLES = [
 
   {
     title: 'TIMER WATCHDOG',
-    desc: 'Continuous timer requires N consecutive blocks of activity. Off-delay timer holds authorization after trigger expires. Tagged hash proves domain-separated attestation.',
+    desc: 'Continuous timer requires N consecutive blocks of activity. Off-delay timer holds authorization after trigger expires. Tagged hash proves domain-separated attestation.\n\nACTIVE: TIMER_CONTINUOUS (inverted — must NOT have reached 144 blocks yet) + SIG + RECURSE_MODIFIED increments the counter each spend, keeping the watchdog alive.\nHELD: TIMER_OFF_DELAY holds authorization for 72 blocks after the trigger expires — grace period.\nEMERG: CSV 1008-block timeout + SIG — if watchdog is never fed, emergency key sweeps.',
     tags: [['TMR_CONT', 'plc'], ['TMR_OFF', 'plc'], ['TAGGED', 'hash'], ['SIG', 'sig']],
     rungs: [
       { label: 'ACTIVE', blocks: [
@@ -7085,7 +7103,7 @@ const EXAMPLES = [
 
   {
     title: 'PRESET COUNTER BOARD VOTE',
-    desc: 'Multi-party approval accumulator. Counter tracks board approvals; once preset (3) is reached, funds release. Hysteresis value band limits payout size.',
+    desc: 'Multi-party approval accumulator. Counter tracks board approvals; once preset (3) is reached, funds release. Hysteresis value band limits payout size.\n\nAPPROVE: COUNTER_PRESET at 0/3 + SIG + HYSTERESIS_VALUE (100k–5M sats band) + RECURSE_MODIFIED increments counter. Each board member casts a vote by spending this rung.\nEXECUTE: COUNTER_PRESET at 3/3 — once 3 votes accumulated, SIG releases the funds.\nCANCEL: 3-of-4 MULTISIG — board supermajority can cancel the vote at any time.',
     tags: [['CTR_PRE', 'plc'], ['HYST_VAL', 'plc'], ['SIG', 'sig']],
     rungs: [
       { label: 'APPROVE', blocks: [
@@ -7113,7 +7131,7 @@ const EXAMPLES = [
 
   {
     title: 'ANCHORED CHANNEL + RECURSE_UNTIL',
-    desc: 'Lightning channel with anchor binding and recursive state until target block height. Channel anchor tags the commitment; RECURSE_UNTIL bounds the protocol lifetime.',
+    desc: 'Lightning channel with anchor binding and recursive state until target block height. Channel anchor tags the commitment; RECURSE_UNTIL bounds the protocol lifetime.\n\nCOOP: Cooperative close — MUSIG_THRESHOLD 2-of-2 + ANCHOR_CHANNEL binding.\nUPDATE: State update — SIG + ANCHOR_CHANNEL re-binding + RECURSE_UNTIL allows recursive state transitions up to block 950000.\nEXPIRE: Channel expiry — CLTV at block 950000 + SIG closes the channel unilaterally.',
     tags: [['A_CHAN', 'anchor'], ['REC_UNTIL', 'rec'], ['MUSIG_THR', 'sig']],
     rungs: [
       { label: 'COOP', blocks: [
@@ -7224,7 +7242,7 @@ const EXAMPLES = [
 
   {
     title: 'LEGACY P2PKH + RECOVERY',
-    desc: 'P2PKH legacy spending with a time-locked recovery path. Demonstrates legacy Bitcoin address semantics wrapped as typed Ladder Script blocks — same spending logic, no arbitrary data surfaces.',
+    desc: 'P2PKH legacy spending with a time-locked recovery path. Demonstrates legacy Bitcoin address semantics wrapped as typed Ladder Script blocks — same spending logic, no arbitrary data surfaces.\n\nSPEND: P2PKH_LEGACY — provide pubkey matching HASH160 commitment + signature. Same as Bitcoin P2PKH but in typed fields.\nRECOVER: CSV 52560-block (~1 year) delay + native SIG recovery key.',
     tags: [['P2PKH', 'legacy'], ['CSV', 'time'], ['SIG', 'sig']],
     rungs: [
       { label: 'SPEND', blocks: [
@@ -7245,7 +7263,7 @@ const EXAMPLES = [
 
   {
     title: 'LEGACY P2SH MULTISIG VAULT',
-    desc: 'P2SH legacy wrapping inner Ladder Script conditions — the PREIMAGE carries serialized conditions that are deserialized and evaluated. Combines with a P2WPKH hot-spend path and CLTV cold sweep.',
+    desc: 'P2SH legacy wrapping inner Ladder Script conditions — the PREIMAGE carries serialized conditions that are deserialized and evaluated. Combines with a P2WPKH hot-spend path and CLTV cold sweep.\n\nHOT: P2WPKH_LEGACY — SegWit-wrapped hash-based spend, delegates to P2PKH evaluation internally.\nVAULT: P2SH_LEGACY — HASH160 of inner conditions committed on-chain; PREIMAGE reveals the Ladder Script conditions at spend time.\nCOLD: CLTV at block 900000 + native SIG — absolute timelock cold sweep.',
     tags: [['P2SH', 'legacy'], ['P2WPKH', 'legacy'], ['CLTV', 'time']],
     rungs: [
       { label: 'HOT', blocks: [
@@ -7270,7 +7288,7 @@ const EXAMPLES = [
 
   {
     title: 'P2TR TAPROOT MIGRATION',
-    desc: 'Taproot key-path and script-path legacy blocks composed with native Ladder Script. P2TR key-path for daily spending, P2TR_SCRIPT for governed multisig, and a PQ-safe emergency recovery.',
+    desc: 'Taproot key-path and script-path legacy blocks composed with native Ladder Script. P2TR key-path for daily spending, P2TR_SCRIPT for governed multisig, and a PQ-safe emergency recovery.\n\nKEY: P2TR_LEGACY key-path — Schnorr signature against the tweaked output key. Fastest taproot spend.\nSCRIPT: P2TR_SCRIPT_LEGACY script-path — reveal a Merkle leaf from the script tree. Inner leaf must be valid Ladder Script conditions (closes inscription vector).\nPQ_SAFE: CSV 26000-block delay + FALCON512 post-quantum SIG — emergency migration to quantum-safe key.',
     tags: [['P2TR', 'legacy'], ['P2TR_S', 'legacy'], ['SIG', 'sig']],
     rungs: [
       { label: 'KEY', blocks: [
@@ -10378,6 +10396,29 @@ function App() {
     return ex !== null ? parseInt(ex, 10) : null;
   });
 
+  // Right panel resize
+  const [rightPanelWidth, setRightPanelWidth] = useState(260);
+  const rightPanelRef = useRef(null);
+  const handleRightPanelResizeStart = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightPanelWidth;
+    const onMove = (ev) => {
+      const delta = startX - ev.clientX;
+      setRightPanelWidth(Math.max(200, Math.min(600, startWidth + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [rightPanelWidth]);
+
   const isSimMode = mode === 'simulate';
 
   // Keyboard shortcuts: ESC closes modals/fullscreen, F11 toggles fullscreen, Delete removes selection
@@ -10996,6 +11037,8 @@ function App() {
       txInputs: newTxInputs.length > 0 ? newTxInputs : [{ id: uid(), txid: '', vout: 0 }],
       txOutputs: newTxOutputs.length > 0 ? newTxOutputs : [{ id: uid(), address: '', amount: 0 }],
     });
+    // Always switch to BUILD tab when loading an example
+    dispatch({ type: 'SET_MODE', value: 'build' });
   }, []);
 
   // Load example from URL param ?example=N
@@ -11330,6 +11373,7 @@ ${ladderRows.map(r => `
           <button className={`mode-tab ${mode === 'spend' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_MODE', value: 'spend' })} title={showTooltips ? 'Spend existing RUNG outputs on signet' : undefined} style={mode === 'spend' ? { color: 'var(--cyan)', borderBottomColor: 'var(--cyan)' } : {}}>SPEND</button>
         </div>
         <div className="header-actions">
+          <button className="header-btn" onClick={() => window.open('../docs/index.html', '_blank')} title={showTooltips ? 'Open the Ladder Script engine guide in a new window' : undefined}>HELP</button>
           <button className="header-btn primary" onClick={() => dispatch({ type: 'SET_SHOW_EXAMPLES', value: true })} title={showTooltips ? 'Load pre-built example programs' : undefined}>EXAMPLES</button>
           <button className="header-btn" onClick={handleImport} title={showTooltips ? 'Import createrungtx JSON from clipboard' : undefined}>IMPORT</button>
           <button className="header-btn" onClick={handleCopyJson} title={showTooltips ? 'Validate and copy wire-format JSON to clipboard' : undefined}>COPY JSON</button>
@@ -11371,12 +11415,13 @@ ${ladderRows.map(r => `
           startScanFrom={startScanFrom}
         />
 
-        <div className="right-panel">
+        <div className="right-panel" style={{ width: rightPanelWidth + 'px' }} ref={rightPanelRef}>
+          <div className="right-panel-resize" onMouseDown={handleRightPanelResizeStart} />
           <div className="panel-tab-bar">
-            {!isSimMode && <button className={`panel-tab ${rightTab === 'properties' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'properties' })}>PROPERTIES</button>}
-            {!isSimMode && <button className={`panel-tab ${rightTab === 'tx' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'tx' })}>TX</button>}
-            {isSimMode && <button className={`panel-tab ${rightTab === 'simulate' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'simulate' })}>CONTEXT</button>}
-            <button className={`panel-tab ${rightTab === 'json' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'json' })}>RPC</button>
+            {!isSimMode && <button className={`panel-tab ${rightTab === 'properties' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'properties' })} title={showTooltips ? 'Edit fields for the selected block, input, or coil' : undefined}>PROPERTIES</button>}
+            {!isSimMode && <button className={`panel-tab ${rightTab === 'tx' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'tx' })} title={showTooltips ? 'Configure transaction inputs, outputs, and locktime' : undefined}>TX</button>}
+            {isSimMode && <button className={`panel-tab ${rightTab === 'simulate' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'simulate' })} title={showTooltips ? 'Set simulation context — amounts, heights, timestamps' : undefined}>CONTEXT</button>}
+            <button className={`panel-tab ${rightTab === 'json' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_RIGHT_TAB', value: 'json' })} title={showTooltips ? 'View the createrungtx RPC JSON for this transaction' : undefined}>RPC</button>
           </div>
           <div className="panel-content">
             {!isSimMode && rightTab === 'properties' && selectedInputId ? (

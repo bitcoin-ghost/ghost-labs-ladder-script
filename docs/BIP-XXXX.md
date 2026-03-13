@@ -576,6 +576,167 @@ The following RPCs are provided for wallet and application integration:
 
 **Policy vs. consensus limits.** MAX_RUNGS, MAX_BLOCKS_PER_RUNG, and MAX_FIELDS_PER_BLOCK are enforced at both policy and consensus layers. The MAX_LADDER_WITNESS_SIZE limit at 10,000 bytes accommodates post-quantum signatures (Dilithium3 at 3,293 bytes) with headroom for multi-block rungs while preventing witness bloat attacks.
 
+## Examples
+
+The following examples demonstrate common spending patterns expressed as Ladder Script conditions. Each example shows the rung/block structure, the RPC JSON for `createrungtx`, and the resulting conditions layout.
+
+### Example 1: Single Signature (Compact Encoding)
+
+The simplest possible RUNG_TX: a single SIG rung with one output.
+
+**Rung structure:**
+```
+Rung 0 (SPEND):
+  └─ SIG { pubkey_commit: <32-byte SHA256 of pubkey>, scheme: SCHNORR }
+```
+
+**RPC JSON:**
+```json
+{
+  "inputs": [{ "txid": "abc123...", "vout": 0 }],
+  "outputs": [
+    {
+      "address": "tb1q...",
+      "amount": 0.00010000,
+      "conditions": [{
+        "blocks": [{ "type": "SIG", "pubkey": "02abc123..." }]
+      }]
+    }
+  ]
+}
+```
+
+The node auto-converts the 33-byte `pubkey` to a 32-byte `PUBKEY_COMMIT` (SHA-256 hash) in the on-chain conditions. The full pubkey is only revealed in the witness at spend time. With a single SIG block, the serializer uses compact encoding — the micro-header encodes the block type directly, and the implicit field layout for SIG (`PUBKEY_COMMIT(32) + SCHEME(1)`) avoids explicit field headers.
+
+### Example 2: 2-of-3 Multisig Vault with Time-Locked Recovery
+
+A vault with daily multisig spending and an emergency cold-key sweep after one year.
+
+**Rung structure:**
+```
+Rung 0 (SPEND):
+  ├─ MULTISIG { threshold: 2, pubkeys: [pk1, pk2, pk3] }
+  └─ AMOUNT_LOCK { min: 546, max: 5000000 }
+
+Rung 1 (SWEEP):
+  ├─ CSV { blocks: 52560 }
+  └─ SIG { pubkey: pk_cold }
+```
+
+**Evaluation:** Rung 0 requires 2-of-3 signatures AND the output amount to be between 546 and 5,000,000 sats (AND logic within rung). If Rung 0 fails, Rung 1 is tried: it requires the UTXO to be at least ~1 year old (52,560 blocks) AND a cold key signature (OR logic across rungs).
+
+**RPC JSON:**
+```json
+{
+  "inputs": [{ "txid": "def456...", "vout": 0 }],
+  "outputs": [
+    {
+      "address": "tb1q...",
+      "amount": 0.00050000,
+      "conditions": [
+        {
+          "label": "SPEND",
+          "blocks": [
+            { "type": "MULTISIG", "threshold": 2, "pubkeys": ["02aaa...", "02bbb...", "02ccc..."] },
+            { "type": "AMOUNT_LOCK", "min": 546, "max": 5000000 }
+          ]
+        },
+        {
+          "label": "SWEEP",
+          "blocks": [
+            { "type": "CSV", "blocks": 52560 },
+            { "type": "SIG", "pubkey": "02ddd..." }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Example 3: Atomic Swap (HTLC)
+
+Cross-chain atomic swap using hash time-locked contracts. Alice claims with the hash preimage; Bob refunds after timeout.
+
+**Rung structure:**
+```
+Rung 0 (CLAIM):
+  ├─ HASH256_PREIMAGE { hash: <32-byte SHA-256 of preimage> }
+  └─ SIG { pubkey: pk_alice }
+
+Rung 1 (REFUND):
+  └─ TIMELOCKED_SIG { pubkey: pk_bob, blocks: 144 }
+```
+
+**Evaluation:** Alice spends via Rung 0 by providing the preimage (which Bob can then extract from the published transaction to claim the other chain) plus her signature. If Alice never claims, Bob uses Rung 1 after 144 blocks.
+
+### Example 4: DCA Covenant Chain
+
+Dollar-cost averaging vault that enforces periodic fixed-amount withdrawals using RECURSE_SAME re-encumbrance.
+
+**Rung structure:**
+```
+Rung 0 (DCA):
+  ├─ SIG { pubkey: pk_owner }
+  ├─ AMOUNT_LOCK { min: 100000, max: 100000 }
+  └─ coil: RECURSE_SAME
+```
+
+**Evaluation:** Each spend is limited to exactly 100,000 sats by AMOUNT_LOCK. The RECURSE_SAME coil forces the change output to carry identical conditions, creating a chain of fixed-size withdrawals. The covenant terminates when the UTXO balance falls below the minimum amount.
+
+### Example 5: Governance-Gated Treasury
+
+Treasury with spending windows, I/O limits, weight cap, and anti-siphon ratio enforcement.
+
+**Rung structure:**
+```
+Rung 0 (GOVERNED):
+  ├─ SIG { pubkey: pk_treasurer }
+  ├─ EPOCH_GATE { epoch_size: 2016, window_size: 144 }
+  ├─ INPUT_COUNT { min: 1, max: 3 }
+  ├─ OUTPUT_COUNT { min: 1, max: 2 }
+  ├─ WEIGHT_LIMIT { max_weight: 400000 }
+  └─ RELATIVE_VALUE { numerator: 9, denominator: 10 }
+
+Rung 1 (OVERRIDE):
+  └─ MULTISIG { threshold: 3, pubkeys: [pk1, pk2, pk3, pk4] }
+```
+
+**Evaluation:** The treasurer can spend only during a 144-block window per 2016-block epoch, with at most 3 inputs and 2 outputs, under the standard weight limit, and must return at least 90% of the input value as change (anti-siphon). The 3-of-4 board override bypasses all governance constraints.
+
+### Example 6: Post-Quantum Vault with Classical Hot Path
+
+Hybrid vault: Schnorr for daily use, FALCON-512 for long-term cold storage.
+
+**Rung structure:**
+```
+Rung 0 (HOT):
+  ├─ SIG { pubkey_commit: <sha256(schnorr_pk)>, scheme: SCHNORR }
+  └─ AMOUNT_LOCK { min: 546, max: 1000000 }
+
+Rung 1 (PQ_COLD):
+  ├─ CSV { blocks: 4320 }
+  └─ SIG { pubkey_commit: <sha256(falcon_pk)>, scheme: FALCON512 }
+```
+
+**Evaluation:** Daily spending uses Schnorr with an amount cap. After ~30 days (4,320 blocks), the FALCON-512 cold key can sweep everything. The PUBKEY_COMMIT mechanism means the 897-byte FALCON-512 public key is only revealed at spend time — the on-chain conditions store only a 32-byte hash.
+
+### Example 7: Legacy P2PKH Wrapped as Ladder Block
+
+Legacy Bitcoin P2PKH semantics wrapped in typed fields, closing arbitrary-data surfaces.
+
+**Rung structure:**
+```
+Rung 0 (SPEND):
+  └─ P2PKH_LEGACY { hash160: <20-byte HASH160 of pubkey> }
+
+Rung 1 (RECOVER):
+  ├─ CSV { blocks: 52560 }
+  └─ SIG { pubkey: pk_recovery }
+```
+
+**Evaluation:** Rung 0 uses P2PKH_LEGACY — the spender provides a pubkey whose HASH160 matches the committed hash, plus a signature. Identical to Bitcoin P2PKH semantics, but expressed as typed fields with no room for data embedding. Rung 1 adds a native Ladder Script recovery path that was not possible in legacy P2PKH.
+
 ## Backward Compatibility
 
 **Non-upgraded nodes.** Transaction version 4 is currently non-standard in Bitcoin Core. No existing software creates v4 transactions. Non-upgraded nodes treat v4 transactions as anyone-can-spend, which is the standard soft fork upgrade path established by BIP-141 (Segregated Witness) and BIP-341 (Taproot).
