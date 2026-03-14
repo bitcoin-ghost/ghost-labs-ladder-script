@@ -2593,21 +2593,21 @@ const BLOCK_FAMILIES = [
       ]},
       { type: 'P2PKH_LEGACY', label: 'P2PKH', desc: 'P2PKH wrapped — HASH160(pubkey) verification + signature', fields: [
         { name: 'hash160', dataType: 'HASH160', label: 'PubKey Hash (HASH160)', placeholder: '20-byte HASH160 hex' },
-        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex' },
-        { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex' }
+        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex', witnessOnly: true },
+        { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
       { type: 'P2SH_LEGACY', label: 'P2SH', desc: 'P2SH wrapped — HASH160 of inner Ladder Script conditions + evaluation', fields: [
         { name: 'hash160', dataType: 'HASH160', label: 'Script Hash (HASH160)', placeholder: '20-byte HASH160 hex' },
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions hex' }
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions hex', witnessOnly: true }
       ]},
       { type: 'P2WPKH_LEGACY', label: 'P2WPKH', desc: 'P2WPKH wrapped — same as P2PKH (segwit version)', fields: [
         { name: 'hash160', dataType: 'HASH160', label: 'PubKey Hash (HASH160)', placeholder: '20-byte HASH160 hex' },
-        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex' },
-        { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex' }
+        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex', witnessOnly: true },
+        { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
       { type: 'P2WSH_LEGACY', label: 'P2WSH', desc: 'P2WSH wrapped — SHA256 of inner Ladder Script conditions + evaluation', fields: [
         { name: 'hash256', dataType: 'HASH256', label: 'Script Hash (SHA256)', placeholder: '32-byte SHA256 hex' },
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions hex' }
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions hex', witnessOnly: true }
       ]},
       { type: 'P2TR_LEGACY', label: 'P2TR', desc: 'P2TR key-path wrapped — public key + signature (same as SIG)', fields: [
         { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex' },
@@ -2616,8 +2616,8 @@ const BLOCK_FAMILIES = [
       ]},
       { type: 'P2TR_SCRIPT_LEGACY', label: 'P2TR_S', desc: 'P2TR script-path wrapped — Merkle root + internal key + revealed leaf (Ladder conditions)', fields: [
         { name: 'hash256', dataType: 'HASH256', label: 'Script Tree Root (SHA256)', placeholder: '32-byte Merkle root hex' },
-        { name: 'internal_key', dataType: 'PUBKEY_COMMIT', label: 'Internal Key Commit', placeholder: '32-byte SHA256(internal_pubkey)' },
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Revealed Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions hex' }
+        { name: 'internal_key', dataType: 'PUBKEY', label: 'Internal Public Key', placeholder: '33-byte compressed pubkey (node computes PUBKEY_COMMIT)' },
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Revealed Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions hex', witnessOnly: true }
       ]},
     ]
   },
@@ -2723,11 +2723,18 @@ function generateTestData(blockType) {
 let _id = 0;
 function uid() { return ++_id; }
 
+// Block types that support inner conditions (script-hash legacy blocks)
+const INNER_CONDITION_TYPES = new Set(['P2SH_LEGACY', 'P2WSH_LEGACY', 'P2TR_SCRIPT_LEGACY']);
+// Block types allowed as inner conditions (no recursion, no complex compound types)
+const ALLOWED_INNER_TYPES = ['SIG', 'MULTISIG', 'HASH_PREIMAGE', 'HASH160_PREIMAGE', 'CSV', 'CLTV', 'CSV_TIME', 'CLTV_TIME', 'TIMELOCKED_SIG', 'CLTV_SIG'];
+
 function createBlock(type) {
   const def = getBlockDef(type);
   const values = {};
   def.fields.forEach(f => { values[f.name] = ''; });
-  return { id: uid(), type, values, inverted: false, name: '' };
+  const block = { id: uid(), type, values, inverted: false, name: '' };
+  if (INNER_CONDITION_TYPES.has(type)) block.innerBlocks = [];
+  return block;
 }
 
 function createRung() {
@@ -3048,6 +3055,8 @@ BlockRegistry.P2PKH_LEGACY.evaluate = (block, simState) => {
 };
 
 BlockRegistry.P2SH_LEGACY.evaluate = (block) => {
+  // Inner blocks defined = valid (hash computed at fund time)
+  if (block.innerBlocks && block.innerBlocks.length > 0) return 'satisfied';
   const hash = (block.values.hash160 || '').trim();
   const preimage = (block.values.preimage || '').trim();
   if (!hash || hash.length !== 40) return 'error';
@@ -3062,6 +3071,7 @@ BlockRegistry.P2WPKH_LEGACY.evaluate = (block, simState) => {
 };
 
 BlockRegistry.P2WSH_LEGACY.evaluate = (block) => {
+  if (block.innerBlocks && block.innerBlocks.length > 0) return 'satisfied';
   const hash = (block.values.hash256 || '').trim();
   const preimage = (block.values.preimage || '').trim();
   if (!hash || hash.length !== 64) return 'error';
@@ -3073,11 +3083,12 @@ BlockRegistry.P2TR_LEGACY.evaluate = (block, simState) =>
   simState.availableKeys?.has(block.values.pubkey) ? 'satisfied' : 'unsatisfied';
 
 BlockRegistry.P2TR_SCRIPT_LEGACY.evaluate = (block) => {
+  if (block.innerBlocks && block.innerBlocks.length > 0 && (block.values.internal_key || '').trim()) return 'satisfied';
   const root = (block.values.hash256 || '').trim();
   const ikey = (block.values.internal_key || '').trim();
   const leaf = (block.values.preimage || '').trim();
   if (!root || root.length !== 64) return 'error';
-  if (!ikey || ikey.length !== 64) return 'error';
+  if (!ikey) return 'error';
   if (!leaf) return 'unsatisfied';
   return 'satisfied';
 };
@@ -3143,7 +3154,7 @@ BlockRegistry.P2SH_LEGACY.testData = () => ({ hash160: TEST_HASH160, preimage: T
 BlockRegistry.P2WPKH_LEGACY.testData = () => ({ hash160: TEST_HASH160, pubkey: TEST_PUBKEYS[0] });
 BlockRegistry.P2WSH_LEGACY.testData = () => ({ hash256: TEST_HASH256, preimage: TEST_HASH256_B });
 BlockRegistry.P2TR_LEGACY.testData = () => ({ pubkey: TEST_PUBKEYS[0] });
-BlockRegistry.P2TR_SCRIPT_LEGACY.testData = () => ({ hash256: TEST_HASH256, internal_key: TEST_HASH256_B, preimage: TEST_HASH256 });
+BlockRegistry.P2TR_SCRIPT_LEGACY.testData = () => ({ hash256: TEST_HASH256, internal_key: TEST_PUBKEYS[0], preimage: TEST_HASH256 });
 
 // ─── Output roles ───
 // 'none' | 'recurse' | 'mutation' | 'split' | 'ctv' | 'validation'
@@ -3191,6 +3202,16 @@ BlockRegistry.LATCH_RESET.fundNeeds = () => _singleKey('pubkey');
 BlockRegistry.COUNTER_DOWN.fundNeeds = () => _singleKey('pubkey');
 BlockRegistry.COUNTER_UP.fundNeeds = () => _singleKey('pubkey');
 BlockRegistry.ANCHOR_CHANNEL.fundNeeds = () => ({ keys: [{ field: 'local_key', multi: false }, { field: 'remote_key', multi: false }], hashes: [] });
+// Legacy family fundNeeds
+BlockRegistry.P2PK_LEGACY.fundNeeds = () => _singleKey('pubkey');
+BlockRegistry.P2PKH_LEGACY.fundNeeds = () => _singleKey('pubkey');
+BlockRegistry.P2WPKH_LEGACY.fundNeeds = () => _singleKey('pubkey');
+BlockRegistry.P2TR_LEGACY.fundNeeds = () => _singleKey('pubkey');
+// P2SH/P2WSH: no direct key fields in conditions (hash commitments only)
+// Inner block keys are collected separately in planFund
+BlockRegistry.P2SH_LEGACY.fundNeeds = () => ({ keys: [], hashes: [] });
+BlockRegistry.P2WSH_LEGACY.fundNeeds = () => ({ keys: [], hashes: [] });
+BlockRegistry.P2TR_SCRIPT_LEGACY.fundNeeds = () => ({ keys: [{ field: 'internal_key', multi: false }], hashes: [] });
 
 // ─── Timelock needs ───
 BlockRegistry.CSV.timelockNeeds = (block) => ({ type: 'CSV', blocks: parseInt(block.values.blocks) || 0 });
@@ -3289,6 +3310,78 @@ BlockRegistry.TAGGED_HASH.buildSigner = (block, keyLookup, preimages) => {
   return { type: 'TAGGED_HASH', preimage };
 };
 
+// ── Legacy family buildSigner ──
+
+BlockRegistry.P2PK_LEGACY.buildSigner = (block, keyLookup, preimages, opts) => {
+  const key = keyLookup(block.values.pubkey);
+  if (!key) return null;
+  return { type: 'P2PK_LEGACY', privkey: key.privkey, scheme: block.values.scheme || opts.scheme || 'SCHNORR' };
+};
+
+BlockRegistry.P2PKH_LEGACY.buildSigner = (block, keyLookup, preimages, opts) => {
+  const key = keyLookup(block.values.pubkey);
+  if (!key) return null;
+  return { type: 'P2PKH_LEGACY', privkey: key.privkey, scheme: block.values.scheme || opts.scheme || 'SCHNORR' };
+};
+
+BlockRegistry.P2WPKH_LEGACY.buildSigner = (block, keyLookup, preimages, opts) => {
+  const key = keyLookup(block.values.pubkey);
+  if (!key) return null;
+  return { type: 'P2WPKH_LEGACY', privkey: key.privkey, scheme: block.values.scheme || opts.scheme || 'SCHNORR' };
+};
+
+BlockRegistry.P2TR_LEGACY.buildSigner = (block, keyLookup, preimages, opts) => {
+  const key = keyLookup(block.values.pubkey);
+  if (!key) return null;
+  return { type: 'P2TR_LEGACY', privkey: key.privkey, scheme: block.values.scheme || opts.scheme || 'SCHNORR' };
+};
+
+// Helper: find key from inner blocks for script-hash legacy blocks
+function _findInnerKey(block, keyLookup) {
+  if (!block.innerBlocks) return null;
+  for (const ib of block.innerBlocks) {
+    // Check pubkey, signing_key, agg_pubkey fields
+    for (const field of ['pubkey', 'signing_key', 'agg_pubkey']) {
+      if (ib.values?.[field]) {
+        const key = keyLookup(ib.values[field]);
+        if (key) return key;
+      }
+    }
+    // Check multi-key fields (pubkeys)
+    if (ib.values?.pubkeys) {
+      const keys = ib.values.pubkeys.split(',').map(k => k.trim()).filter(Boolean);
+      for (const pk of keys) {
+        const key = keyLookup(pk);
+        if (key) return key;
+      }
+    }
+  }
+  return null;
+}
+
+BlockRegistry.P2SH_LEGACY.buildSigner = (block, keyLookup, preimages, opts) => {
+  const entry = { type: 'P2SH_LEGACY' };
+  if (block.values.preimage) entry.preimage = block.values.preimage;
+  const key = _findInnerKey(block, keyLookup);
+  if (key) entry.privkey = key.privkey;
+  return entry;
+};
+
+BlockRegistry.P2WSH_LEGACY.buildSigner = (block, keyLookup, preimages, opts) => {
+  const entry = { type: 'P2WSH_LEGACY' };
+  if (block.values.preimage) entry.preimage = block.values.preimage;
+  const key = _findInnerKey(block, keyLookup);
+  if (key) entry.privkey = key.privkey;
+  return entry;
+};
+
+BlockRegistry.P2TR_SCRIPT_LEGACY.buildSigner = (block, keyLookup, preimages, opts) => {
+  const entry = { type: 'P2TR_SCRIPT_LEGACY' };
+  if (block.values.preimage) entry.preimage = block.values.preimage;
+  const key = _findInnerKey(block, keyLookup);
+  if (key) entry.privkey = key.privkey;
+  return entry;
+};
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -3728,6 +3821,54 @@ function bytesToHex(bytes) {
 async function sha256Bytes(data) {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', data));
 }
+// ── RIPEMD-160 (minimal synchronous implementation) ──
+// Used for HASH160 = RIPEMD160(SHA256(data)) needed by P2PKH/P2WPKH legacy blocks
+const _rmd160 = (() => {
+  const f = (j,x,y,z) => j<16?(x^y^z):j<32?((x&y)|(~x&z)):j<48?((x|~y)^z):j<64?((x&z)|(y&~z)):(x^(y|~z));
+  const K1 = [0,0x5A827999,0x6ED9EBA1,0x8F1BBCDC,0xA953FD4E];
+  const K2 = [0x50A28BE6,0x5C4DD124,0x6D703EF3,0x7A6D76E9,0];
+  const R1 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8,3,10,14,4,9,15,8,1,2,7,0,6,13,11,5,12,1,9,11,10,0,8,12,4,13,3,7,15,14,5,6,2,4,0,5,9,7,12,2,10,14,1,3,8,11,6,15,13];
+  const R2 = [5,14,7,0,9,2,11,4,13,6,15,8,1,10,3,12,6,11,3,7,0,13,5,10,14,15,8,12,4,9,1,2,15,5,1,3,7,14,6,9,11,8,12,2,10,0,4,13,8,6,4,1,3,11,15,0,5,12,2,13,9,7,10,14,12,15,10,4,1,5,8,7,6,2,13,14,0,3,9,11];
+  const S1 = [11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8,7,6,8,13,11,9,7,15,7,12,15,9,11,7,13,12,11,13,6,7,14,9,13,15,14,8,13,6,5,12,7,5,11,12,14,15,14,15,9,8,9,14,5,6,8,6,5,12,9,15,5,11,6,8,13,12,5,12,13,14,11,8,5,6];
+  const S2 = [8,9,9,11,13,15,15,5,7,7,8,11,14,14,12,6,9,13,15,7,12,8,9,11,7,7,12,7,6,15,13,11,9,7,15,11,8,6,6,14,12,13,5,14,13,13,7,5,15,5,8,11,14,14,6,14,6,9,12,9,12,5,15,8,8,5,12,9,12,5,14,6,8,13,6,5,15,13,11,11];
+  const rotl = (x,n) => ((x << n) | (x >>> (32-n))) >>> 0;
+  return function ripemd160(msg) {
+    let H0=0x67452301,H1=0xEFCDAB89,H2=0x98BADCFE,H3=0x10325476,H4=0xC3D2E1F0;
+    const len = msg.length;
+    const bitLen = len * 8;
+    const padded = new Uint8Array(((len + 9 + 63) & ~63));
+    padded.set(msg);
+    padded[len] = 0x80;
+    const dv = new DataView(padded.buffer);
+    dv.setUint32(padded.length - 8, bitLen >>> 0, true);
+    dv.setUint32(padded.length - 4, (bitLen / 0x100000000) >>> 0, true);
+    for (let off = 0; off < padded.length; off += 64) {
+      const X = new Uint32Array(16);
+      for (let i = 0; i < 16; i++) X[i] = dv.getUint32(off + i*4, true);
+      let al=H0,bl=H1,cl=H2,dl=H3,el=H4,ar=H0,br=H1,cr=H2,dr=H3,er=H4;
+      for (let j=0;j<80;j++){
+        const rnd=j>>>4;
+        let t=(al+f(j,bl,cl,dl)+X[R1[j]]+K1[rnd])>>>0;
+        t=(rotl(t,S1[j])+el)>>>0;
+        al=el;el=dl;dl=rotl(cl,10);cl=bl;bl=t;
+        t=(ar+f(79-j,br,cr,dr)+X[R2[j]]+K2[rnd])>>>0;
+        t=(rotl(t,S2[j])+er)>>>0;
+        ar=er;er=dr;dr=rotl(cr,10);cr=br;br=t;
+      }
+      const t=(H1+cl+dr)>>>0;
+      H1=(H2+dl+er)>>>0;H2=(H3+el+ar)>>>0;H3=(H4+al+br)>>>0;H4=(H0+bl+cr)>>>0;H0=t;
+    }
+    const out = new Uint8Array(20);
+    const ov = new DataView(out.buffer);
+    ov.setUint32(0,H0,true);ov.setUint32(4,H1,true);ov.setUint32(8,H2,true);ov.setUint32(12,H3,true);ov.setUint32(16,H4,true);
+    return out;
+  };
+})();
+/** Compute HASH160 = RIPEMD160(SHA256(data)) — async due to SubtleCrypto SHA256 */
+async function computeHash160(hexData) {
+  const sha = await sha256Bytes(hexToBytes(hexData));
+  return bytesToHex(_rmd160(sha));
+}
 async function sortedPairHash(a, b) {
   const ab = hexToBytes(a), bb = hexToBytes(b);
   const combined = new Uint8Array(64);
@@ -3805,7 +3946,7 @@ function exportBlockFields(block) {
   const def = getBlockDef(block.type);
   const fields = [];
   def.fields.forEach(f => {
-    if (f.noWire) return; // skip non-wire fields (e.g. merkle_leaves)
+    if (f.noWire || f.witnessOnly) return; // skip non-wire fields and witness-only fields
     const val = block.values[f.name];
     if (!val) return;
     if (f.dataType === 'NUMERIC') {
@@ -3822,6 +3963,8 @@ function exportBlockFields(block) {
       fields.push({ type: 'HASH256', hex: val });
     } else if (f.dataType === 'HASH160') {
       fields.push({ type: 'HASH160', hex: val });
+    } else if (f.dataType === 'PREIMAGE') {
+      fields.push({ type: 'PREIMAGE', hex: val });
     } else if (f.dataType === 'SCHEME' && val) {
       const schemeMap = { SCHNORR: '01', ECDSA: '02', FALCON512: '10', FALCON1024: '11', DILITHIUM3: '12', SPHINCS_SHA: '13' };
       fields.push({ type: 'SCHEME', hex: schemeMap[val] || '01' });
@@ -3860,6 +4003,13 @@ function wireFieldsToValues(wireBlock) {
         fi++;
       }
     } else if ((fd.dataType === 'HASH256' || fd.dataType === 'HASH160') && (wf.type === 'HASH256' || wf.type === 'HASH160')) {
+      values[fd.name] = wf.hex;
+      fi++;
+    } else if (wf.type === 'PUBKEY_COMMIT') {
+      // PUBKEY_COMMIT from wire — store the commit hash (read-only in UI)
+      values[fd.name] = wf.hex;
+      fi++;
+    } else if (fd.dataType === 'PREIMAGE' && wf.type === 'PREIMAGE') {
       values[fd.name] = wf.hex;
       fi++;
     } else {
@@ -4647,6 +4797,79 @@ function BlockModal({ block, onChange, onClose, rungs }) {
             )}
           </div>
 
+          {/* Inner Conditions (for script-hash legacy blocks) */}
+          {INNER_CONDITION_TYPES.has(block.type) && (
+            <div className="block-modal-section">
+              <div className="block-modal-section-title">INNER CONDITIONS</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+                Define the Ladder Script blocks that will be serialized, hashed, and committed on-chain.
+                At spend time, these conditions are revealed and evaluated.
+              </div>
+              {(block.innerBlocks || []).map((ib, ibi) => {
+                const ibDef = getBlockDef(ib.type);
+                const ibFamily = BLOCK_FAMILIES.find(f => f.blocks.some(b => b.type === ib.type));
+                return (
+                  <div key={ib.id || ibi} style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', marginBottom: 4, background: 'var(--gray-900)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: ibFamily?.color || 'var(--text)' }}>
+                        {ibDef?.label || ib.type}
+                      </span>
+                      <button style={{ fontSize: 9, background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer' }}
+                        onClick={() => onChange(block.id, '__removeInnerBlock', ibi)}>DELETE</button>
+                    </div>
+                    {(ibDef?.fields || []).map(f => {
+                      if (f.dataType === 'SCHEME') {
+                        return (
+                          <div key={f.name} className="block-modal-field-row" style={{ marginLeft: 8 }}>
+                            <span className="block-modal-field-label" style={{ fontSize: 10 }}>{f.label}</span>
+                            <span className="block-modal-field-type" style={{ fontSize: 9 }}>SCHEME</span>
+                            <select className="block-modal-field-select" value={ib.values?.[f.name] || ''}
+                              onChange={(e) => onChange(block.id, '__updateInnerBlock', { idx: ibi, field: f.name, value: e.target.value })}>
+                              <option value="">SCHNORR (default)</option>
+                              <option value="ECDSA">ECDSA</option>
+                              <option value="FALCON512">FALCON-512 (PQ)</option>
+                              <option value="FALCON1024">FALCON-1024 (PQ)</option>
+                              <option value="DILITHIUM3">DILITHIUM3 (PQ)</option>
+                              <option value="SPHINCS_SHA">SPHINCS+-SHA2 (PQ)</option>
+                            </select>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={f.name} className="block-modal-field-row" style={{ marginLeft: 8 }}>
+                          <span className="block-modal-field-label" style={{ fontSize: 10 }}>{f.label}</span>
+                          <span className="block-modal-field-type" style={{ fontSize: 9 }}>{f.dataType}</span>
+                          <input className="block-modal-field-input" value={ib.values?.[f.name] || ''}
+                            placeholder={f.placeholder}
+                            onChange={(e) => onChange(block.id, '__updateInnerBlock', { idx: ibi, field: f.name, value: e.target.value })} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 4 }}>
+                <select style={{ fontSize: 10, padding: '3px 6px', background: 'var(--gray-800)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 3 }}
+                  value="" onChange={(e) => { if (e.target.value) onChange(block.id, '__addInnerBlock', e.target.value); }}>
+                  <option value="">+ ADD INNER BLOCK...</option>
+                  {ALLOWED_INNER_TYPES.map(t => {
+                    const d = getBlockDef(t);
+                    return <option key={t} value={t}>{d?.label || t} — {d?.desc?.substring(0, 50)}</option>;
+                  })}
+                </select>
+              </div>
+              {(block.innerBlocks || []).length > 0 && (
+                <div style={{ marginTop: 6, fontSize: 9, color: 'var(--text-dim)' }}>
+                  {block.values?.hash160 || block.values?.hash256 ? (
+                    <span>Hash: <code style={{ color: 'var(--green)' }}>{(block.values.hash160 || block.values.hash256 || '').substring(0, 20)}...</code> (auto-computed at fund time)</span>
+                  ) : (
+                    <span>Hash will be auto-computed when you click FUND FROM WALLET</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Evaluation Rules */}
           {rules && (
             <div className="block-modal-section">
@@ -5360,6 +5583,16 @@ function PropertiesPanel() {
       if (b.id !== blockId) return b;
       if (field === '__inverted') return { ...b, inverted: value };
       if (field === '__name') return { ...b, name: value };
+      if (field === '__addInnerBlock') {
+        const ibDef = getBlockDef(value);
+        const ibVals = {}; (ibDef?.fields || []).forEach(f => { ibVals[f.name] = ''; });
+        return { ...b, innerBlocks: [...(b.innerBlocks || []), { id: uid(), type: value, values: ibVals }] };
+      }
+      if (field === '__removeInnerBlock') return { ...b, innerBlocks: (b.innerBlocks || []).filter((_, i) => i !== value) };
+      if (field === '__updateInnerBlock') {
+        const { idx, field: ibField, value: ibVal } = value;
+        return { ...b, innerBlocks: (b.innerBlocks || []).map((ib, i) => i !== idx ? ib : { ...ib, values: { ...ib.values, [ibField]: ibVal } }) };
+      }
       return { ...b, values: { ...b.values, [field]: value } };
     })
   })) }), [dispatch]);
@@ -7270,7 +7503,8 @@ const EXAMPLES = [
         { type: 'P2WPKH_LEGACY', values: { hash160: 'b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0', pubkey: FAKE.pk1, signature: '' } },
       ], output: { name: 'HOT_SPEND', type: 'standard' } },
       { label: 'VAULT', blocks: [
-        { type: 'P2SH_LEGACY', values: { hash160: 'c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0', preimage: '' } },
+        { type: 'P2SH_LEGACY', values: { hash160: '', preimage: '' },
+          innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk2 } }] },
       ], output: { name: 'VAULT_UNLOCK', type: 'standard' } },
       { label: 'COLD', blocks: [
         { type: 'CLTV', values: { height: '900000' } },
@@ -7295,7 +7529,8 @@ const EXAMPLES = [
         { type: 'P2TR_LEGACY', values: { pubkey: FAKE.pk1, signature: '' } },
       ], output: { name: 'KEY_PATH', type: 'standard' } },
       { label: 'SCRIPT', blocks: [
-        { type: 'P2TR_SCRIPT_LEGACY', values: { hash256: FAKE.hash1, internal_key: FAKE.hash2, preimage: '' } },
+        { type: 'P2TR_SCRIPT_LEGACY', values: { hash256: '', internal_key: FAKE.pk2, preimage: '' },
+          innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk3 } }] },
       ], output: { name: 'SCRIPT_PATH', type: 'standard' } },
       { label: 'PQ_SAFE', blocks: [
         { type: 'CSV', values: { blocks: '26000' } },
@@ -7727,18 +7962,40 @@ function planFund(rungs, txOutputs, options) {
           hashFields.push({ ri, bi, hashType, field: hn.field });
         }
       });
+      // Collect pubkeys from inner blocks (P2SH/P2WSH/P2TR_SCRIPT)
+      if (block.innerBlocks) {
+        for (const ib of block.innerBlocks) {
+          const ibReg = BlockRegistry[ib.type];
+          if (!ibReg) continue;
+          const ibNeeds = ibReg.fundNeeds(ib);
+          ibNeeds.keys.forEach(kn => {
+            if (kn.multi && ib.values?.[kn.field]) {
+              ib.values[kn.field].split(',').map(k => k.trim()).filter(Boolean).forEach(k => {
+                pubkeyFields.push({ ri, bi, field: kn.field, multi: false, _innerBlockId: ib.id, _innerPk: k });
+              });
+            } else if (!kn.multi && ib.values?.[kn.field]) {
+              pubkeyFields.push({ ri, bi, field: kn.field, multi: false, _innerBlockId: ib.id, _innerPk: ib.values[kn.field] });
+            }
+          });
+        }
+      }
     });
   });
 
   // ── 2. Collect unique pubkeys and count keypairs needed ──
   const allPubkeysNeeded = new Set();
   pubkeyFields.forEach(pf => {
-    const block = rungs[pf.ri].blocks[pf.bi];
-    if (pf.multi) {
-      const keys = (block.values[pf.field] || '').split(',').map(k => k.trim()).filter(Boolean);
-      keys.forEach(k => allPubkeysNeeded.add(k));
+    if (pf._innerPk) {
+      // Inner block pubkey — use directly
+      allPubkeysNeeded.add(pf._innerPk);
     } else {
-      allPubkeysNeeded.add(block.values[pf.field]);
+      const block = rungs[pf.ri].blocks[pf.bi];
+      if (pf.multi) {
+        const keys = (block.values[pf.field] || '').split(',').map(k => k.trim()).filter(Boolean);
+        keys.forEach(k => allPubkeysNeeded.add(k));
+      } else {
+        allPubkeysNeeded.add(block.values[pf.field]);
+      }
     }
   });
   const keypairCount = Math.max(allPubkeysNeeded.size + emptyPubkeySigs.length, 1);
@@ -7930,7 +8187,27 @@ function applyFundKeypairs(rungs, oldToNew, emptyKeyMap, hashReplacements, schem
         vals.hash = hr.hash;
       }
 
-      return { ...block, values: vals };
+      // Replace pubkeys in inner blocks
+      let updatedInner = block.innerBlocks;
+      if (block.innerBlocks && block.innerBlocks.length > 0) {
+        updatedInner = block.innerBlocks.map(ib => {
+          const ibVals = { ...ib.values };
+          const ibReg = BlockRegistry[ib.type];
+          if (ibReg) {
+            const ibNeeds = ibReg.fundNeeds(ib);
+            ibNeeds.keys.forEach(kn => {
+              if (kn.multi && ibVals[kn.field]) {
+                ibVals[kn.field] = ibVals[kn.field].split(',').map(k => k.trim()).filter(Boolean).map(k => oldToNew.get(k) || k).join(', ');
+              } else if (!kn.multi && ibVals[kn.field] && oldToNew.has(ibVals[kn.field])) {
+                ibVals[kn.field] = oldToNew.get(ibVals[kn.field]);
+              }
+            });
+          }
+          return { ...ib, values: ibVals };
+        });
+      }
+
+      return { ...block, values: vals, innerBlocks: updatedInner };
     }),
     // Also set the coil scheme for COMPACT_SIG outputs
     output: rung.output.type !== 'relay' ? { ...rung.output, scheme } : rung.output,
@@ -7973,7 +8250,23 @@ function buildRungSnapshot(rungs, newOutputs, oldToNew, emptyKeyMap, hashReplace
       }
       const hr = hashReplacements.get(`${ri}:${bi}`);
       if (hr && bv.hash) bv.hash = hr.hash;
-      return { type: block.type, values: bv };
+      const entry = { type: block.type, values: bv };
+      // Preserve innerBlocks for script-hash legacy blocks
+      if (block.innerBlocks && block.innerBlocks.length > 0) {
+        entry.innerBlocks = block.innerBlocks.map(ib => {
+          const ibv = { ...ib.values };
+          const ibReg = BlockRegistry[ib.type];
+          if (ibReg) {
+            const ibNeeds = ibReg.fundNeeds(ib);
+            ibNeeds.keys.forEach(kn => {
+              if (!kn.multi && ibv[kn.field] && oldToNew.has(ibv[kn.field])) ibv[kn.field] = oldToNew.get(ibv[kn.field]);
+              else if (kn.multi && ibv[kn.field]) ibv[kn.field] = ibv[kn.field].split(',').map(k => k.trim()).filter(Boolean).map(k => oldToNew.get(k) || k).join(', ');
+            });
+          }
+          return { id: ib.id, type: ib.type, values: ibv };
+        });
+      }
+      return entry;
     });
     const voutIdx = newOutputs.findIndex(o => o.id === r.output?.txOutputId);
     const coilType = r.output?.wireType || 'UNLOCK';
@@ -8529,7 +8822,11 @@ function SignetPanel() {
           const relayRefs = (r.outputRefs || []).map(ref => relayNameMap.get(ref)).filter(idx => idx !== undefined);
           const coilType = r.output?.wireType || 'UNLOCK';
           const coilAddress = (coilType === 'UNLOCK_TO') ? (txOutputs.find(o => o.id === r.output?.txOutputId)?.address || null) : null;
-          return { label: r.label, vout: voutIdx >= 0 ? voutIdx : null, blocks: r.blocks.map(b => ({ type: b.type, values: { ...b.values } })), relayRefs: relayRefs.length > 0 ? relayRefs : undefined, coilType, coilAddress };
+          return { label: r.label, vout: voutIdx >= 0 ? voutIdx : null, blocks: r.blocks.map(b => {
+            const entry = { type: b.type, values: { ...b.values } };
+            if (b.innerBlocks && b.innerBlocks.length > 0) entry.innerBlocks = b.innerBlocks.map(ib => ({ id: ib.id, type: ib.type, values: { ...ib.values } }));
+            return entry;
+          }), relayRefs: relayRefs.length > 0 ? relayRefs : undefined, coilType, coilAddress };
         });
         const recordRelays = (() => {
           const rr = rungs.filter(r => r.output.type === 'relay');
@@ -8649,6 +8946,74 @@ function SignetPanel() {
     for (let i = 0; i < rungs.length; i++) {
       rungs[i] = updatedRungs[i];
     }
+
+    // 6-legacy. Auto-compute HASH160(pubkey) for P2PKH/P2WPKH legacy blocks
+    for (let ri = 0; ri < updatedRungs.length; ri++) {
+      for (let bi = 0; bi < updatedRungs[ri].blocks.length; bi++) {
+        const block = updatedRungs[ri].blocks[bi];
+        if ((block.type === 'P2PKH_LEGACY' || block.type === 'P2WPKH_LEGACY') && block.values?.pubkey) {
+          const h160 = await computeHash160(block.values.pubkey);
+          updatedRungs[ri].blocks[bi] = { ...block, values: { ...block.values, hash160: h160 } };
+          rungs[ri] = updatedRungs[ri];
+        }
+      }
+    }
+
+    // 6-inner. Serialize inner conditions for P2SH/P2WSH/P2TR_SCRIPT legacy blocks
+    for (let ri = 0; ri < updatedRungs.length; ri++) {
+      for (let bi = 0; bi < updatedRungs[ri].blocks.length; bi++) {
+        const block = updatedRungs[ri].blocks[bi];
+        if (!INNER_CONDITION_TYPES.has(block.type)) continue;
+        if (!block.innerBlocks || block.innerBlocks.length === 0) continue;
+
+        // Inner block pubkeys already replaced by applyFundKeypairs
+        const updatedInner = block.innerBlocks;
+
+        // Build wire-format conditions from inner blocks
+        const innerConditions = [{ blocks: updatedInner.map(exportBlockFields) }];
+
+        // Use createrungtx via API to serialize the inner conditions
+        const dummyPayload = {
+          inputs: [{ txid: '0'.repeat(64), vout: 0 }],
+          outputs: [{ amount: 0.00001, conditions: innerConditions }]
+        };
+        const dummyResult = await apiCall('/api/ladder/create', dummyPayload, true);
+        if (!dummyResult || !dummyResult.hex) {
+          console.error('Failed to serialize inner conditions for', block.type);
+          continue;
+        }
+
+        // Decode to get scriptPubKey
+        const decoded = await apiCall('/api/ladder/decode-tx', { hex: dummyResult.hex }, true);
+        if (!decoded?.vout?.[0]?.scriptPubKey?.hex) {
+          console.error('Failed to decode inner conditions tx');
+          continue;
+        }
+        // Strip 1-byte RUNG_CONDITIONS_PREFIX (0xC1) to get raw serialized conditions
+        const scriptHex = decoded.vout[0].scriptPubKey.hex;
+        const preimageHex = scriptHex.substring(2); // skip prefix byte
+
+        // Compute hash
+        let hashVal;
+        if (block.type === 'P2SH_LEGACY') {
+          hashVal = await computeHash160(preimageHex);
+        } else {
+          // P2WSH and P2TR_SCRIPT use SHA256
+          hashVal = bytesToHex(await sha256Bytes(hexToBytes(preimageHex)));
+        }
+
+        // Update block with computed hash and preimage
+        const hashField = block.type === 'P2SH_LEGACY' ? 'hash160' : 'hash256';
+        updatedRungs[ri].blocks[bi] = {
+          ...block,
+          innerBlocks: updatedInner,
+          values: { ...block.values, [hashField]: hashVal, preimage: preimageHex }
+        };
+        rungs[ri] = updatedRungs[ri];
+        console.log('%c[FUND] Inner conditions serialized for', 'color: magenta', block.type, 'hash:', hashVal.substring(0, 16) + '...', 'preimage:', preimageHex.length / 2, 'bytes');
+      }
+    }
+
     setRungs(() => updatedRungs);
 
     // 6a. Auto-compute ACCUMULATOR Merkle roots from leaves (async crypto)
@@ -10773,6 +11138,16 @@ function App() {
         if (b.id !== blockId) return b;
         if (field === '__inverted') return { ...b, inverted: value };
         if (field === '__name') return { ...b, name: value };
+        if (field === '__addInnerBlock') {
+          const ibDef = getBlockDef(value);
+          const ibVals = {}; (ibDef?.fields || []).forEach(f => { ibVals[f.name] = ''; });
+          return { ...b, innerBlocks: [...(b.innerBlocks || []), { id: uid(), type: value, values: ibVals }] };
+        }
+        if (field === '__removeInnerBlock') return { ...b, innerBlocks: (b.innerBlocks || []).filter((_, i) => i !== value) };
+        if (field === '__updateInnerBlock') {
+          const { idx, field: ibField, value: ibVal } = value;
+          return { ...b, innerBlocks: (b.innerBlocks || []).map((ib, i) => i !== idx ? ib : { ...ib, values: { ...ib.values, [ibField]: ibVal } }) };
+        }
         return { ...b, values: { ...b.values, [field]: value } };
       })
     }))});

@@ -944,6 +944,105 @@ No changes to the wire format, serialization, evaluation framework, sighash comp
 
 This means the quantum migration path is not a one-time event but a continuous capability. A user can lock funds to FALCON-512 today, and if a stronger scheme is standardised later, spend via the FALCON path and re-lock to the new scheme — all within the existing block type system.
 
+### Post-Quantum Multi-Scheme Composition
+
+Ladder Script's rung/block structure enables security constructions not possible in any other Bitcoin transaction format. Because blocks compose with AND logic within a rung and OR logic across rungs, multiple post-quantum schemes can be combined in a single output.
+
+**AND composition — defence in depth:**
+
+```
+Rung 0:  SIG(SCHNORR) + SIG(FALCON-512)
+```
+
+Both signatures must be satisfied. A quantum computer breaking secp256k1 Schnorr cannot spend the output — it must also break FALCON. If a flaw is found in FALCON, the Schnorr signature still protects the funds. Neither cryptographic assumption failing alone is fatal.
+
+**Cross-family scheme diversity:**
+
+```
+Rung 0:  SIG(FALCON-512) + SIG(DILITHIUM3)
+```
+
+FALCON is based on NTRU lattices. Dilithium is based on module lattices (Module-LWE). These are distinct mathematical structures. A cryptanalytic advance against one lattice family does not automatically break the other. This is the post-quantum equivalent of not trusting a single mathematical assumption.
+
+**OR fallback across rungs — scheme migration:**
+
+```
+Rung 0:  SIG(FALCON-512)        ← primary spend path
+Rung 1:  SIG(FALCON-1024)       ← fallback if 512 is weakened
+Rung 2:  SIG(SPHINCS_SHA)       ← hash-based, independent assumption
+```
+
+OR across rungs means if FALCON-512 is compromised, the owner spends via a higher-security path. SPHINCS+ is particularly significant: its security reduces to SHA-256 collision resistance rather than any lattice assumption. If every lattice-based scheme is simultaneously broken, SPHINCS+ still stands. If SHA-256 breaks, Bitcoin's proof-of-work and transaction integrity are already compromised — the signature scheme is the least of the network's problems.
+
+Only one rung's witness is revealed at spend time — the UTXO is 33 bytes (MLSC) or 42 bytes (inline) regardless of how many fallback paths exist.
+
+**Threshold PQ multisig — institutional custody:**
+
+```
+Rung 0:  MULTISIG(2-of-3, FALCON-512 keys)
+```
+
+Three independently generated FALCON-512 keypairs, 2 required to spend. Protects against single-key compromise, supply chain attacks on key generation hardware, and loss/destruction of any one key. This is the institutional custody model for the post-quantum era — the same m-of-n structure used today with Schnorr, applied to PQ schemes.
+
+**Mixed-family threshold — maximum adversarial cost:**
+
+```
+Rung 0:  MULTISIG(2-of-3: schnorr_key, falcon_key, dilithium_key)
+```
+
+An attacker must simultaneously break two of three distinct cryptographic problems across different mathematical families. This is the most robust single-output construction possible with current cryptography.
+
+**COSIGN — efficient PQ coverage for existing wallets:**
+
+```
+Anchor UTXO:   SIG(FALCON-512) + RECURSE_SAME(max_depth=1000)
+Child UTXOs:   COSIGN(anchor_hash)
+```
+
+A single FALCON-512 anchor UTXO provides quantum protection for unlimited classical child outputs. Each child spends only when the anchor is co-spent (and recreated via RECURSE_SAME). The PQ witness cost is paid once per transaction, not once per output. This is the practical migration path for wallets with many existing classical UTXOs.
+
+**Why this matters for BIP evaluation:** BIP-360 (P2QRH) proposes hybrid classical+PQ for single outputs but defers multi-scheme composition to future proposals. Ladder Script solves scheme composition, threshold PQ multisig, cross-family diversity, and scheme migration fallbacks within the existing block type system — no additional proposals required.
+
+### Condition Opacity
+
+MLSC outputs (`0xC2`) store only a 32-byte Merkle root in the UTXO set. This root is computed as `TaggedHash("LadderInternal", ...)` over the condition tree and is computationally indistinguishable from random data.
+
+**No information is leaked about:**
+
+- The number of rungs (spending paths)
+- Whether classical or post-quantum signatures are used
+- Which specific PQ schemes are present
+- Threshold parameters (m-of-n structure)
+- Whether timelocks, covenants, or hash conditions exist
+- Whether a COSIGN anchor is required
+- The total complexity of the spending conditions
+
+**Comparison to existing output formats:**
+
+| Format | What an adversary sees | Quantum target? |
+|--------|----------------------|-----------------|
+| P2PKH | `OP_DUP OP_HASH160 <20B hash> ...` | HASH160 of pubkey — no target until spend |
+| P2WPKH | `OP_0 <20B hash>` | Same as P2PKH |
+| P2TR | `OP_1 <32B x-only pubkey>` | **Yes — x-only pubkey is a Shor's algorithm target** |
+| P2QRH (BIP-360) | `OP_2 <32B hash>` | Hash of PQ key — reveals a PQ key exists |
+| MLSC | `0xC2 <32B Merkle root>` | **Nothing — root is indistinguishable from random** |
+
+P2TR exposes the tweaked output key directly. A quantum adversary scanning the UTXO set can identify every P2TR output and target them with Shor's algorithm. P2QRH commits to a hash of the post-quantum key, which reveals that a PQ scheme is in use and which scheme from the commitment structure.
+
+MLSC reveals nothing. A quantum adversary scanning the UTXO set sees a field of identical 32-byte blobs. There is no signal to distinguish a 1-satoshi dust output from a high-value vault with 3-of-5 hybrid PQ multisig across three lattice families with SPHINCS+ fallback.
+
+**Interaction with multi-scheme composition:** The opacity property compounds with the multi-scheme constructions described above. An adversary not only cannot break the schemes — they cannot determine which schemes to attack. The five-layer security model:
+
+1. **Opacity** — the adversary cannot see the conditions (Merkle root hides everything)
+2. **Path ambiguity** — the adversary cannot determine which rung is the primary spend path
+3. **Scheme ambiguity** — the adversary cannot determine which signature schemes are used
+4. **Compositional security** — even if the schemes are guessed, multiple independent breaks are required
+5. **Hash-based fallback** — SPHINCS+ reduces to SHA-256, which is unbreakable by any known quantum algorithm (Grover's algorithm provides only quadratic speedup, mitigated by SHA-256's 128-bit post-quantum security level)
+
+**Temporal property:** Condition opacity holds for all unspent outputs. At spend time, only the *satisfied rung* is revealed in the witness — unsatisfied rungs remain hidden behind the Merkle proof. An adversary observing a spend learns the structure of the used path but gains no information about alternative paths that were not exercised.
+
+**Caveat — condition reuse:** If identical conditions are used across multiple outputs (same Merkle root), spending one output reveals the structure for all outputs sharing that root. Implementations SHOULD generate unique condition trees per output where possible, or use output-specific nonces in timelock or hash conditions to ensure distinct Merkle roots even when the logical spending policy is identical.
+
 ### 0xc1 Prefix Collision Analysis
 
 The `0xc1` byte identifies Ladder Script conditions as the first byte of scriptPubKey. Collision analysis:
