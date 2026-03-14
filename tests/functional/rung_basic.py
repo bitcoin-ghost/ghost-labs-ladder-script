@@ -187,10 +187,7 @@ class LadderScriptBasicTest(BitcoinTestFramework):
 
         # Governance block type tests (C-5)
         self.test_epoch_gate(node)
-        # SKIPPED: EPOCH_GATE negative test — validation.cpp passes block_height=0
-        # to CScriptCheck (default), so EPOCH_GATE always sees height 0 and the
-        # gate is always open. Needs consensus fix to pass real height.
-        # self.test_negative_epoch_gate_outside_window(node)
+        self.test_negative_epoch_gate_outside_window(node)
         self.test_weight_limit(node)
         self.test_negative_weight_limit_exceeded(node)
         self.test_input_count(node)

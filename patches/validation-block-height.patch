@@ -1,0 +1,127 @@
+diff --git a/ghost-core/src/test/txvalidationcache_tests.cpp b/ghost-core/src/test/txvalidationcache_tests.cpp
+index af36a95..b6b643c 100644
+--- a/ghost-core/src/test/txvalidationcache_tests.cpp
++++ b/ghost-core/src/test/txvalidationcache_tests.cpp
+@@ -24,7 +24,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
+                        const CCoinsViewCache& inputs, unsigned int flags, bool cacheSigStore,
+                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
+                        ValidationCache& validation_cache,
+-                       std::vector<CScriptCheck>* pvChecks) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
++                       std::vector<CScriptCheck>* pvChecks = nullptr,
++                       int32_t block_height = 0) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+ 
+ BOOST_AUTO_TEST_SUITE(txvalidationcache_tests)
+ 
+diff --git a/ghost-core/src/validation.cpp b/ghost-core/src/validation.cpp
+index 8190e9c..fd2e858 100644
+--- a/ghost-core/src/validation.cpp
++++ b/ghost-core/src/validation.cpp
+@@ -39,6 +39,7 @@
+ #include <policy/settings.h>
+ #include <policy/truc_policy.h>
+ #include <pow.h>
++#include <rung/evaluator.h>  // LADDER SCRIPT
+ #include <primitives/block.h>
+ #include <primitives/transaction.h>
+ #include <random.h>
+@@ -143,7 +144,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
+                        const CCoinsViewCache& inputs, unsigned int flags, bool cacheSigStore,
+                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
+                        ValidationCache& validation_cache,
+-                       std::vector<CScriptCheck>* pvChecks = nullptr)
++                       std::vector<CScriptCheck>* pvChecks = nullptr,
++                       int32_t block_height = 0)
+                        EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+ 
+ bool CheckFinalTxAtTip(const CBlockIndex& active_chain_tip, const CTransaction& tx)
+@@ -400,7 +402,7 @@ void Chainstate::MaybeUpdateMempoolForReorg(
+ static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationState& state,
+                 const CCoinsViewCache& view, const CTxMemPool& pool,
+                 unsigned int flags, PrecomputedTransactionData& txdata, CCoinsViewCache& coins_tip,
+-                ValidationCache& validation_cache)
++                ValidationCache& validation_cache, int32_t block_height = 0)
+                 EXCLUSIVE_LOCKS_REQUIRED(cs_main, pool.cs)
+ {
+     AssertLockHeld(cs_main);
+@@ -432,7 +434,7 @@ static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationS
+     }
+ 
+     // Call CheckInputScripts() to cache signature and script validity against current tip consensus rules.
+-    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore= */ true, /* cacheFullScriptStore= */ true, txdata, validation_cache);
++    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore= */ true, /* cacheFullScriptStore= */ true, txdata, validation_cache, /*pvChecks=*/nullptr, block_height);
+ }
+ 
+ namespace {
+@@ -1264,7 +1266,9 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
+ 
+     // Check input scripts and signatures.
+     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
+-    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache())) {
++    // Pass current tip height for height-dependent Ladder Script governance blocks (e.g. EPOCH_GATE).
++    const int32_t tip_height = m_active_chainstate.m_chain.Tip() ? m_active_chainstate.m_chain.Tip()->nHeight : 0;
++    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache(), /*pvChecks=*/nullptr, tip_height)) {
+         // Detect a failure due to a missing witness so that p2p code can handle rejection caching appropriately.
+         if (!tx.HasWitness() && SpendsNonAnchorWitnessProg(tx, m_view)) {
+             state.Invalid(TxValidationResult::TX_WITNESS_STRIPPED,
+@@ -1300,8 +1304,9 @@ bool MemPoolAccept::ConsensusScriptChecks(const ATMPArgs& args, Workspace& ws)
+     // invalid blocks (using TestBlockValidity), however allowing such
+     // transactions into the mempool can be exploited as a DoS attack.
+     unsigned int currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman)};
++    const int32_t consensus_tip_height = m_active_chainstate.m_chain.Tip() ? m_active_chainstate.m_chain.Tip()->nHeight : 0;
+     if (!CheckInputsFromMempoolAndCache(tx, state, m_view, m_pool, currentBlockScriptVerifyFlags,
+-                                        ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache())) {
++                                        ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache(), consensus_tip_height)) {
+         LogPrintf("BUG! PLEASE REPORT THIS! CheckInputScripts failed against latest-block but not STANDARD flags %s, %s\n", hash.ToString(), state.ToString());
+         return Assume(false);
+     }
+@@ -2107,6 +2112,18 @@ std::optional<std::pair<ScriptError, std::string>> CScriptCheck::operator()() {
+     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
+     const CScriptWitness *witness = &ptxTo->vin[nIn].scriptWitness;
+     ScriptError error{SCRIPT_ERR_UNKNOWN_ERROR};
++
++    // LADDER SCRIPT: Route v3 RUNG_TX transactions to ladder witness evaluator
++    if (ptxTo->version == CTransaction::RUNG_TX_VERSION) {
++        CachingTransactionSignatureChecker checker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *m_signature_cache, *txdata);
++        if (rung::VerifyRungTx(*ptxTo, nIn, m_tx_out, nFlags, checker, *txdata, &error, m_block_height)) {
++            return std::nullopt;
++        } else {
++            auto debug_str = strprintf("input %i of %s (wtxid %s), spending %s:%i", nIn, ptxTo->GetHash().ToString(), ptxTo->GetWitnessHash().ToString(), ptxTo->vin[nIn].prevout.hash.ToString(), ptxTo->vin[nIn].prevout.n);
++            return std::make_pair(error, std::move(debug_str));
++        }
++    }
++
+     if (VerifyScript(scriptSig, m_tx_out.scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *m_signature_cache, *txdata), &error)) {
+         return std::nullopt;
+     } else {
+@@ -2154,7 +2171,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
+                        const CCoinsViewCache& inputs, unsigned int flags, bool cacheSigStore,
+                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
+                        ValidationCache& validation_cache,
+-                       std::vector<CScriptCheck>* pvChecks)
++                       std::vector<CScriptCheck>* pvChecks,
++                       int32_t block_height)
+ {
+     if (tx.IsCoinBase()) return true;
+ 
+@@ -2198,7 +2216,7 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
+         // spent being checked as a part of CScriptCheck.
+ 
+         // Verify signature
+-        CScriptCheck check(txdata.m_spent_outputs[i], tx, validation_cache.m_signature_cache, i, flags, cacheSigStore, &txdata);
++        CScriptCheck check(txdata.m_spent_outputs[i], tx, validation_cache.m_signature_cache, i, flags, cacheSigStore, &txdata, block_height);
+         if (pvChecks) {
+             pvChecks->emplace_back(std::move(check));
+         } else if (auto result = check(); result.has_value()) {
+@@ -2655,10 +2673,10 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state,
+             // they need to be added to control which runs them asynchronously. Otherwise, CheckInputScripts runs the checks before returning.
+             if (control) {
+                 std::vector<CScriptCheck> vChecks;
+-                tx_ok = CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache, &vChecks);
++                tx_ok = CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache, &vChecks, pindex->nHeight);
+                 if (tx_ok) control->Add(std::move(vChecks));
+             } else {
+-                tx_ok = CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache);
++                tx_ok = CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache, /*pvChecks=*/nullptr, pindex->nHeight);
+             }
+             if (!tx_ok) {
+                 // Any transaction validation failure in ConnectBlock is a block consensus failure
