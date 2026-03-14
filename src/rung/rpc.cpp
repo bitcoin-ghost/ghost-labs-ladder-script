@@ -331,26 +331,69 @@ static RungBlock ParseBlockSpec(const UniValue& block_obj, bool conditions_only)
         if (!field.IsValid(reason)) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid field: " + reason);
         }
-        // Auto-convert PUBKEY to PUBKEY_COMMIT in conditions (PUBKEY is witness-only)
+        // Reject raw hash fields for block types where the node computes the hash.
+        // Users must provide the source data (PUBKEY or PREIMAGE) instead.
+        if (conditions_only) {
+            if (field.type == RungDataType::HASH160 &&
+                (block.type == RungBlockType::P2PKH_LEGACY ||
+                 block.type == RungBlockType::P2WPKH_LEGACY)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "Use PUBKEY instead of HASH160 for P2PKH/P2WPKH; the node computes HASH160 automatically");
+            }
+            if (field.type == RungDataType::HASH160 &&
+                block.type == RungBlockType::P2SH_LEGACY) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "Use PREIMAGE instead of HASH160 for P2SH; the node computes the hash automatically");
+            }
+            if (field.type == RungDataType::HASH256 &&
+                (block.type == RungBlockType::P2WSH_LEGACY ||
+                 block.type == RungBlockType::P2TR_SCRIPT_LEGACY)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "Use PREIMAGE instead of HASH256 for P2WSH/P2TR_SCRIPT; the node computes the hash automatically");
+            }
+            if (field.type == RungDataType::HASH256 &&
+                (block.type == RungBlockType::HASH_PREIMAGE ||
+                 block.type == RungBlockType::HASH_SIG ||
+                 block.type == RungBlockType::HTLC)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "Use PREIMAGE instead of HASH256; the node computes the hash commitment automatically");
+            }
+            if (field.type == RungDataType::HASH160 &&
+                block.type == RungBlockType::HASH160_PREIMAGE) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "Use PREIMAGE instead of HASH160; the node computes the hash commitment automatically");
+            }
+        }
+        // Auto-convert PUBKEY in conditions — node computes the commitment hash.
+        // P2PKH/P2WPKH legacy: PUBKEY → HASH160 (RIPEMD160(SHA256(pubkey)))
+        // All others: PUBKEY → PUBKEY_COMMIT (SHA256(pubkey))
         if (conditions_only && field.type == RungDataType::PUBKEY) {
             RungField commit_field;
-            commit_field.type = RungDataType::PUBKEY_COMMIT;
-            commit_field.data.resize(CSHA256::OUTPUT_SIZE);
-            CSHA256().Write(field.data.data(), field.data.size()).Finalize(commit_field.data.data());
+            if (block.type == RungBlockType::P2PKH_LEGACY ||
+                block.type == RungBlockType::P2WPKH_LEGACY) {
+                commit_field.type = RungDataType::HASH160;
+                commit_field.data.resize(CHash160::OUTPUT_SIZE);
+                CHash160().Write(field.data).Finalize(commit_field.data.data());
+            } else {
+                commit_field.type = RungDataType::PUBKEY_COMMIT;
+                commit_field.data.resize(CSHA256::OUTPUT_SIZE);
+                CSHA256().Write(field.data.data(), field.data.size()).Finalize(commit_field.data.data());
+            }
             block.fields.push_back(std::move(commit_field));
             continue;
         }
-        // Auto-convert PREIMAGE to hash commitment in conditions (node-computed, closes data-stuffing vector)
+        // Auto-convert PREIMAGE to hash commitment in conditions (node-computed, closes data-stuffing vector).
         // User provides the preimage, node computes the hash — user never writes to the hash field directly.
+        // P2SH/HASH160_PREIMAGE: PREIMAGE → HASH160 (RIPEMD160(SHA256(preimage)))
+        // P2WSH/P2TR_SCRIPT/HASH_PREIMAGE/HASH_SIG/HTLC/TAGGED_HASH: PREIMAGE → HASH256 (SHA256(preimage))
         if (conditions_only && field.type == RungDataType::PREIMAGE) {
             RungField hash_field;
-            if (block.type == RungBlockType::HASH160_PREIMAGE) {
-                // HASH160_PREIMAGE: RIPEMD160(SHA256(preimage)) → HASH160
+            if (block.type == RungBlockType::HASH160_PREIMAGE ||
+                block.type == RungBlockType::P2SH_LEGACY) {
                 hash_field.type = RungDataType::HASH160;
                 hash_field.data.resize(CHash160::OUTPUT_SIZE);
                 CHash160().Write(field.data).Finalize(hash_field.data.data());
             } else {
-                // HASH_PREIMAGE, HASH_SIG, HTLC, TAGGED_HASH: SHA256(preimage) → HASH256
                 hash_field.type = RungDataType::HASH256;
                 hash_field.data.resize(CSHA256::OUTPUT_SIZE);
                 CSHA256().Write(field.data.data(), field.data.size()).Finalize(hash_field.data.data());

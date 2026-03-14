@@ -2595,33 +2595,33 @@ const BLOCK_FAMILIES = [
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: '64-byte Schnorr sig hex' },
         { name: 'scheme', dataType: 'SCHEME', label: 'Scheme', placeholder: '01=Schnorr', optional: true }
       ]},
-      { type: 'P2PKH_LEGACY', label: 'P2PKH', desc: 'P2PKH wrapped — HASH160(pubkey) verification + signature', fields: [
-        { name: 'hash160', dataType: 'HASH160', label: 'PubKey Hash (HASH160)', placeholder: '20-byte HASH160 hex' },
-        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex', witnessOnly: true },
+      { type: 'P2PKH_LEGACY', label: 'P2PKH', desc: 'P2PKH wrapped — provide pubkey, node computes HASH160 commitment', fields: [
+        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex — node computes HASH160' },
+        { name: 'hash160', dataType: 'HASH160', label: 'HASH160 (read-only)', placeholder: 'Auto-computed by node from pubkey', computed: true },
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
-      { type: 'P2SH_LEGACY', label: 'P2SH', desc: 'P2SH wrapped — HASH160 of inner Ladder Script conditions + evaluation', fields: [
-        { name: 'hash160', dataType: 'HASH160', label: 'Script Hash (HASH160)', placeholder: '20-byte HASH160 hex' },
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions hex', witnessOnly: true }
+      { type: 'P2SH_LEGACY', label: 'P2SH', desc: 'P2SH wrapped — provide inner conditions, node computes HASH160', fields: [
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions — node computes HASH160' },
+        { name: 'hash160', dataType: 'HASH160', label: 'Script Hash (read-only)', placeholder: 'Auto-computed by node from inner conditions', computed: true }
       ]},
-      { type: 'P2WPKH_LEGACY', label: 'P2WPKH', desc: 'P2WPKH wrapped — same as P2PKH (segwit version)', fields: [
-        { name: 'hash160', dataType: 'HASH160', label: 'PubKey Hash (HASH160)', placeholder: '20-byte HASH160 hex' },
-        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex', witnessOnly: true },
+      { type: 'P2WPKH_LEGACY', label: 'P2WPKH', desc: 'P2WPKH wrapped — provide pubkey, node computes HASH160 (segwit version)', fields: [
+        { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex — node computes HASH160' },
+        { name: 'hash160', dataType: 'HASH160', label: 'HASH160 (read-only)', placeholder: 'Auto-computed by node from pubkey', computed: true },
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
-      { type: 'P2WSH_LEGACY', label: 'P2WSH', desc: 'P2WSH wrapped — SHA256 of inner Ladder Script conditions + evaluation', fields: [
-        { name: 'hash256', dataType: 'HASH256', label: 'Script Hash (SHA256)', placeholder: '32-byte SHA256 hex' },
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions hex', witnessOnly: true }
+      { type: 'P2WSH_LEGACY', label: 'P2WSH', desc: 'P2WSH wrapped — provide inner conditions, node computes SHA256', fields: [
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions — node computes SHA256' },
+        { name: 'hash256', dataType: 'HASH256', label: 'Script Hash (read-only)', placeholder: 'Auto-computed by node from inner conditions', computed: true }
       ]},
       { type: 'P2TR_LEGACY', label: 'P2TR', desc: 'P2TR key-path wrapped — public key + signature (same as SIG)', fields: [
         { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex' },
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: '64-byte Schnorr sig hex' },
         { name: 'scheme', dataType: 'SCHEME', label: 'Scheme', placeholder: '01=Schnorr', optional: true }
       ]},
-      { type: 'P2TR_SCRIPT_LEGACY', label: 'P2TR_S', desc: 'P2TR script-path wrapped — Merkle root + internal key + revealed leaf (Ladder conditions)', fields: [
-        { name: 'hash256', dataType: 'HASH256', label: 'Script Tree Root (SHA256)', placeholder: '32-byte Merkle root hex' },
-        { name: 'internal_key', dataType: 'PUBKEY', label: 'Internal Public Key', placeholder: '33-byte compressed pubkey (node computes PUBKEY_COMMIT)' },
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Revealed Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions hex', witnessOnly: true }
+      { type: 'P2TR_SCRIPT_LEGACY', label: 'P2TR_S', desc: 'P2TR script-path wrapped — provide inner conditions + internal key, node computes hashes', fields: [
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Script Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions — node computes Merkle root' },
+        { name: 'hash256', dataType: 'HASH256', label: 'Script Tree Root (read-only)', placeholder: 'Auto-computed by node from script leaf', computed: true },
+        { name: 'internal_key', dataType: 'PUBKEY', label: 'Internal Public Key', placeholder: '33-byte compressed pubkey (node computes PUBKEY_COMMIT)' }
       ]},
     ]
   },
@@ -3054,32 +3054,27 @@ BlockRegistry.P2PK_LEGACY.evaluate = (block, simState) =>
   simState.availableKeys?.has(block.values.pubkey) ? 'satisfied' : 'unsatisfied';
 
 BlockRegistry.P2PKH_LEGACY.evaluate = (block, simState) => {
-  const hash = (block.values.hash160 || '').trim();
-  if (!hash || hash.length !== 40) return 'error';
-  return simState.availableKeys?.has(block.values.pubkey) ? 'satisfied' : 'unsatisfied';
+  const pk = (block.values.pubkey || '').trim();
+  if (!pk) return 'error';
+  return simState.availableKeys?.has(pk) ? 'satisfied' : 'unsatisfied';
 };
 
 BlockRegistry.P2SH_LEGACY.evaluate = (block) => {
-  // Inner blocks defined = valid (hash computed at fund time)
   if (block.innerBlocks && block.innerBlocks.length > 0) return 'satisfied';
-  const hash = (block.values.hash160 || '').trim();
   const preimage = (block.values.preimage || '').trim();
-  if (!hash || hash.length !== 40) return 'error';
   if (!preimage) return 'unsatisfied';
   return 'satisfied';
 };
 
 BlockRegistry.P2WPKH_LEGACY.evaluate = (block, simState) => {
-  const hash = (block.values.hash160 || '').trim();
-  if (!hash || hash.length !== 40) return 'error';
-  return simState.availableKeys?.has(block.values.pubkey) ? 'satisfied' : 'unsatisfied';
+  const pk = (block.values.pubkey || '').trim();
+  if (!pk) return 'error';
+  return simState.availableKeys?.has(pk) ? 'satisfied' : 'unsatisfied';
 };
 
 BlockRegistry.P2WSH_LEGACY.evaluate = (block) => {
   if (block.innerBlocks && block.innerBlocks.length > 0) return 'satisfied';
-  const hash = (block.values.hash256 || '').trim();
   const preimage = (block.values.preimage || '').trim();
-  if (!hash || hash.length !== 64) return 'error';
   if (!preimage) return 'unsatisfied';
   return 'satisfied';
 };
@@ -3089,12 +3084,10 @@ BlockRegistry.P2TR_LEGACY.evaluate = (block, simState) =>
 
 BlockRegistry.P2TR_SCRIPT_LEGACY.evaluate = (block) => {
   if (block.innerBlocks && block.innerBlocks.length > 0 && (block.values.internal_key || '').trim()) return 'satisfied';
-  const root = (block.values.hash256 || '').trim();
   const ikey = (block.values.internal_key || '').trim();
-  const leaf = (block.values.preimage || '').trim();
-  if (!root || root.length !== 64) return 'error';
+  const preimage = (block.values.preimage || '').trim();
   if (!ikey) return 'error';
-  if (!leaf) return 'unsatisfied';
+  if (!preimage) return 'unsatisfied';
   return 'satisfied';
 };
 
@@ -3154,12 +3147,12 @@ BlockRegistry.OUTPUT_COUNT.testData = () => ({ min: '1', max: '2' });
 BlockRegistry.RELATIVE_VALUE.testData = () => ({ numerator: '9', denominator: '10' });
 BlockRegistry.ACCUMULATOR.testData = () => ({ merkle_root: TEST_HASH256 });
 BlockRegistry.P2PK_LEGACY.testData = () => ({ pubkey: TEST_PUBKEYS[0] });
-BlockRegistry.P2PKH_LEGACY.testData = () => ({ hash160: TEST_HASH160, pubkey: TEST_PUBKEYS[0] });
-BlockRegistry.P2SH_LEGACY.testData = () => ({ hash160: TEST_HASH160, preimage: TEST_HASH256 });
-BlockRegistry.P2WPKH_LEGACY.testData = () => ({ hash160: TEST_HASH160, pubkey: TEST_PUBKEYS[0] });
-BlockRegistry.P2WSH_LEGACY.testData = () => ({ hash256: TEST_HASH256, preimage: TEST_HASH256_B });
+BlockRegistry.P2PKH_LEGACY.testData = () => ({ pubkey: TEST_PUBKEYS[0] });
+BlockRegistry.P2SH_LEGACY.testData = () => ({ preimage: TEST_PREIMAGE });
+BlockRegistry.P2WPKH_LEGACY.testData = () => ({ pubkey: TEST_PUBKEYS[0] });
+BlockRegistry.P2WSH_LEGACY.testData = () => ({ preimage: TEST_PREIMAGE });
 BlockRegistry.P2TR_LEGACY.testData = () => ({ pubkey: TEST_PUBKEYS[0] });
-BlockRegistry.P2TR_SCRIPT_LEGACY.testData = () => ({ hash256: TEST_HASH256, internal_key: TEST_PUBKEYS[0], preimage: TEST_HASH256 });
+BlockRegistry.P2TR_SCRIPT_LEGACY.testData = () => ({ preimage: TEST_PREIMAGE, internal_key: TEST_PUBKEYS[0] });
 
 // ─── Output roles ───
 // 'none' | 'recurse' | 'mutation' | 'split' | 'ctv' | 'validation'
@@ -7566,7 +7559,7 @@ const EXAMPLES = [
     tags: [['P2PKH', 'legacy'], ['CSV', 'time'], ['SIG', 'sig']],
     rungs: [
       { label: 'SPEND', blocks: [
-        { type: 'P2PKH_LEGACY', values: { hash160: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0', pubkey: FAKE.pk1, signature: '' } },
+        { type: 'P2PKH_LEGACY', values: { pubkey: FAKE.pk1, signature: '' } },
       ], output: { name: 'NORMAL_SPEND', type: 'standard' } },
       { label: 'RECOVER', blocks: [
         { type: 'CSV', values: { blocks: '52560' } },
@@ -7587,10 +7580,10 @@ const EXAMPLES = [
     tags: [['P2SH', 'legacy'], ['P2WPKH', 'legacy'], ['CLTV', 'time']],
     rungs: [
       { label: 'HOT', blocks: [
-        { type: 'P2WPKH_LEGACY', values: { hash160: 'b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0', pubkey: FAKE.pk1, signature: '' } },
+        { type: 'P2WPKH_LEGACY', values: { pubkey: FAKE.pk1, signature: '' } },
       ], output: { name: 'HOT_SPEND', type: 'standard' } },
       { label: 'VAULT', blocks: [
-        { type: 'P2SH_LEGACY', values: { hash160: '', preimage: '' },
+        { type: 'P2SH_LEGACY', values: { preimage: '' },
           innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk2 } }] },
       ], output: { name: 'VAULT_UNLOCK', type: 'standard' } },
       { label: 'COLD', blocks: [
@@ -7616,7 +7609,7 @@ const EXAMPLES = [
         { type: 'P2TR_LEGACY', values: { pubkey: FAKE.pk1, signature: '' } },
       ], output: { name: 'KEY_PATH', type: 'standard' } },
       { label: 'SCRIPT', blocks: [
-        { type: 'P2TR_SCRIPT_LEGACY', values: { hash256: '', internal_key: FAKE.pk2, preimage: '' },
+        { type: 'P2TR_SCRIPT_LEGACY', values: { preimage: '', internal_key: FAKE.pk2 },
           innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk3 } }] },
       ], output: { name: 'SCRIPT_PATH', type: 'standard' } },
       { label: 'PQ_SAFE', blocks: [
@@ -9038,17 +9031,7 @@ function SignetPanel() {
       rungs[i] = updatedRungs[i];
     }
 
-    // 6-legacy. Auto-compute HASH160(pubkey) for P2PKH/P2WPKH legacy blocks
-    for (let ri = 0; ri < updatedRungs.length; ri++) {
-      for (let bi = 0; bi < updatedRungs[ri].blocks.length; bi++) {
-        const block = updatedRungs[ri].blocks[bi];
-        if ((block.type === 'P2PKH_LEGACY' || block.type === 'P2WPKH_LEGACY') && block.values?.pubkey) {
-          const h160 = await computeHash160(block.values.pubkey);
-          updatedRungs[ri].blocks[bi] = { ...block, values: { ...block.values, hash160: h160 } };
-          rungs[ri] = updatedRungs[ri];
-        }
-      }
-    }
+    // 6-legacy removed — HASH160(pubkey) for P2PKH/P2WPKH now computed by node via PUBKEY→HASH160 auto-conversion.
 
     // 6-inner. Serialize inner conditions for P2SH/P2WSH/P2TR_SCRIPT legacy blocks
     for (let ri = 0; ri < updatedRungs.length; ri++) {
@@ -9084,24 +9067,14 @@ function SignetPanel() {
         const scriptHex = decoded.vout[0].scriptPubKey.hex;
         const preimageHex = scriptHex.substring(2); // skip prefix byte
 
-        // Compute hash
-        let hashVal;
-        if (block.type === 'P2SH_LEGACY') {
-          hashVal = await computeHash160(preimageHex);
-        } else {
-          // P2WSH and P2TR_SCRIPT use SHA256
-          hashVal = bytesToHex(await sha256Bytes(hexToBytes(preimageHex)));
-        }
-
-        // Update block with computed hash and preimage
-        const hashField = block.type === 'P2SH_LEGACY' ? 'hash160' : 'hash256';
+        // Store serialized inner conditions as preimage — node computes hash automatically
         updatedRungs[ri].blocks[bi] = {
           ...block,
           innerBlocks: updatedInner,
-          values: { ...block.values, [hashField]: hashVal, preimage: preimageHex }
+          values: { ...block.values, preimage: preimageHex }
         };
         rungs[ri] = updatedRungs[ri];
-        console.log('%c[FUND] Inner conditions serialized for', 'color: magenta', block.type, 'hash:', hashVal.substring(0, 16) + '...', 'preimage:', preimageHex.length / 2, 'bytes');
+        console.log('%c[FUND] Inner conditions serialized for', 'color: magenta', block.type, 'preimage:', preimageHex.length / 2, 'bytes (node computes hash)');
       }
     }
 

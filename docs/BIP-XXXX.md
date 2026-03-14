@@ -925,11 +925,16 @@ PUBKEY_COMMIT values are always computed by the node from validated public keys 
 **Hash preimage commitments** follow the same model. For HASH_PREIMAGE, HASH160_PREIMAGE, HTLC, and HASH_SIG blocks, the node computes the hash commitment from a user-supplied preimage:
 
 - **HASH_PREIMAGE / HASH_SIG / HTLC:** User provides `PREIMAGE` → node computes `HASH256 = SHA256(preimage)` and stores the hash in conditions.
-- **HASH160_PREIMAGE:** User provides `PREIMAGE` → node computes `HASH160 = RIPEMD160(SHA256(preimage))` and stores the hash in conditions.
+- **HASH160_PREIMAGE / P2SH_LEGACY:** User provides `PREIMAGE` → node computes `HASH160 = RIPEMD160(SHA256(preimage))` and stores the hash in conditions.
+- **P2WSH_LEGACY / P2TR_SCRIPT_LEGACY:** User provides `PREIMAGE` (serialized inner conditions) → node computes `HASH256 = SHA256(preimage)` and stores the hash in conditions.
 
-This closes a potential data-stuffing vector: without node-computed hashes, a user could write arbitrary 32-byte values into the HASH256 condition field, encoding ~32 bytes of arbitrary data per block. With node-computed hashes, every stored hash is provably derived from a known preimage — the user cannot inject arbitrary data into the hash commitment.
+**Legacy block key commitments** extend the PUBKEY auto-conversion:
 
-The combined effect of node-computed PUBKEY_COMMIT and node-computed hash commitments is that **no condition field in the UTXO set accepts arbitrary user-chosen bytes**. Every commitment is a deterministic function of validated input data.
+- **P2PKH_LEGACY / P2WPKH_LEGACY:** User provides `PUBKEY` → node computes `HASH160 = RIPEMD160(SHA256(pubkey))` and stores the hash in conditions. Raw HASH160 input is rejected.
+- **P2PK_LEGACY / P2TR_LEGACY:** User provides `PUBKEY` → node computes `PUBKEY_COMMIT = SHA256(pubkey)` (standard auto-conversion).
+- **P2TR_SCRIPT_LEGACY:** Internal key follows standard `PUBKEY → PUBKEY_COMMIT` conversion; script tree root follows `PREIMAGE → HASH256` conversion.
+
+The combined effect is that **no condition field across all 60 block types accepts arbitrary user-chosen bytes**. Every commitment stored in the UTXO set is a deterministic hash function of validated input data. The node rejects raw hash/commitment values for block types that support auto-conversion, forcing all data through the node-computed path.
 
 ### Post-Quantum Library Dependency
 
