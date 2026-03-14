@@ -167,7 +167,7 @@ body {
 /* Main Content */
 .main-content {
   display: grid;
-  grid-template-columns: 180px 1fr auto;
+  grid-template-columns: 162px 1fr auto;
   overflow: hidden;
 }
 
@@ -5575,6 +5575,66 @@ function LadderView({ scanSequence, fullSimState, energizedOutputs, energizedRun
   );
 }
 
+const FIELD_TOOLTIP = {
+  // By dataType
+  PUBKEY: 'Compressed public key — 33 bytes (66 hex chars), starts with 02 or 03',
+  SIGNATURE: 'Digital signature — produced at spend time by signing with the private key',
+  HASH256: 'SHA-256 hash — 32 bytes (64 hex chars)',
+  HASH160: 'HASH160 = RIPEMD160(SHA256(data)) — 20 bytes (40 hex chars)',
+  PREIMAGE: 'Preimage data that hashes to the commitment — revealed at spend time',
+  SCHEME: 'Signature scheme — SCHNORR (default), ECDSA, or post-quantum (FALCON, DILITHIUM, SPHINCS+)',
+  PUBKEY_COMMIT: 'SHA-256 commitment to a public key — computed automatically by the node',
+  BLOCK_HEIGHT: 'Bitcoin block height — e.g. 860000',
+  TIMESTAMP: 'Unix timestamp in seconds — e.g. 1700000000',
+  BLOCK_COUNT: 'Number of blocks to wait (relative timelock)',
+  TIME_SECONDS: 'Number of seconds to wait (relative timelock, granularity 512s)',
+  // By field name
+  pubkey: 'Compressed public key — 33 bytes (66 hex chars), starts with 02 or 03',
+  pubkeys: 'Comma-separated list of compressed public keys (33 bytes each)',
+  signing_key: 'The signer\'s compressed public key — 33 bytes hex',
+  agg_pubkey: 'Aggregated MuSig public key — the combined key of all signers',
+  adaptor_point: 'Adaptor point for the adaptor signature — 32 bytes hex',
+  threshold: 'Minimum number of signatures required (e.g. 2 of 3)',
+  group_size: 'Total number of signers in the MuSig group',
+  hash: 'Hash value — the preimage must hash to this to satisfy the condition',
+  hash160: 'HASH160 of the public key — RIPEMD160(SHA256(pubkey)), 20 bytes (40 hex chars)',
+  hash256: 'SHA-256 hash commitment — 32 bytes (64 hex chars)',
+  blocks: 'Number of blocks to wait before this condition can be satisfied',
+  height: 'Block height at which this condition becomes valid',
+  delay: 'Delay in blocks before the action takes effect',
+  recovery_key: 'Recovery public key — used to claw back funds if the hot key is compromised',
+  hot_key: 'Hot spending key — used for day-to-day transactions',
+  template_hash: 'CTV template hash — SHA-256 of the committed transaction template',
+  internal_key: 'Internal public key for Taproot key-path — 33 bytes compressed',
+  preimage: 'Serialized inner conditions — computed automatically during funding',
+  oracle_pk: 'Oracle\'s public key — the oracle that attests to external data',
+  state: 'Current state value — typically 0 (unset) or 1 (set)',
+  count: 'Current counter value',
+  current: 'Current counter value',
+  target: 'Target counter value — condition satisfied when counter reaches this',
+  commitment: 'Hash commitment — one-shot blocks become invalid after first use',
+  conditions_hash: 'Hash of the conditions being co-signed',
+  merkle_root: 'Merkle root of the accumulator set — computed from leaves',
+  merkle_leaves: 'Comma-separated list of leaf hashes for the Merkle tree',
+  tag: 'Tag string for tagged hash — domain separator',
+  data: 'Anchor data — 32 bytes hex',
+  local_key: 'Local channel party\'s public key',
+  remote_key: 'Remote channel party\'s public key',
+  pool_id: 'Pool identifier — 32-byte hex',
+  asset_id: 'Asset identifier for the seal — 32 bytes hex',
+  state_hash: 'Current state hash of the sealed asset',
+  threshold_n: 'Required signatures (n of m)',
+  threshold_m: 'Total guardians (n of m)',
+  guardian_hash: 'Hash of the guardian set',
+  ref_name: 'Name of the output/relay to reference — must match a coil name or rung label',
+  scheme: 'Signature scheme — SCHNORR (default), ECDSA, or post-quantum',
+  sequence: 'Input sequence number — controls relative timelocks (CSV). Default 0xfffffffe',
+};
+
+function fieldTooltip(field) {
+  return FIELD_TOOLTIP[field.name] || FIELD_TOOLTIP[field.dataType] || field.placeholder || '';
+}
+
 function PropertiesPanel() {
   const { selectedBlock: block, rungs } = useContext(AppContext);
   const dispatch = useContext(AppDispatch);
@@ -5642,11 +5702,12 @@ function PropertiesPanel() {
           </div>
         </div>
         <div className="prop-row">
-          <span className="prop-label">Name</span>
+          <span className="prop-label" title="Optional label for this block — helps identify it in complex transactions">Name</span>
           <input
             className="prop-input"
             value={block.name || ''}
             placeholder="Label this block..."
+            title="Optional label for this block — helps identify it in complex transactions"
             onChange={(e) => onChange(block.id, '__name', e.target.value)}
           />
         </div>
@@ -5655,9 +5716,10 @@ function PropertiesPanel() {
             type="checkbox"
             id="inverted"
             checked={block.inverted}
+            title="Invert this condition — SATISFIED becomes UNSATISFIED and vice versa"
             onChange={(e) => onChange(block.id, '__inverted', e.target.checked)}
           />
-          <label htmlFor="inverted">INVERTED (NOT)</label>
+          <label htmlFor="inverted" title="Invert this condition — SATISFIED becomes UNSATISFIED and vice versa">INVERTED (NOT)</label>
         </div>
       </div>
       {def.fields.length > 0 && (
@@ -5689,10 +5751,11 @@ function PropertiesPanel() {
             if (field.dataType === 'SCHEME') {
               return (
                 <div key={field.name} className="prop-row">
-                  <span className="prop-label">{field.label}</span>
+                  <span className="prop-label" title="Signature scheme — determines the cryptographic algorithm used for signing">{field.label}</span>
                   <select
                     className="prop-select"
                     value={block.values[field.name] || ''}
+                    title="Signature scheme — SCHNORR (default BIP-340), ECDSA (legacy), or post-quantum algorithms"
                     onChange={(e) => onChange(block.id, field.name, e.target.value)}
                   >
                     <option value="">SCHNORR (default)</option>
@@ -5707,11 +5770,12 @@ function PropertiesPanel() {
             }
             return (
               <div key={field.name} className="prop-row">
-                <span className="prop-label">{field.label}</span>
+                <span className="prop-label" title={fieldTooltip(field)}>{field.label}</span>
                 <input
                   className="prop-input"
                   value={block.values[field.name] || ''}
                   placeholder={field.placeholder}
+                  title={fieldTooltip(field)}
                   onChange={(e) => onChange(block.id, field.name, e.target.value)}
                 />
               </div>
@@ -5779,31 +5843,34 @@ function TxPanel() {
               )}
             </div>
             <div className="prop-row">
-              <span className="prop-label">TXID</span>
+              <span className="prop-label" title="Transaction ID of the UTXO to spend — 64 hex characters">TXID</span>
               <input
                 className="prop-input"
                 value={input.txid}
                 placeholder="64-char hex"
+                title="Transaction ID of the UTXO to spend — 64 hex characters from a previous transaction"
                 onChange={(e) => onInputChange(input.id, 'txid', e.target.value)}
               />
             </div>
             <div className="prop-row">
-              <span className="prop-label">VOUT</span>
+              <span className="prop-label" title="Output index within the referenced transaction — which output to spend">VOUT</span>
               <input
                 className="prop-input"
                 type="number"
                 value={input.vout}
                 min="0"
+                title="Output index within the referenced transaction (0 = first output)"
                 onChange={(e) => onInputChange(input.id, 'vout', e.target.value)}
                 style={{ width: 60, flex: 'none' }}
               />
             </div>
             <div className="prop-row">
-              <span className="prop-label">Sequence</span>
+              <span className="prop-label" title="nSequence — controls relative timelocks (CSV). Default 0xfffffffe enables nLockTime">Sequence</span>
               <input
                 className="prop-input"
                 value={input.sequence || ''}
                 placeholder="0xfffffffe (default)"
+                title="nSequence number — set for CSV relative timelocks. Default 0xfffffffe enables nLockTime without CSV"
                 onChange={(e) => onInputChange(input.id, 'sequence', e.target.value)}
                 style={{ flex: 1 }}
               />
@@ -5827,21 +5894,23 @@ function TxPanel() {
               )}
             </div>
             <div className="prop-row">
-              <span className="prop-label">Address</span>
+              <span className="prop-label" title="Destination Bitcoin address — bc1q... (segwit), bc1p... (taproot), or raw script hex">Address</span>
               <input
                 className="prop-input"
                 value={output.address}
                 placeholder="bc1q... or script hex"
+                title="Destination Bitcoin address — where funds are sent when this output's conditions are satisfied"
                 onChange={(e) => onOutputChange(output.id, 'address', e.target.value)}
               />
             </div>
             <div className="prop-row">
-              <span className="prop-label">Amount</span>
+              <span className="prop-label" title="Output amount in satoshis (1 BTC = 100,000,000 sats)">Amount</span>
               <input
                 className="prop-input"
                 type="number"
                 value={output.amount}
                 placeholder="sats"
+                title="Output amount in satoshis — total outputs should be less than total inputs (difference = miner fee)"
                 onChange={(e) => onOutputChange(output.id, 'amount', e.target.value)}
               />
               <span style={{ fontSize: 9, color: 'var(--text-dim)', flexShrink: 0 }}>sats</span>
@@ -5874,12 +5943,13 @@ function TxPanel() {
           Set for CLTV spends. Block height or unix timestamp.
         </div>
         <div className="prop-row">
-          <span className="prop-label">nLockTime</span>
+          <span className="prop-label" title="Transaction locktime — block height (< 500M) or unix timestamp (>= 500M). Required for CLTV conditions">nLockTime</span>
           <input
             className="prop-input"
             type="number"
             value={locktime || 0}
             min="0"
+            title="Transaction locktime — set to the CLTV block height or timestamp. 0 = no locktime"
             onChange={(e) => onLocktimeChange(parseInt(e.target.value) || 0)}
           />
         </div>
@@ -6038,20 +6108,22 @@ function CoilPropertiesPanel({ rungId }) {
       <div className="prop-section">
         <div className="prop-section-title">OUTPUT — {rungNum}</div>
         <div className="prop-row">
-          <span className="prop-label">Name</span>
+          <span className="prop-label" title="Name this spending path — used for cross-referencing between rungs">Name</span>
           <input
             className="prop-input"
             value={rung.output.name}
             placeholder="e.g. SPEND_PATH"
+            title="Name this output/spending path — other rungs can reference it via OUTPUT_REF or relay references"
             onChange={(e) => onChange(rung.id, 'name', e.target.value.toUpperCase())}
             style={{ textTransform: 'uppercase' }}
           />
         </div>
         <div className="prop-row">
-          <span className="prop-label">Coil Type</span>
+          <span className="prop-label" title="Coil type — Standard (normal spend), Relay (internal logic, no TX output), Latch/Unlatch (state), etc.">Coil Type</span>
           <select
             className="prop-select"
             value={rung.output.type}
+            title="Coil type — Standard outputs map to TX outputs. Relay coils are internal logic gates referenced by other rungs"
             onChange={(e) => onChange(rung.id, 'type', e.target.value)}
           >
             {COIL_TYPES.map(ct => (
@@ -6077,10 +6149,11 @@ function CoilPropertiesPanel({ rungId }) {
               C++ RPC coil settings. These define how the output is unlocked on-chain.
             </div>
             <div className="prop-row">
-              <span className="prop-label">Coil Type</span>
+              <span className="prop-label" title="Wire coil type — UNLOCK (standard spend), UNLOCK_TO (spend to address + conditions), COVENANT (constrain spending tx)">Coil Type</span>
               <select
                 className="prop-select"
                 value={rung.output.wireType || 'UNLOCK'}
+                title="How this output is unlocked on-chain — UNLOCK for standard spends, COVENANT to constrain the spending transaction"
                 onChange={(e) => onChange(rung.id, 'wireType', e.target.value)}
               >
                 {WIRE_COIL_TYPES.map(ct => (
@@ -6089,10 +6162,11 @@ function CoilPropertiesPanel({ rungId }) {
               </select>
             </div>
             <div className="prop-row">
-              <span className="prop-label">Attestation</span>
+              <span className="prop-label" title="Attestation mode — how signatures are attached to the witness">Attestation</span>
               <select
                 className="prop-select"
                 value={rung.output.attestation || 'INLINE'}
+                title="INLINE = signatures in witness data. AGGREGATE = block-level aggregate. DEFERRED = template hash only"
                 onChange={(e) => onChange(rung.id, 'attestation', e.target.value)}
               >
                 {ATTESTATION_TYPES.map(at => (
@@ -6101,10 +6175,11 @@ function CoilPropertiesPanel({ rungId }) {
               </select>
             </div>
             <div className="prop-row">
-              <span className="prop-label">Scheme</span>
+              <span className="prop-label" title="Default signature scheme for this rung — can be overridden per block">Scheme</span>
               <select
                 className="prop-select"
                 value={rung.output.scheme || 'SCHNORR'}
+                title="Default signature scheme — SCHNORR (BIP-340), ECDSA (legacy), or post-quantum algorithms"
                 onChange={(e) => onChange(rung.id, 'scheme', e.target.value)}
               >
                 {SCHEME_TYPES.map(st => (
@@ -6120,10 +6195,11 @@ function CoilPropertiesPanel({ rungId }) {
               Assign a transaction output to this rung. When this spending path is satisfied, these funds are sent.
             </div>
             <div className="prop-row">
-              <span className="prop-label">VOUT</span>
+              <span className="prop-label" title="Assign a TX output to this rung — the funds sent when this spending path is satisfied">VOUT</span>
               <select
                 className="prop-select"
                 value={rung.output.txOutputId || ''}
+                title="Link this rung to a transaction output — defines which funds are released when conditions are met"
                 onChange={(e) => onChange(rung.id, 'txOutputId', e.target.value ? parseInt(e.target.value) : null)}
               >
                 <option value="">— none —</option>
