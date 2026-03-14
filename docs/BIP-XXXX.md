@@ -805,6 +805,24 @@ Wallets cannot spend ladder-locked outputs without implementing the ladder evalu
 
 **Coexistence.** Version 4 transactions coexist with all existing transaction versions. No existing transaction type is deprecated or modified by this proposal. Should Ladder Script achieve broad adoption, a future BIP may propose deprecating the creation of new legacy output types to consolidate the benefits of typed, structured conditions across the network.
 
+## Weight and Fee Accounting
+
+`RUNG_TX` inherits the SegWit witness discount without modification. Transaction weight is computed by Bitcoin Core's existing `GetTransactionWeight()` function, which applies the standard `WITNESS_SCALE_FACTOR` (4):
+
+| Component | Location | Weight |
+|-----------|----------|--------|
+| Conditions (`0xC1` prefix) | `scriptPubKey` (non-witness) | 4 WU per byte |
+| Witness (signatures, keys, preimages, SCRIPT_BODY) | Witness field | 1 WU per byte |
+| Transaction structure (version, inputs, outputs, locktime) | Non-witness | 4 WU per byte |
+
+This weighting naturally incentivises the design choices Ladder Script already makes:
+
+- **Small conditions, large witness.** PUBKEY_COMMIT stores 32 bytes in conditions (128 WU) rather than a full post-quantum key (897 bytes = 3,588 WU). The full key is revealed in the witness at 1 WU per byte.
+- **Node-computed hashes.** Hash commitments in conditions are 20-32 bytes regardless of preimage size. The preimage or SCRIPT_BODY is witness-only.
+- **MLSC (Merkelised conditions).** A Merkle root stores 32 bytes in conditions. Unrevealed branches have zero weight. Revealed conditions pay witness weight.
+
+No custom weight function is required. Virtual transaction size (`vsize`) for fee estimation uses `GetVirtualTransactionSize()`, identical to SegWit and Taproot transactions.
+
 ## Deployment
 
 Activation uses BIP-9 version bits signaling with Speedy Trial parameters, following the precedent established by BIP-341 (Taproot):
