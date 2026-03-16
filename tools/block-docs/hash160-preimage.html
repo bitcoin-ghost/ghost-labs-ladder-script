@@ -36,8 +36,8 @@
       <line x1="20" y1="10" x2="20" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <line x1="600" y1="10" x2="600" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <!-- Wire -->
-      <line x1="20" y1="60" x2="140" y2="60" stroke="#e6a817" stroke-width="2"/>
-      <line x1="460" y1="60" x2="600" y2="60" stroke="#e6a817" stroke-width="2"/>
+      <line x1="20" y1="60" x2="140" y2="60" stroke="#ff1744" stroke-width="2"/>
+      <line x1="460" y1="60" x2="600" y2="60" stroke="#ff1744" stroke-width="2"/>
       <!-- Block body -->
       <rect x="140" y="20" width="320" height="80" rx="2" fill="#2a2a2a" stroke="#b070b0" stroke-width="1.5"/>
       <!-- Block label -->
@@ -73,6 +73,13 @@
         <td class="field-desc">Expected RIPEMD160(SHA256) hash value. <strong>Node-computed</strong> &mdash; the user provides PREIMAGE and the node computes this field automatically. Raw hash input is rejected.</td>
       </tr>
       <tr>
+        <td class="field-name">witness_hash</td>
+        <td class="field-type">HASH160</td>
+        <td class="field-size">20 B</td>
+        <td class="field-side-w">Witness</td>
+        <td class="field-desc">Copy of the expected hash, echoed in the witness for implicit layout matching.</td>
+      </tr>
+      <tr>
         <td class="field-name">preimage</td>
         <td class="field-type">PREIMAGE</td>
         <td class="field-size">1-252 B</td>
@@ -103,14 +110,15 @@
     <div class="wire-row">
       <span class="wire-segment wire-type">0x0202</span>
       <span class="wire-segment wire-inv">0</span>
-      <span class="wire-segment wire-count">1</span>
+      <span class="wire-segment wire-count">2</span>
+      <span class="wire-segment wire-field-hash" style="min-width:140px">HASH160 &middot; 20B</span>
       <span class="wire-segment wire-field-pre" style="min-width:140px">PREIMAGE &middot; 32B</span>
-      <span class="wire-bytes">= 38 bytes</span>
+      <span class="wire-bytes">= 58 bytes</span>
     </div>
 
     <div class="wire-total">
       <span class="wire-total-label">Total (conditions + witness)</span>
-      <span class="wire-total-bytes">~66 bytes</span>
+      <span class="wire-total-bytes">~84 bytes</span>
     </div>
   </div>
 
@@ -172,6 +180,7 @@
   <span class="json-key">"type"</span>: <span class="json-str">"HASH160_PREIMAGE"</span>,
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
+    { <span class="json-key">"type"</span>: <span class="json-str">"HASH160"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"89abcd...20 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"PREIMAGE"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"deadbeef...1-252 bytes"</span> }
   ]
 }</pre></div>

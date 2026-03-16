@@ -35,15 +35,6 @@
     .logo-icon img { width: 100%; height: 100%; object-fit: contain; }
     .logo-text { font-weight: 700; font-size: 20px; }
     .logo-text span { color: var(--orange); }
-    .nav-links { display: flex; align-items: center; gap: 8px; }
-    .nav-links > a, .nav-dropdown > a { color: var(--gray-300); text-decoration: none; padding: 8px 16px; font-size: 14px; font-weight: 500; border-radius: 8px; transition: all 0.2s; }
-    .nav-links > a:hover, .nav-dropdown > a:hover { color: var(--white); background: var(--gray-800); }
-    .nav-links > a.active, .nav-dropdown > a.active { color: var(--orange); }
-    .nav-dropdown { position: relative; }
-    .nav-dropdown-menu { position: absolute; top: 100%; left: 0; background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 8px; padding: 8px; min-width: 160px; opacity: 0; visibility: hidden; transform: translateY(-8px); transition: all 0.2s; }
-    .nav-dropdown:hover .nav-dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); }
-    .nav-dropdown-menu a { display: block; padding: 10px 16px; color: var(--gray-300); text-decoration: none; font-size: 14px; border-radius: 6px; }
-    .nav-dropdown-menu a:hover { background: var(--gray-800); color: var(--white); }
     .nav-right { display: flex; align-items: center; gap: 12px; }
     .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; font-family: var(--font-display); font-size: 14px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer; }
     .btn-primary { background: var(--orange); color: var(--black); }
@@ -240,9 +231,9 @@
     .example-block.cov { color: #5bcd5b; border-color: #2d852d; }
     .example-block.rec { color: #cd8f5b; border-color: #856a2d; }
     .example-block.plc { color: #b55bcd; border-color: #6a2d85; }
-    .example-block.compound { color: #f59e0b; border-color: #b27308; }
-    .example-block.gov { color: #8b5cf6; border-color: #5b3aad; }
-    .example-block.anchor { color: #888888; border-color: #555555; }
+    .example-block.compound { color: #ffffff; border-color: #999999; }
+    .example-block.gov { color: #9e9e9e; border-color: #666666; }
+    .example-block.anchor { color: #ffea00; border-color: #b3a400; }
     .example-coil { font-size: 8px; font-family: var(--font-engine); color: #555; flex-shrink: 0; }
 
     /* Footer */
@@ -255,7 +246,6 @@
     .footer-right { font-size: 13px; color: var(--gray-500); }
 
     @media (max-width: 768px) {
-      .nav-links { display: none; }
       .explainer { grid-template-columns: 1fr; }
       .family-grid { grid-template-columns: 1fr; }
       .doc-grid { grid-template-columns: 1fr; }
@@ -277,27 +267,11 @@
         <div class="logo-icon"><img src="../logo.png" alt="Bitcoin Ghost"></div>
         <div class="logo-text">Bitcoin<span>Ghost</span></div>
       </a>
-      <div class="nav-links">
-        <a href="../index.html">Home</a>
-        <a href="../network.html">Network</a>
-        <div class="nav-dropdown">
-          <a href="../pool.html">Pool</a>
-          <div class="nav-dropdown-menu">
-            <a href="../pool.html">Connect</a>
-            <a href="../pool-stats.html">Statistics</a>
-            <a href="../node-finder.html">Node Finder</a>
-          </div>
-        </div>
-        <a href="../how-it-works.html">How It Works</a>
-        <a href="../economics.html">Economics</a>
-        <a href="../ghost-labs.html" class="active">Labs</a>
-        <a href="../docs/index.html">Docs</a>
-      </div>
       <div class="nav-right">
+        <a href="../ghost-labs.html" class="btn btn-ghost">Labs</a>
         <a href="https://github.com/bitcoin-ghost" class="btn btn-ghost" target="_blank">
           <svg style="width:20px;height:20px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         </a>
-        <a href="../get-started.html" class="btn btn-primary">Get Started</a>
       </div>
     </div>
   </nav>
@@ -308,8 +282,8 @@
       <p class="page-subtitle">Typed structured transaction conditions for Bitcoin. A declarative block model replacing opcode-based Script.</p>
       <div class="signet-badge"><div class="dot"></div>Active — Signet Testing</div>
       <div class="hero-ctas">
-        <a href="engine/index.html" class="btn btn-primary">Open Builder</a>
-        <a href="docs/#BIP" class="btn btn-secondary">Read the BIP</a>
+        <a href="ladder-engine.html" class="btn btn-primary">Open Builder</a>
+        <a href="docs/#BIP-XXXX" class="btn btn-secondary">Read the BIP</a>
         <a href="docs/#SUMMARY" class="btn btn-secondary">Documentation</a>
         <a href="docs/#BLOCKS" class="btn btn-secondary">Block Reference</a>
         <a href="https://github.com/bitcoin-ghost/ghost-labs-ladder-script" class="btn btn-ghost" target="_blank">
@@ -326,10 +300,10 @@
       <div class="section-num">// 00</div>
       <h2 class="section-title">What Is Ladder Script</h2>
       <div class="section-content">
-        <p>Ladder Script introduces <strong>transaction version 4</strong> (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">RUNG_TX</code>) to Bitcoin. Instead of writing opcode sequences on an untyped stack, you declare spending conditions as named, typed function blocks organized into rungs. The result is a transaction format where every byte has a declared type, every condition is a named block with validated fields, and evaluation is deterministic with bounded execution time.</p>
-        <p><strong>Zero-spam conditions.</strong> Bitcoin Script allows arbitrary data pushes &mdash; 32 bytes of anything can be a key, a hash, or a JPEG shard. Ladder Script makes this structurally impossible. With MLSC (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>), conditions are never stored in the output or UTXO set &mdash; only a 32-byte Merkle root. Fake conditions produce unspendable outputs, and since unspendable outputs are never spent, the fake data is never revealed on-chain. The spam kills itself. Raw public keys are witness-only; conditions use PUBKEY_COMMIT (SHA-256 of the key). Every witness field must cryptographically verify against its condition counterpart.</p>
-        <p><strong>Post-quantum ready.</strong> FALCON-512, FALCON-1024, Dilithium3, and SPHINCS+ are native. The SCHEME field routes any SIG block to classical or post-quantum verification without changing the wire format. PUBKEY_COMMIT lets you lock funds to a 32-byte hash of a 1,793-byte PQ key today &mdash; reveal the full key only at spend time. COSIGN lets a single PQ-secured UTXO guard unlimited classical UTXOs.</p>
-        <p><strong>Programmable money.</strong> Covenants, recursive conditions, rate limiters, state machines, sequenced approvals, fee-band gating, adaptor signatures, and protocol anchoring &mdash; all as composable typed blocks within the same wire format. No new opcodes, no Script gymnastics. The PLC family alone brings decades of proven industrial automation patterns to Bitcoin transaction logic. The possibilities are endless.</p>
+        <p><strong>Ladder Script</strong> introduces <strong>transaction version 4</strong> (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">RUNG_TX</code>). Spending conditions are declared as named, typed blocks organised into rungs &mdash; a model borrowed from industrial PLC ladder diagrams used in safety-critical factory control. Every byte in every block has a declared type with enforced size constraints. Evaluation is deterministic with bounded execution time. There are 59 block types across 10 families covering signatures, timelocks, hash verification, covenants, recursion, anchors, programmable logic, compound patterns, governance, and legacy Bitcoin transaction types.</p>
+        <p><strong>Anti-spam hardened.</strong> Three coordinated defenses close all practical data embedding surfaces. <strong>merkle_pub_key</strong>: public keys are not stored in condition fields at all &mdash; they are folded into the Merkle leaf hash at fund time and verified positionally at spend time. There is no writable pubkey slot in conditions for an attacker to fill with arbitrary data. <strong>Selective inversion</strong>: key-consuming blocks (SIG, MULTISIG, HTLC, and 14 others) cannot be inverted. This prevents the garbage-pubkey attack where an attacker uses a junk key, lets the signature fail, inverts the result to SATISFIED, and lands arbitrary data in the block witness. <strong>Hash lock deprecation</strong>: HASH_PREIMAGE and HASH160_PREIMAGE are removed. These were invertible non-key blocks with writable hash fields &mdash; an inverted hash lock with a garbage hash and arbitrary preimage data could embed up to 252 bytes per block. All legitimate hash-lock use cases are covered by HTLC and HASH_SIG compound blocks, which combine hash verification with a mandatory signature. With MLSC (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>), the on-chain output is a fixed 33-byte scriptPubKey regardless of how many spending paths or conditions exist.</p>
+        <p><strong>Post-quantum ready.</strong> FALCON-512, FALCON-1024, Dilithium3, and SPHINCS+ are native signature schemes. A single SCHEME field on any signature block routes verification to classical Schnorr or any post-quantum algorithm without changing the wire format or condition structure. With merkle_pub_key, condition size is constant regardless of key size &mdash; a 33-byte Schnorr key and a 1,952-byte Dilithium3 key produce the same Merkle leaf. The full key is provided only in the witness at spend time, where its hash is verified against the committed leaf. COSIGN lets a single PQ-secured UTXO serve as a co-spending guardian for unlimited classical UTXOs &mdash; incremental PQ migration without a flag day.</p>
+        <p><strong>Programmable money.</strong> Covenants, recursive conditions, rate limiters, state machines, sequenced approvals, fee-band gating, adaptor signatures, and protocol anchoring &mdash; all as composable typed blocks within the same wire format. The PLC family alone brings 14 block types drawn from decades of proven industrial automation patterns. Legacy Bitcoin transaction types (P2PKH through P2TR script-path) are wrapped as typed blocks, significantly reducing data-embedding surfaces including the taproot inscription vector.</p>
       </div>
     </div>
   </section>
@@ -424,21 +398,25 @@
   <span class="jk">"version"</span><span class="jp">:</span> <span class="jn">4</span><span class="jp">,</span>
   <span class="jk">"outputs"</span><span class="jp">: [</span>
     <span class="jp">{</span>
-      <span class="jk">"amount_sats"</span><span class="jp">:</span> <span class="jn">100000</span><span class="jp">,</span>
+      <span class="jk">"amount"</span><span class="jp">:</span> <span class="jn">0.001</span><span class="jp">,</span>
       <span class="jk">"conditions"</span><span class="jp">: [</span>
         <span class="jp">{</span>                                     <span class="jc">// Rung 0: hot spend</span>
           <span class="jk">"blocks"</span><span class="jp">: [</span>
-            <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"SIG"</span><span class="jp">,</span> <span class="jk">"pubkey"</span><span class="jp">:</span> <span class="js">"02a1b2...hot"</span> <span class="jp">},</span>
-            <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"CSV"</span><span class="jp">,</span> <span class="jk">"blocks"</span><span class="jp">:</span> <span class="jn">144</span> <span class="jp">}</span>
+            <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"SIG"</span><span class="jp">,</span> <span class="jk">"fields"</span><span class="jp">: [{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"PUBKEY"</span><span class="jp">,</span> <span class="jk">"hex"</span><span class="jp">:</span> <span class="js">"02a1b2..."</span> <span class="jp">}] },</span>
+            <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"CSV"</span><span class="jp">,</span> <span class="jk">"fields"</span><span class="jp">: [{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"NUMERIC"</span><span class="jp">,</span> <span class="jk">"hex"</span><span class="jp">:</span> <span class="js">"9000"</span> <span class="jp">}] }</span>
           <span class="jp">]</span>
         <span class="jp">},</span>
         <span class="jp">{</span>                                     <span class="jc">// Rung 1: cold recovery</span>
           <span class="jk">"blocks"</span><span class="jp">: [</span>
-            <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"MULTISIG"</span><span class="jp">,</span> <span class="jk">"threshold"</span><span class="jp">:</span> <span class="jn">2</span><span class="jp">,</span> <span class="jk">"pubkeys"</span><span class="jp">:</span> <span class="jp">[</span><span class="js">"02c3..."</span><span class="jp">,</span> <span class="js">"03d4..."</span><span class="jp">,</span> <span class="js">"02e5..."</span><span class="jp">]</span> <span class="jp">}</span>
+            <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"MULTISIG"</span><span class="jp">,</span> <span class="jk">"fields"</span><span class="jp">: [</span>
+              <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"NUMERIC"</span><span class="jp">,</span> <span class="jk">"hex"</span><span class="jp">:</span> <span class="js">"02"</span> <span class="jp">},</span>   <span class="jc">// threshold</span>
+              <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"PUBKEY"</span><span class="jp">,</span> <span class="jk">"hex"</span><span class="jp">:</span> <span class="js">"02c3..."</span> <span class="jp">},</span>
+              <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"PUBKEY"</span><span class="jp">,</span> <span class="jk">"hex"</span><span class="jp">:</span> <span class="js">"03d4..."</span> <span class="jp">},</span>
+              <span class="jp">{</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"PUBKEY"</span><span class="jp">,</span> <span class="jk">"hex"</span><span class="jp">:</span> <span class="js">"02e5..."</span> <span class="jp">}</span>
+            <span class="jp">] }</span>
           <span class="jp">]</span>
         <span class="jp">}</span>
-      <span class="jp">],</span>
-      <span class="jk">"coil"</span><span class="jp">: {</span> <span class="jk">"type"</span><span class="jp">:</span> <span class="js">"UNLOCK"</span> <span class="jp">}</span>
+      <span class="jp">]</span>
     <span class="jp">}</span>
   <span class="jp">]</span>
 <span class="jp">}</span></pre>
@@ -456,9 +434,9 @@
       <div class="explainer">
         <div class="explainer-text">
           <h4>Typed Fields, No Free-Form Data</h4>
-          <p>In Bitcoin Script, a 32-byte push could be a public key, a hash, a preimage, or arbitrary data. Ladder Script restricts conditions to typed fields: PUBKEY_COMMIT, HASH256, HASH160, NUMERIC, SCHEME, and SPEND_INDEX &mdash; all fixed-size hashes or bounded integers with enforced size constraints. SCHEME routes signatures to classical (Schnorr, ECDSA) or post-quantum (FALCON-512, FALCON-1024, Dilithium3, SPHINCS+) verification.</p>
-          <p>PUBKEY, SIGNATURE, and PREIMAGE are witness-only &mdash; they cannot appear in locking conditions. Raw public keys are provided at spend time and must SHA-256 hash-match the corresponding PUBKEY_COMMIT. With MLSC (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>), conditions never enter the UTXO set at all &mdash; only a 32-byte Merkle root. Fake conditions produce unspendable outputs whose data is never revealed on-chain.</p>
-          <p>Static analysis requires only parsing, not execution simulation. Every field in a Ladder Script witness can be identified, validated, and displayed without running any code.</p>
+          <p>Ladder Script restricts conditions to typed fields: HASH256, HASH160, NUMERIC, SCHEME, and SPEND_INDEX &mdash; all fixed-size hashes or bounded integers with enforced size constraints. SCHEME routes signatures to classical (Schnorr, ECDSA) or post-quantum (FALCON-512, FALCON-1024, Dilithium3, SPHINCS+) verification. Public keys are not stored in conditions &mdash; they are folded into the Merkle leaf hash via merkle_pub_key.</p>
+          <p>PUBKEY, PUBKEY_COMMIT, SIGNATURE, PREIMAGE, and SCRIPT_BODY are not valid in conditions &mdash; consensus rejects them at deserialization. With MLSC (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>), conditions never enter the UTXO set at all &mdash; only a 32-byte Merkle root. There is no writable slot in conditions that an attacker can fill with arbitrary data.</p>
+          <p>Static analysis requires only parsing, not execution simulation. Every field in a Ladder Script output can be identified, validated, and displayed without running any code.</p>
         </div>
         <div>
           <div class="json-panel">
@@ -467,17 +445,21 @@
               <div class="json-panel-tab">Data Types</div>
             </div>
             <div class="json-body">
-<pre><span class="jk">PUBKEY</span>       <span class="jc">// 1-2,048 bytes  (witness only)</span>
-<span class="jk">PUBKEY_COMMIT</span> <span class="jc">// 32 bytes       (SHA-256 of key, conditions only)</span>
+<pre><span class="jc">// Condition fields (stored on-chain)</span>
 <span class="jk">HASH256</span>      <span class="jc">// 32 bytes       (SHA-256 digest)</span>
 <span class="jk">HASH160</span>      <span class="jc">// 20 bytes       (RIPEMD160(SHA256))</span>
-<span class="jk">PREIMAGE</span>     <span class="jc">// 1-252 bytes    (witness only)</span>
-<span class="jk">SIGNATURE</span>    <span class="jc">// 1-50,000 bytes (witness only)</span>
 <span class="jk">SPEND_INDEX</span>  <span class="jc">// 4 bytes        (uint32 LE)</span>
 <span class="jk">NUMERIC</span>      <span class="jc">// 1-4 bytes      (uint32 LE)</span>
 <span class="jk">SCHEME</span>       <span class="jc">// 1 byte         (sig scheme: 01=Schnorr, 02=ECDSA,</span>
              <span class="jc">//                  10=FALCON-512, 11=FALCON-1024,</span>
-             <span class="jc">//                  12=Dilithium3, 13=SPHINCS+)</span></pre>
+             <span class="jc">//                  12=Dilithium3, 13=SPHINCS+)</span>
+
+<span class="jc">// Witness fields (revealed at spend time)</span>
+<span class="jk">PUBKEY</span>       <span class="jc">// 1-2,048 bytes  (bound by Merkle leaf)</span>
+<span class="jk">SIGNATURE</span>    <span class="jc">// 1-50,000 bytes</span>
+<span class="jk">PREIMAGE</span>     <span class="jc">// 1-252 bytes</span>
+<span class="jk">SCRIPT_BODY</span>  <span class="jc">// 1-520 bytes    (inner conditions)</span>
+<span class="jk">DATA</span>         <span class="jc">// 1-80 bytes     (DATA_RETURN block only)</span></pre>
             </div>
           </div>
         </div>
@@ -485,40 +467,43 @@
     </div>
   </section>
 
-  <!-- 03: PUBKEY_COMMIT — Hash-Commit / Key-Reveal -->
-  <section id="pubkey-commit">
+  <!-- 03: merkle_pub_key — Pubkeys Bound by Merkle Leaf -->
+  <section id="merkle-pub-key">
     <div class="container">
       <div class="section-num">// 03</div>
-      <h2 class="section-title">PUBKEY_COMMIT: Hash Now, Reveal Later</h2>
+      <h2 class="section-title">merkle_pub_key: Bound by Merkle, Not by Field</h2>
 
       <div class="explainer">
         <div class="explainer-text">
-          <h4>32 Bytes In, Full Key Out</h4>
-          <p>In Bitcoin Script, raw public keys sit in the UTXO set &mdash; 33 bytes for classical, up to 1,793 bytes for post-quantum. Ladder Script never stores raw keys in conditions. Instead, every public key is stored as a <strong>PUBKEY_COMMIT</strong>: the SHA-256 hash of the full key, always exactly 32 bytes.</p>
-          <p>At spend time, the witness provides the full public key (PUBKEY field). The evaluator computes <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">SHA256(witness_pubkey)</code> and verifies it matches the committed hash. Only then does signature verification proceed against the revealed key.</p>
-          <p>This gives you three things for free:</p>
+          <h4>No Writable Pubkey Slot</h4>
+          <p>Public keys are <strong>not stored in condition fields</strong>. Instead, they are folded into the Merkle leaf hash at fund time: <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">TaggedHash("LadderLeaf", rung_blocks || pk1 || pk2 || ... || pkN)</code>. The RPC accepts raw public keys, validates them, and computes the leaf. There is no PUBKEY_COMMIT field in conditions &mdash; and therefore no writable slot for an attacker to fill with arbitrary data.</p>
+          <p>At spend time, pubkeys are provided in the witness. The evaluator walks the rung's blocks left-to-right using <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">PubkeyCountForBlock()</code> to assign pubkeys positionally. The Merkle proof verification guarantees these are the same pubkeys committed at fund time &mdash; only then does signature verification proceed.</p>
         </div>
         <div>
           <div class="json-panel">
             <div class="json-panel-header">
               <div class="json-panel-dot green"></div>
-              <div class="json-panel-tab">PUBKEY_COMMIT Flow</div>
+              <div class="json-panel-tab">merkle_pub_key Flow</div>
             </div>
             <div class="json-body">
-<pre><span class="jc">// At UTXO creation (conditions)</span>
-<span class="jk">PUBKEY_COMMIT</span> = <span class="js">SHA256(full_pubkey)</span>
-<span class="jc">// Always 32 bytes, any key size</span>
+<pre><span class="jc">// Build time — RPC validates + folds into leaf</span>
+<span class="jn">1.</span> Validate PUBKEY (size bounds, prefix)
+<span class="jn">2.</span> Walk blocks: <span class="jk">PubkeyCountForBlock()</span> per block
+<span class="jn">3.</span> <span class="jk">leaf</span> = <span class="js">TaggedHash("LadderLeaf",</span>
+         <span class="js">  rung_blocks || pk1 || pk2 || ... || pkN)</span>
+<span class="jc">// No pubkey data in condition fields</span>
 
-<span class="jc">// At spend time (witness)</span>
-<span class="jk">PUBKEY</span> = <span class="js">full_pubkey</span>  <span class="jc">// 33B classical</span>
+<span class="jc">// Spend time — witness reveals full keys</span>
+<span class="jk">PUBKEY</span> = <span class="js">full_pubkey</span>  <span class="jc">// 32B SPHINCS+</span>
+                       <span class="jc">// 33B Schnorr / ECDSA</span>
                        <span class="jc">// 897B FALCON-512</span>
                        <span class="jc">// 1,793B FALCON-1024</span>
                        <span class="jc">// 1,952B Dilithium3</span>
-                       <span class="jc">// 64B SPHINCS+</span>
 
 <span class="jc">// Evaluator checks:</span>
-<span class="jn">1.</span> SHA256(witness.PUBKEY) == conditions.PUBKEY_COMMIT
-<span class="jn">2.</span> Verify(witness.SIGNATURE, witness.PUBKEY, sighash)</pre>
+<span class="jn">4.</span> Recompute leaf from witness pubkeys
+<span class="jn">5.</span> Merkle proof verifies leaf == committed root
+<span class="jn">6.</span> Verify(witness.SIGNATURE, witness.PUBKEY, sighash)</pre>
             </div>
           </div>
         </div>
@@ -527,9 +512,9 @@
       <div class="callout">
         <div class="callout-title">Why This Matters</div>
         <div class="callout-content">
-          <strong>Post-quantum readiness</strong> &mdash; Lock funds to a 32-byte hash of a 1,793-byte FALCON-1024 or 1,952-byte Dilithium3 key today. The UTXO set stays small. The large key only appears in the witness (which gets the segwit discount) at spend time.<br><br>
-          <strong>Spam resistance</strong> &mdash; PUBKEY_COMMIT is a fixed 32-byte hash. Witness keys must SHA-256 match their condition commitment or the evaluator rejects the spend. With MLSC, conditions never reach the UTXO set &mdash; only a 32-byte Merkle root. Fake data in unspendable outputs is never revealed on-chain.<br><br>
-          <strong>Uniform UTXO size</strong> &mdash; Whether your key is 33 bytes (Schnorr) or 1,952 bytes (Dilithium3), the UTXO entry is always 32 bytes. UTXO set bloat from large keys is eliminated entirely.
+          <strong>Zero writable pubkey surface</strong> &mdash; There is no PUBKEY_COMMIT field in conditions. Public keys exist only in the Merkle leaf computation and the witness. An attacker cannot write arbitrary data into a pubkey slot because no such slot exists.<br><br>
+          <strong>Uniform leaf size</strong> &mdash; Whether the key is 33 bytes (Schnorr) or 1,952 bytes (Dilithium3), the condition fields are identical. The leaf hash absorbs the key bytes during tree construction. The full key only appears in the witness at spend time.<br><br>
+          <strong>Positional binding</strong> &mdash; Pubkeys are assigned to blocks by walking left-to-right across key-consuming blocks. A SIG consumes 1 pubkey, MULTISIG consumes N (from its threshold field), HTLC consumes 2. Wrong order &rarr; Merkle proof fails.
         </div>
       </div>
     </div>
@@ -545,9 +530,9 @@
       </div>
 
       <div class="ladder-diagram">
-        <div class="ladder-diagram-label">Hash-Locked Atomic Swap with Timelock Fallback</div>
+        <div class="ladder-diagram-label">Atomic Swap with Compound HTLC + Timelock Fallback</div>
 
-        <!-- Rung 0: Hash preimage + counterparty sig (swap path) -->
+        <!-- Rung 0: HTLC compound block (hash + timelock + sig) -->
         <div class="rung">
           <div class="rung-label">R000</div>
           <div class="rail energized"></div>
@@ -555,17 +540,8 @@
           <div class="contact energized">
             <span class="contact-bracket">&#x23A1;</span>
             <div class="contact-body">
-              <div class="contact-type">HASH_PREIMAGE</div>
-              <div class="contact-value">sha256(secret)</div>
-            </div>
-            <span class="contact-bracket">&#x23A4;</span>
-          </div>
-          <div class="wire energized"></div>
-          <div class="contact energized">
-            <span class="contact-bracket">&#x23A1;</span>
-            <div class="contact-body">
-              <div class="contact-type">SIG</div>
-              <div class="contact-value">counterparty</div>
+              <div class="contact-type">HTLC</div>
+              <div class="contact-value">hash+sig+csv</div>
             </div>
             <span class="contact-bracket">&#x23A4;</span>
           </div>
@@ -618,9 +594,9 @@
       </div>
 
       <div style="margin-top: 48px;">
-        <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; color: var(--white);">Relay Coils &amp; Cross-Rung Logic</h3>
+        <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; color: var(--white);">Coils, Relays &amp; Cross-Rung Logic</h3>
         <div class="section-content">
-          <p>In real PLC systems, relay coils carry state between rungs &mdash; one rung energizes a coil, and a contact on another rung reads it. Ladder Script uses the same pattern. Each rung terminates in a <strong>coil</strong> that determines its effect:</p>
+          <p>Each rung terminates in a <strong>coil</strong> that determines its effect. <strong>Relays</strong> are a separate mechanism &mdash; shared condition blocks that rungs reference via <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">relay_refs</code> for cross-rung AND composition.</p>
         </div>
 
         <div class="explainer" style="margin-top: 24px;">
@@ -631,32 +607,32 @@
                 <div class="json-panel-tab">Coil Types</div>
               </div>
               <div class="json-body">
-<pre><span class="jk">UNLOCK</span>    <span class="jc">// Standard — energizes = spend authorized</span>
-<span class="jk">RELAY</span>     <span class="jc">// Sets a named relay flag (no direct unlock)</span>
-<span class="jk">LATCH</span>     <span class="jc">// Latching relay — once set, stays set</span>
-<span class="jk">UNLATCH</span>   <span class="jc">// Resets a latched relay</span>
-<span class="jk">SIGNAL</span>    <span class="jc">// Output signal for covenant state</span>
+<pre><span class="jk">UNLOCK</span>      <span class="jc">// 0x01 — Standard spend authorization</span>
+<span class="jk">UNLOCK_TO</span>   <span class="jc">// 0x02 — Spend to specific address, recipient</span>
+            <span class="jc">//         must also satisfy coil conditions</span>
+<span class="jk">COVENANT</span>    <span class="jc">// 0x03 — Constrains the spending transaction</span>
+            <span class="jc">//         structure via coil conditions</span>
 
-<span class="jc">// Relay contacts (block references)</span>
-<span class="jk">REF: relay_name</span>  <span class="jc">// NO contact: pass if relay is de-energized</span>
-<span class="jk">REF: !relay_name</span> <span class="jc">// NC contact: pass if relay is energized</span></pre>
+<span class="jc">// Relays (separate from coils)</span>
+<span class="jc">// Shared condition blocks referenced by rungs</span>
+<span class="jc">// Forward-only: relay N can only require relays 0..N-1</span></pre>
               </div>
             </div>
           </div>
           <div class="explainer-text">
             <h4>Cross-Rung Composition</h4>
-            <p>A <strong>RELAY coil</strong> doesn't unlock the UTXO directly. Instead, it sets a flag that other rungs can read via relay contacts. This enables multi-rung AND composition that goes beyond simple per-rung AND logic.</p>
-            <p>Example: Rung 0 checks a signature and sets relay <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">auth</code>. Rung 1 checks a timelock and reads relay <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">auth</code> &mdash; it only passes if both the timelock AND the signature from Rung 0 are satisfied. The UNLOCK coil on Rung 1 is what actually authorizes the spend.</p>
-            <p>Relays are evaluated in rung order, top to bottom. A relay reference can only read coils from earlier rungs, preventing circular dependencies.</p>
+            <p><strong>Relays</strong> are shared condition blocks that multiple rungs can reference. A rung lists the relay indices it depends on &mdash; all referenced relays must be satisfied (AND) for that rung to pass. This enables cross-rung AND composition beyond simple per-rung logic.</p>
+            <p>Example: Relay 0 checks a signature. Rung 0 references relay 0 and adds a timelock &mdash; it only passes if both the relay's signature AND the timelock are satisfied. Rung 1 references the same relay 0 with a different spending path. The relay condition is defined once and reused.</p>
+            <p>Relays use forward-only indexing: relay N can only require relays 0..N-1, preventing circular dependencies.</p>
           </div>
         </div>
 
         <div class="ladder-diagram" style="margin-top: 24px;">
           <div class="ladder-diagram-label">Example: Relay-Gated Approval</div>
 
-          <!-- Rung 0: SIG → RELAY(auth) -->
+          <!-- Relay 0: shared SIG condition -->
           <div class="rung">
-            <div class="rung-label">R000</div>
+            <div class="rung-label" style="color:var(--cyan);">RLY0</div>
             <div class="rail energized"></div>
             <div class="wire short energized"></div>
             <div class="contact energized">
@@ -670,23 +646,23 @@
             <div class="wire energized"></div>
             <div class="coil energized">
               <span class="coil-paren">(</span>
-              <div class="coil-body"><div class="coil-type">RELAY:auth</div></div>
+              <div class="coil-body"><div class="coil-type" style="color:var(--cyan);">RELAY</div></div>
               <span class="coil-paren">)</span>
             </div>
             <div class="wire short energized"></div>
             <div class="rail energized"></div>
           </div>
 
-          <!-- Rung 1: REF(auth) + CSV + SIG → UNLOCK -->
+          <!-- Rung 0: refs relay 0 + CSV + SIG → UNLOCK -->
           <div class="rung">
-            <div class="rung-label">R001</div>
+            <div class="rung-label">R000</div>
             <div class="rail energized"></div>
             <div class="wire short energized"></div>
             <div class="contact energized">
               <span class="contact-bracket">&#x23A1;</span>
               <div class="contact-body">
-                <div class="contact-type">REF</div>
-                <div class="contact-value">auth</div>
+                <div class="contact-type" style="color:var(--cyan);">REF</div>
+                <div class="contact-value">relay 0</div>
               </div>
               <span class="contact-bracket">&#x23A4;</span>
             </div>
@@ -728,13 +704,13 @@
       <div class="section-num">// 05</div>
       <h2 class="section-title">Block Type Families</h2>
       <div class="section-content">
-        <p>60 block types organized into ten numbered families. New block types are added within families, not as opcodes. See the <a href="docs/#BLOCKS" style="color:var(--orange);text-decoration:none;">Block Reference</a> for deep-dive documentation on each type.</p>
+        <p>59 block types organized into ten numbered families. New block types are added within families, not as opcodes. See the <a href="docs/#BLOCKS" style="color:var(--orange);text-decoration:none;">Block Reference</a> for deep-dive documentation on each type.</p>
       </div>
 
       <div class="family-grid">
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Signature</div>
+            <div class="family-name" style="color:#ff1744;">Signature</div>
             <div class="family-range">0x0001-0x00FF</div>
           </div>
           <div class="family-desc">Identity verification with native post-quantum support via SCHEME field routing to FALCON-512/1024, Dilithium3, or SPHINCS+.</div>
@@ -748,7 +724,7 @@
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Timelock</div>
+            <div class="family-name" style="color:#ff6d00;">Timelock</div>
             <div class="family-range">0x0100-0x01FF</div>
           </div>
           <div class="family-desc">Temporal constraints using both relative (BIP-68) and absolute timelocks in blocks or seconds.</div>
@@ -761,19 +737,17 @@
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Hash</div>
+            <div class="family-name" style="color:#00e676;">Hash</div>
             <div class="family-range">0x0200-0x02FF</div>
           </div>
-          <div class="family-desc">Knowledge proofs via preimage reveal. SHA-256, RIPEMD160, and BIP-340 tagged hashes.</div>
+          <div class="family-desc">BIP-340 domain-separated hash verification. HASH_PREIMAGE and HASH160_PREIMAGE are deprecated &mdash; use HTLC or HASH_SIG compound blocks for hash-lock use cases.</div>
           <div class="family-blocks">
-            <span class="family-block">HASH_PREIMAGE</span>
-            <span class="family-block">HASH160_PREIMAGE</span>
             <span class="family-block">TAGGED_HASH</span>
           </div>
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Covenant</div>
+            <div class="family-name" style="color:#2979ff;">Covenant</div>
             <div class="family-range">0x0300-0x03FF</div>
           </div>
           <div class="family-desc">Output constraints. Template verification (BIP-119), timelocked vaults, and amount range enforcement.</div>
@@ -785,7 +759,7 @@
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Recursion</div>
+            <div class="family-name" style="color:#aa00ff;">Recursion</div>
             <div class="family-range">0x0400-0x04FF</div>
           </div>
           <div class="family-desc">Self-referential conditions for perpetual covenants, state machines, countdowns, UTXO tree splitting, and progressive relaxation.</div>
@@ -800,7 +774,7 @@
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Anchor</div>
+            <div class="family-name" style="color:#ffea00;">Anchor</div>
             <div class="family-range">0x0500-0x05FF</div>
           </div>
           <div class="family-desc">Typed L2 metadata. Tag UTXOs with protocol roles for channels, pools, reserves, sealed commitments, and oracle attestations.</div>
@@ -811,11 +785,12 @@
             <span class="family-block">ANCHOR_RESERVE</span>
             <span class="family-block">ANCHOR_SEAL</span>
             <span class="family-block">ANCHOR_ORACLE</span>
+            <span class="family-block">DATA_RETURN</span>
           </div>
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">PLC</div>
+            <div class="family-name" style="color:#ff4081;">PLC</div>
             <div class="family-range">0x0600-0x06FF</div>
           </div>
           <div class="family-desc">Programmable Logic Controllers. Industrial automation patterns for stateful, rate-governed, and sequenced transaction logic.</div>
@@ -838,7 +813,7 @@
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Compound</div>
+            <div class="family-name" style="color:#ffffff;">Compound</div>
             <div class="family-range">0x0700-0x07FF</div>
           </div>
           <div class="family-desc">Multi-block patterns collapsed into single blocks. Eliminates per-block headers and field counts for merged conditions.</div>
@@ -853,7 +828,7 @@
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name">Governance</div>
+            <div class="family-name" style="color:#9e9e9e;">Governance</div>
             <div class="family-range">0x0800-0x08FF</div>
           </div>
           <div class="family-desc">Transaction-level constraints with no Tapscript equivalent. Enforce weight limits, I/O counts, value ratios, spending windows, and set membership proofs.</div>
@@ -868,10 +843,10 @@
         </div>
         <div class="family-card">
           <div class="family-header">
-            <div class="family-name" style="color:#e91e90;">Legacy</div>
+            <div class="family-name" style="color:#00e5ff;">Legacy</div>
             <div class="family-range">0x0900-0x09FF</div>
           </div>
-          <div class="family-desc">Wraps legacy Bitcoin transaction types (P2PK, P2PKH, P2SH, P2WPKH, P2WSH, P2TR key-path, P2TR script-path) as typed Ladder Script blocks. Same spending semantics, no arbitrary data surfaces. Closes inscription and data-embedding vectors while giving legacy users access to full Ladder Script composability.</div>
+          <div class="family-desc">Wraps legacy Bitcoin transaction types (P2PK, P2PKH, P2SH, P2WPKH, P2WSH, P2TR key-path, P2TR script-path) as typed Ladder Script blocks. Same spending semantics, significantly reducing arbitrary data surfaces. Designed to close inscription and data-embedding vectors while giving legacy users access to full Ladder Script composability.</div>
           <div class="family-blocks">
             <span class="family-block">P2PK_LEGACY</span>
             <span class="family-block">P2PKH_LEGACY</span>
@@ -894,10 +869,9 @@
 
       <div class="explainer">
         <div class="explainer-text">
-          <h4>Version 4 Transactions</h4>
+          <h4>Output Formats &amp; Wire Encoding</h4>
           <p>Ladder Script supports two output formats. <strong>Inline</strong> (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC1</code>) stores full serialized conditions in the output. <strong>MLSC</strong> (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>) stores only a 32-byte Merkle root &mdash; conditions are revealed at spend time in the witness.</p>
-          <p>The conditions provide the lock (pubkeys, hashes, parameters). The witness provides the key (signatures, preimages). At verification time, they merge field-by-field for evaluation. All 60 block evaluators are identical for both output formats.</p>
-          <p><strong>Compact rungs</strong> use an <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">n_blocks == 0</code> sentinel to store data inline without block overhead. COMPACT_SIG stores a 32-byte pubkey commitment and 1-byte scheme directly on the rung, resolving to a standard SIG block at evaluation time. Primarily used for change outputs.</p>
+          <p>Blocks use <strong>micro-headers</strong> &mdash; a 1-byte lookup table (0x00&ndash;0x3C) that encodes the block type, inversion flag, and implicit field layout in a single byte. Known block types with standard field layouts skip the 2-byte type code, field count, and type bytes entirely. Escape codes (0x80/0x81) fall back to the full header for unknown or non-standard blocks. Inversion is only permitted for non-key-consuming block types (timelocks, covenants, PLC, governance, anchors, recursion) &mdash; key-consuming blocks cannot be inverted.</p>
           <p>Sighash uses a tagged hash <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">"LadderSighash"</code> that commits to the conditions hash (or Merkle root for MLSC outputs), binding each signature to the exact conditions it satisfies.</p>
         </div>
         <div>
@@ -910,21 +884,28 @@
 <pre><span class="jc">// Inline output (0xC1)</span>
 <span class="jn">0xC1</span> <span class="jp">||</span> <span class="js">SerializedRungConditions</span>
 
-<span class="jc">// MLSC output (0xC2) — Merkle root only</span>
+<span class="jc">// MLSC output (0xC2) — 33-byte scriptPubKey</span>
 <span class="jn">0xC2</span> <span class="jp">||</span> <span class="js">conditions_root (32 bytes)</span>
 
-<span class="jc">// Witness (unlocking)</span>
+<span class="jc">// Witness (v4 wire format)</span>
 <span class="jp">[</span><span class="jk">n_rungs</span><span class="jp">:</span> <span class="js">varint</span><span class="jp">]</span>
   <span class="jp">[</span><span class="jk">n_blocks</span><span class="jp">:</span> <span class="js">varint</span><span class="jp">]</span>
+    <span class="jp">[</span><span class="jk">micro_header</span><span class="jp">:</span> <span class="js">uint8</span><span class="jp">]</span>   <span class="jc">// 0x00-0x3C lookup</span>
+                              <span class="jc">// 0x80/0x81 escape</span>
+    <span class="jc">// if escape:</span>
     <span class="jp">[</span><span class="jk">block_type</span><span class="jp">:</span> <span class="js">uint16 LE</span><span class="jp">]</span>
-    <span class="jp">[</span><span class="jk">inverted</span><span class="jp">:</span> <span class="js">uint8</span><span class="jp">]</span>
     <span class="jp">[</span><span class="jk">n_fields</span><span class="jp">:</span> <span class="js">varint</span><span class="jp">]</span>
       <span class="jp">[</span><span class="jk">data_type</span><span class="jp">:</span> <span class="js">uint8</span><span class="jp">]</span>
       <span class="jp">[</span><span class="jk">data_len</span><span class="jp">:</span> <span class="js">varint</span><span class="jp">]</span>
       <span class="jp">[</span><span class="jk">data</span><span class="jp">:</span> <span class="js">bytes</span><span class="jp">]</span>
 <span class="jp">[</span><span class="jk">coil_type</span><span class="jp">:</span> <span class="js">uint8</span><span class="jp">]</span>
 <span class="jp">[</span><span class="jk">attestation</span><span class="jp">:</span> <span class="js">uint8</span><span class="jp">]</span>
-<span class="jp">[</span><span class="jk">scheme</span><span class="jp">:</span> <span class="js">uint8</span><span class="jp">]</span></pre>
+<span class="jp">[</span><span class="jk">scheme</span><span class="jp">:</span> <span class="js">uint8</span><span class="jp">]</span>
+<span class="jp">[</span><span class="jk">address_len</span><span class="jp">:</span> <span class="js">varint</span><span class="jp">]</span>
+<span class="jp">[</span><span class="jk">address</span><span class="jp">:</span> <span class="js">bytes</span><span class="jp">]</span>
+<span class="jp">[</span><span class="jk">n_coil_conditions</span><span class="jp">:</span> <span class="js">varint</span><span class="jp">]</span>
+<span class="jp">[</span><span class="jk">n_relays</span><span class="jp">:</span> <span class="js">varint</span><span class="jp">]</span>           <span class="jc">// relay blocks</span>
+<span class="jp">[</span><span class="jk">rung_relay_refs</span><span class="jp">:</span> <span class="js">varint[]</span><span class="jp">]</span> <span class="jc">// per-rung refs</span></pre>
             </div>
           </div>
         </div>
@@ -932,10 +913,10 @@
     </div>
   </section>
 
-  <!-- 06.5: MLSC -->
+  <!-- 07: MLSC -->
   <section id="mlsc" style="border-bottom: 1px solid var(--gray-800);">
     <div class="container">
-      <div class="section-num">// 06.1</div>
+      <div class="section-num">// 07</div>
       <h2 class="section-title">Merkelized Ladder Script Conditions</h2>
       <div class="section-content">
         <p><strong>MLSC</strong> (<code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">0xC2</code>) replaces full inline conditions with a single 32-byte Merkle root. The complete conditions are never stored on-chain at creation &mdash; only the root appears in the output and UTXO set. At spend time, the spender reveals only the exercised rung plus a Merkle proof in the witness. Unused spending paths stay permanently hidden.</p>
@@ -944,11 +925,11 @@
       <div class="explainer" style="margin-top: 32px;">
         <div class="explainer-text">
           <h4>How It Works</h4>
-          <p>Each rung is hashed into a leaf using <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">TaggedHash("LadderLeaf", ...)</code>, then combined into a binary Merkle tree using <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">TaggedHash("LadderInternal", ...)</code> for interior nodes. This follows BIP-341 (Taproot) convention for domain separation, preventing second preimage attacks between tree layers.</p>
+          <p>Each rung is hashed into a leaf using <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">TaggedHash("LadderLeaf", rung_blocks || pk1 || ... || pkN)</code>, then combined into a binary Merkle tree using <code style="color:var(--amber);background:#2a2a2a;padding:1px 6px;border-radius:3px;font-family:var(--font-engine);">TaggedHash("LadderInternal", ...)</code> for interior nodes. Public keys are folded into the leaf hash via merkle_pub_key &mdash; they do not appear in condition fields. This follows BIP-341 (Taproot) convention for domain separation, preventing second preimage attacks between tree layers.</p>
           <h4 style="margin-top: 20px;">MAST Privacy</h4>
-          <p>Only the satisfied rung is revealed. A 2-rung script reveals 1 rung + 1 proof hash (32 bytes). A 16-rung script reveals 1 rung + 4 proof hashes (128 bytes). Unused paths remain opaque &mdash; observers cannot determine the number, type, or structure of alternative spending conditions.</p>
+          <p>Only the satisfied rung is revealed. A 2-rung script reveals 1 rung + 1 proof hash (32 bytes). An 8-rung script reveals 1 rung + 3 proof hashes (96 bytes). Unused paths remain opaque &mdash; observers cannot determine the number, type, or structure of alternative spending conditions.</p>
           <h4 style="margin-top: 20px;">Data Embedding Resistance</h4>
-          <p>Fake conditions (arbitrary data disguised as keys) produce unspendable outputs. Since unspendable outputs are never spent, the fake conditions are never revealed on-chain. The blockchain sees only 32 bytes of opaque Merkle root &mdash; identical to Bitcoin P2WSH and P2TR. <strong>The spam kills itself.</strong></p>
+          <p>MLSC closes all practical data embedding vectors. Condition fields contain only fixed-size hashes, bounded integers, and scheme bytes &mdash; no writable pubkey slot exists (merkle_pub_key). Key-consuming blocks cannot be inverted (selective inversion). Pure hash locks are deprecated (hash lock deprecation). Consensus rejects witness-only types (PUBKEY, PUBKEY_COMMIT, SIGNATURE, PREIMAGE) in conditions at deserialization. The only value stored on-chain is a 32-byte Merkle root.</p>
         </div>
         <div>
           <div class="json-panel">
@@ -965,13 +946,15 @@
 <span class="jp">       /      \       /        \</span>
 <span class="js">   rung_0  rung_1  coil_leaf  EMPTY</span>
 
-<span class="jc">// Output: 42 bytes (fixed)</span>
-<span class="jn">value(8)</span> <span class="jp">+</span> <span class="jn">0xC2(1)</span> <span class="jp">+</span> <span class="jn">root(32)</span>
+<span class="jc">// Leaf hash (merkle_pub_key):</span>
+<span class="jc">// TaggedHash("LadderLeaf",</span>
+<span class="jc">//   rung_blocks || pk1 || pk2 || ...)</span>
 
-<span class="jc">// UTXO entry: 40 bytes (fixed)</span>
-<span class="jc">// regardless of script complexity</span>
+<span class="jc">// scriptPubKey: 0xC2 + root = 33 bytes (fixed)</span>
+<span class="jc">// tx output: value(8) + len(1) + spk(33) = 42 bytes</span>
+<span class="jc">// leaf order: [rungs..., relays..., coil]</span>
 
-<span class="jc">// Spending: reveal rung 0 only</span>
+<span class="jc">// Spending: reveal rung 0 + pubkeys in witness</span>
 <span class="jc">// Proof: rung_leaf[1] (32 bytes)</span>
 <span class="jc">// Rung 1 structure stays hidden</span></pre>
             </div>
@@ -983,16 +966,16 @@
               <div class="json-panel-tab">Weight Savings</div>
             </div>
             <div class="json-body">
-<pre><span class="jc">// UTXO set (per output)</span>
-<span class="jk">Single-sig:</span>    <span class="jp">52 B → </span><span class="jn">40 B</span> <span class="jc">(-23%)</span>
-<span class="jk">2-of-3 Multisig:</span> <span class="jp">112 B → </span><span class="jn">40 B</span> <span class="jc">(-64%)</span>
-<span class="jk">4-path Covenant:</span> <span class="jp">320 B → </span><span class="jn">40 B</span> <span class="jc">(-88%)</span>
-<span class="jk">15-of-15:</span>      <span class="jp">530 B → </span><span class="jn">40 B</span> <span class="jc">(-92%)</span>
+<pre><span class="jc">// MLSC scriptPubKey is always 33 bytes</span>
+<span class="jc">// 0xC2 (1) + Merkle root (32) = 33 bytes</span>
+<span class="jc">// Inline scriptPubKey scales with complexity:</span>
 
-<span class="jc">// Full lifecycle weight (create + spend)</span>
-<span class="jk">Single-sig:</span>    <span class="jp">359 WU → </span><span class="jn">319 WU</span> <span class="jc">(-11%)</span>
-<span class="jk">2-of-3 Multisig:</span> <span class="jp">732 WU → </span><span class="jn">528 WU</span> <span class="jc">(-28%)</span>
-<span class="jk">4-path Covenant:</span> <span class="jp">1427 WU → </span><span class="jn">383 WU</span> <span class="jc">(-73%)</span></pre>
+<span class="jk">Single SIG:</span>      <span class="jp">Inline ~42 B → </span><span class="jn">MLSC 33 B</span>
+<span class="jk">2-of-3 MULTISIG:</span> <span class="jp">Inline ~105 B → </span><span class="jn">MLSC 33 B</span>
+<span class="jk">Complex covenant:</span> <span class="jp">Inline scales → </span><span class="jn">MLSC 33 B</span>
+
+<span class="jc">// Inline is useful for debugging</span>
+<span class="jc">// MLSC is the production format</span></pre>
             </div>
           </div>
         </div>
@@ -1000,109 +983,109 @@
     </div>
   </section>
 
-  <!-- 07: Use Cases -->
+  <!-- 08: Use Cases -->
   <section id="use-cases">
     <div class="container">
-      <div class="section-num">// 07</div>
+      <div class="section-num">// 08</div>
       <h2 class="section-title">Use Cases</h2>
       <div class="section-content">
-        <p>Ladder Script enables transaction patterns that are impossible or impractical with Bitcoin Script.</p>
+        <p>59 block types across 10 families enable a wide range of transaction patterns, from single-sig to complex stateful contracts.</p>
       </div>
 
       <div class="use-case-grid">
         <div class="use-case">
           <div class="use-case-title">HYSTERESIS_FEE</div>
           <div class="use-case-desc">Fee-band gated spending. A UTXO that can only be spent when the transaction fee rate falls within a specified range, preventing overpayment during fee spikes.</div>
-          <div class="use-case-tag">PLC Family</div>
+          <div class="use-case-tag" style="color:#ff4081;background:rgba(255,64,129,0.1)">PLC Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">AMOUNT_LOCK</div>
           <div class="use-case-desc">Output amount range enforcement. Ensure the spending transaction creates outputs within a minimum and maximum satoshi range, enabling deposit/withdrawal bounds.</div>
-          <div class="use-case-tag">Covenant Family</div>
+          <div class="use-case-tag" style="color:#2979ff;background:rgba(41,121,255,0.1)">Covenant Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Post-Quantum Migration</div>
-          <div class="use-case-desc">PUBKEY_COMMIT reduces PQ keys (897–1,952 bytes) to 32-byte UTXO commitments. COSIGN lets a single PQ anchor guard unlimited classical UTXOs. Four PQ schemes: FALCON-512, FALCON-1024, Dilithium3, SPHINCS+.</div>
-          <div class="use-case-tag">Signature Family</div>
+          <div class="use-case-desc">merkle_pub_key folds PQ keys (32&ndash;1,952 bytes) into the Merkle leaf &mdash; condition fields are constant-size regardless of key algorithm. COSIGN lets a single PQ-secured UTXO co-sign for unlimited classical UTXOs. Four PQ schemes: FALCON-512, FALCON-1024, Dilithium3, SPHINCS+.</div>
+          <div class="use-case-tag" style="color:#ff1744;background:rgba(255,23,68,0.1)">Signature Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Recursive Covenants</div>
-          <div class="use-case-desc">RECURSE_SAME for perpetual re-encumbrance. RECURSE_COUNT for countdowns. RECURSE_DECAY for progressive parameter relaxation. All with provable termination.</div>
-          <div class="use-case-tag">Recursion Family</div>
+          <div class="use-case-desc">Six recursion types: RECURSE_SAME (perpetual re-encumbrance), RECURSE_MODIFIED (single mutation per spend), RECURSE_COUNT (countdown), RECURSE_SPLIT (output splitting), RECURSE_DECAY (progressive parameter relaxation), RECURSE_UNTIL (height-bounded). All with provable termination.</div>
+          <div class="use-case-tag" style="color:#aa00ff;background:rgba(170,0,255,0.1)">Recursion Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Rate-Limited Vaults</div>
           <div class="use-case-desc">RATE_LIMIT + VAULT_LOCK for time-gated withdrawal limits. ONE_SHOT for single-use emergency keys. SEQUENCER for multi-step approval flows.</div>
-          <div class="use-case-tag">PLC + Covenant</div>
+          <div class="use-case-tag" style="color:#ff4081;background:rgba(255,64,129,0.1)">PLC</div> <div class="use-case-tag" style="color:#2979ff;background:rgba(41,121,255,0.1)">Covenant</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Adaptor Signatures</div>
-          <div class="use-case-desc">ADAPTOR_SIG block type enables atomic swaps and payment channel protocols with a single block, replacing complex Script constructions.</div>
-          <div class="use-case-tag">Signature Family</div>
+          <div class="use-case-desc">ADAPTOR_SIG enables atomic swaps and payment channel protocols with a single typed block. The adaptor point and signing key are folded into the Merkle leaf via merkle_pub_key.</div>
+          <div class="use-case-tag" style="color:#ff1744;background:rgba(255,23,68,0.1)">Signature Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Aggregate Threshold Signatures</div>
           <div class="use-case-desc">MUSIG_THRESHOLD enables M-of-N multisig via MuSig2/FROST where the on-chain footprint is identical to single-sig (~131 bytes). A 3-of-5 treasury is indistinguishable from a solo wallet on-chain.</div>
-          <div class="use-case-tag">Signature Family</div>
+          <div class="use-case-tag" style="color:#ff1744;background:rgba(255,23,68,0.1)">Signature Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Protocol Anchoring</div>
-          <div class="use-case-desc">Six typed anchor blocks for Lightning channels, mining pools, reserve sets, sealed commitments, and oracle attestations. Replace ad-hoc OP_RETURN tagging.</div>
-          <div class="use-case-tag">Anchor Family</div>
+          <div class="use-case-desc">Seven typed anchor blocks for Lightning channels, mining pools, reserve sets, sealed commitments, oracle attestations, and prunable data outputs. All typed and validated at consensus.</div>
+          <div class="use-case-tag" style="color:#ffea00;background:rgba(255,234,0,0.1)">Anchor Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Structural Spam Resistance</div>
-          <div class="use-case-desc">MLSC outputs store only a 32-byte Merkle root &mdash; no conditions in the UTXO set. Fake conditions produce unspendable outputs whose data is never revealed. Typed fields with enforced size constraints eliminate free-form data pushes.</div>
+          <div class="use-case-desc">Three coordinated defenses: merkle_pub_key eliminates writable pubkey fields from conditions. Selective inversion prevents key-consuming blocks from being inverted (closes garbage-pubkey attack). Hash lock deprecation removes HASH_PREIMAGE and HASH160_PREIMAGE (closes invertible-preimage attack). MLSC outputs store only a 33-byte scriptPubKey (0xC2 + 32-byte Merkle root).</div>
           <div class="use-case-tag">Core Design</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Compound Wire Savings</div>
           <div class="use-case-desc">HTLC collapses hash + timelock + signature into one block, eliminating redundant headers. TIMELOCKED_SIG, HASH_SIG, CLTV_SIG each merge two blocks into one. PTLC collapses adaptor sig + CSV for payment channels. TIMELOCKED_MULTISIG collapses M-of-N + CSV for penalty branches and vault recovery.</div>
-          <div class="use-case-tag">Compound Family</div>
+          <div class="use-case-tag" style="color:#ffffff;background:rgba(255,255,255,0.1)">Compound Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Transaction Governance</div>
           <div class="use-case-desc">EPOCH_GATE restricts spending to periodic windows. WEIGHT_LIMIT caps transaction size. INPUT_COUNT and OUTPUT_COUNT bound I/O fanout. RELATIVE_VALUE prevents fee siphoning. ACCUMULATOR proves Merkle set membership.</div>
-          <div class="use-case-tag">Governance Family</div>
+          <div class="use-case-tag" style="color:#9e9e9e;background:rgba(158,158,158,0.1)">Governance Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Timer-Controlled Access</div>
           <div class="use-case-desc">TIMER_CONTINUOUS requires N consecutive blocks of activity before authorization. TIMER_OFF_DELAY holds spending rights for a grace period after a trigger expires. Together they implement watchdog patterns and supervised custody.</div>
-          <div class="use-case-tag">PLC Family</div>
+          <div class="use-case-tag" style="color:#ff4081;background:rgba(255,64,129,0.1)">PLC Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Approval Accumulators</div>
           <div class="use-case-desc">COUNTER_PRESET accumulates approvals from independent parties. Each approval increments via RECURSE_MODIFIED. Once the preset count is reached, funds release. Unlike MULTISIG, approvals can arrive in separate transactions.</div>
-          <div class="use-case-tag">PLC Family</div>
+          <div class="use-case-tag" style="color:#ff4081;background:rgba(255,64,129,0.1)">PLC Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Value-Band Spending</div>
           <div class="use-case-desc">HYSTERESIS_VALUE constrains output values to a band [low, high]. Prevents both dust outputs and excessive single-spend withdrawals. Useful for corporate disbursement policies and regulated fund flows.</div>
-          <div class="use-case-tag">PLC Family</div>
+          <div class="use-case-tag" style="color:#ff4081;background:rgba(255,64,129,0.1)">PLC Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Calendar-Dated Unlocks</div>
           <div class="use-case-desc">CLTV_TIME locks funds until a specific Unix timestamp rather than a block height. Ideal for grant agreements, employment vesting, and financial contracts with real-world calendar deadlines.</div>
-          <div class="use-case-tag">Timelock Family</div>
+          <div class="use-case-tag" style="color:#ff6d00;background:rgba(255,109,0,0.1)">Timelock Family</div>
         </div>
         <div class="use-case">
           <div class="use-case-title">Tagged Hash Attestation</div>
           <div class="use-case-desc">TAGGED_HASH enables BIP-340 domain-separated hash verification. Oracles, price feeds, and external data sources commit using tagged hashes, ensuring domain isolation and preventing cross-protocol replay.</div>
-          <div class="use-case-tag">Hash Family</div>
+          <div class="use-case-tag" style="color:#00e676;background:rgba(0,230,118,0.1)">Hash Family</div>
         </div>
         <div class="use-case">
-          <div class="use-case-title">Time-Bounded Recursion</div>
-          <div class="use-case-desc">RECURSE_UNTIL terminates recursive covenants at a specific block height, providing a hard lifetime bound. Unlike RECURSE_COUNT which counts spends, RECURSE_UNTIL anchors termination to consensus time.</div>
-          <div class="use-case-tag">Recursion Family</div>
+          <div class="use-case-title">UTXO Tree Splitting</div>
+          <div class="use-case-desc">RECURSE_SPLIT enables a single UTXO to split into multiple outputs, each re-encumbered with the same conditions. Enables binary tree distribution patterns for airdrops, batch payouts, and scalable covenant propagation.</div>
+          <div class="use-case-tag" style="color:#aa00ff;background:rgba(170,0,255,0.1)">Recursion Family</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 08: Try the Builder -->
+  <!-- 09: Try the Builder -->
   <section id="builder">
     <div class="container">
-      <div class="section-num">// 08</div>
+      <div class="section-num">// 09</div>
       <h2 class="section-title">Try the Builder</h2>
       <div class="section-content">
         <p>The Ladder Script Builder is a visual tool for constructing ladder transactions. Drag blocks onto rungs, configure typed fields, and see the resulting wire format in real time.</p>
@@ -1180,7 +1163,7 @@
       </div>
 
       <div style="text-align: center; margin-top: 32px;">
-        <a href="engine/index.html" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Launch Builder</a>
+        <a href="ladder-engine.html" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Launch Builder</a>
       </div>
 
       <script>
@@ -1212,10 +1195,10 @@
     </div>
   </section>
 
-  <!-- 09: Examples -->
+  <!-- 10: Examples -->
   <section id="examples">
     <div class="container">
-      <div class="section-num">// 09</div>
+      <div class="section-num">// 10</div>
       <h2 class="section-title">Examples</h2>
       <div class="section-content">
         <p>Pre-built programs from the Ladder Script Builder. Click any example to load it in the engine.</p>
@@ -1223,7 +1206,7 @@
 
       <div class="example-grid">
 
-        <a href="engine/index.html?example=0" class="example-card">
+        <a href="ladder-engine.html?example=0" class="example-card">
           <div class="example-title">2-OF-3 MULTISIG VAULT</div>
           <div class="example-desc">Corporate treasury with 2-of-3 multisig spending and a time-locked recovery path using a single backup key after 1 year.</div>
           <div class="example-rungs">
@@ -1245,15 +1228,14 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=1" class="example-card">
+        <a href="ladder-engine.html?example=1" class="example-card">
           <div class="example-title">ATOMIC SWAP (HTLC)</div>
-          <div class="example-desc">Cross-chain atomic swap via hash time-locked contract. Alice claims with preimage; Bob recovers after 144 blocks.</div>
+          <div class="example-desc">Cross-chain atomic swap via compound HTLC block. Hash + timelock + signature in a single block. Refund via CSV + SIG.</div>
           <div class="example-rungs">
             <div class="example-rung">
               <div class="example-rung-label">CLAIM</div>
               <div class="example-rail"></div><div class="example-wire"></div>
-              <div class="example-block hash">HASH_PRE</div><div class="example-wire"></div>
-              <div class="example-block sig">SIG</div><div class="example-wire"></div>
+              <div class="example-block compound">HTLC</div><div class="example-wire"></div>
               <div class="example-coil">( UNLOCK )</div>
               <div class="example-wire"></div><div class="example-rail"></div>
             </div>
@@ -1268,7 +1250,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=2" class="example-card">
+        <a href="ladder-engine.html?example=2" class="example-card">
           <div class="example-title">ADAPTOR SIG SWAP</div>
           <div class="example-desc">Schnorr adaptor signature atomic swap. On-chain adapted sig reveals the adaptor secret for the counterparty.</div>
           <div class="example-rungs">
@@ -1291,7 +1273,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=3" class="example-card">
+        <a href="ladder-engine.html?example=3" class="example-card">
           <div class="example-title">DCA COVENANT CHAIN</div>
           <div class="example-desc">Dollar-cost averaging covenant. Splits UTXO into a buy output each spend, counting down 12 purchases with recursive state.</div>
           <div class="example-rungs">
@@ -1315,7 +1297,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=4" class="example-card">
+        <a href="ladder-engine.html?example=4" class="example-card">
           <div class="example-title">VAULT WITH UNVAULT + CLAWBACK</div>
           <div class="example-desc">Bitcoin vault pattern: normal spend requires unvault delay (24h). Emergency clawback to cold key at any time.</div>
           <div class="example-rungs">
@@ -1338,7 +1320,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=5" class="example-card">
+        <a href="ladder-engine.html?example=5" class="example-card">
           <div class="example-title">RATE-LIMITED WALLET</div>
           <div class="example-desc">Daily spending cap of 50,000 sats with accumulator. Refills over 144 blocks. Two-key override for full sweep.</div>
           <div class="example-rungs">
@@ -1362,7 +1344,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=6" class="example-card">
+        <a href="ladder-engine.html?example=6" class="example-card">
           <div class="example-title">DEAD MAN'S SWITCH (INHERITANCE)</div>
           <div class="example-desc">Owner must sign within ~6 months to keep funds. On timeout, heir can claim. Resets each spend via latch.</div>
           <div class="example-rungs">
@@ -1386,7 +1368,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=7" class="example-card">
+        <a href="ladder-engine.html?example=7" class="example-card">
           <div class="example-title">ESCROW WITH ORACLE</div>
           <div class="example-desc">Buyer/seller escrow. Either party + oracle can release. Joint buyer+seller can settle directly without oracle.</div>
           <div class="example-rungs">
@@ -1419,7 +1401,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=8" class="example-card">
+        <a href="ladder-engine.html?example=8" class="example-card">
           <div class="example-title">PAYMENT CHANNEL</div>
           <div class="example-desc">Lightning-style payment channel. Cooperative close with both sigs, or unilateral close after 1-day CSV timeout.</div>
           <div class="example-rungs">
@@ -1452,7 +1434,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=9" class="example-card">
+        <a href="ladder-engine.html?example=9" class="example-card">
           <div class="example-title">SEQUENCED PAYOUT</div>
           <div class="example-desc">Multi-stage project payout. Funds release in 5 sequential milestones. Each milestone requires oracle + recipient sig.</div>
           <div class="example-rungs">
@@ -1478,7 +1460,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=10" class="example-card">
+        <a href="ladder-engine.html?example=10" class="example-card">
           <div class="example-title">FEE-GATED COVENANT</div>
           <div class="example-desc">Covenant that only allows spending when fees are 5-50 sat/vB. Prevents panic-spending during fee spikes.</div>
           <div class="example-rungs">
@@ -1502,7 +1484,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=11" class="example-card">
+        <a href="ladder-engine.html?example=11" class="example-card">
           <div class="example-title">ONE-SHOT TRIGGER + LATCH</div>
           <div class="example-desc">Single-use authorization: ONE_SHOT fires once, latching the output. The latch can only be reset by a separate key.</div>
           <div class="example-rungs">
@@ -1532,7 +1514,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=12" class="example-card">
+        <a href="ladder-engine.html?example=12" class="example-card">
           <div class="example-title">RECURSIVE SPLIT (TREE)</div>
           <div class="example-desc">Binary split covenant: UTXO splits into 2 equal children on each spend, up to 4 levels deep.</div>
           <div class="example-rungs">
@@ -1557,7 +1539,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=13" class="example-card">
+        <a href="ladder-engine.html?example=13" class="example-card">
           <div class="example-title">BLOCK-HEIGHT TIMELOCK + COMPARE</div>
           <div class="example-desc">Funds locked until block 900,000. After unlock, output amount must exceed 10,000 sats. CLTV + COMPARE combo.</div>
           <div class="example-rungs">
@@ -1573,7 +1555,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=14" class="example-card">
+        <a href="ladder-engine.html?example=14" class="example-card">
           <div class="example-title">COUNTER-UP SUBSCRIPTION</div>
           <div class="example-desc">Recurring subscription: counter increments each payment (max 24). Amount-locked to fixed payment size. Auto-renews via recursion.</div>
           <div class="example-rungs">
@@ -1606,7 +1588,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=15" class="example-card">
+        <a href="ladder-engine.html?example=15" class="example-card">
           <div class="example-title">QUANTUM-SAFE VAULT</div>
           <div class="example-desc">Post-quantum vault using FALCON-512 hot spend and Dilithium3 cold recovery after 1-year CSV. Hybrid classical+PQ path.</div>
           <div class="example-rungs">
@@ -1637,7 +1619,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=16" class="example-card">
+        <a href="ladder-engine.html?example=16" class="example-card">
           <div class="example-title">QUANTUM VAULT + CHILDREN</div>
           <div class="example-desc">PQ-secured parent vault that splits into child UTXOs via RECURSE_SPLIT. Each child inherits Falcon-512 protection.</div>
           <div class="example-rungs">
@@ -1678,7 +1660,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=17" class="example-card">
+        <a href="ladder-engine.html?example=17" class="example-card">
           <div class="example-title">MULTI-INPUT CONSOLIDATION</div>
           <div class="example-desc">Consolidates 3 UTXOs into a single output. Demonstrates multi-input rung assignment with CTV template commitment.</div>
           <div class="example-rungs">
@@ -1694,7 +1676,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=18" class="example-card">
+        <a href="ladder-engine.html?example=18" class="example-card">
           <div class="example-title">MUSIG_THRESHOLD TREASURY</div>
           <div class="example-desc">3-of-5 corporate treasury using MuSig2/FROST. On-chain looks identical to single-sig. Time-locked backup key for recovery.</div>
           <div class="example-rungs">
@@ -1716,7 +1698,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=19" class="example-card">
+        <a href="ladder-engine.html?example=19" class="example-card">
           <div class="example-title">PTLC PAYMENT CHANNEL</div>
           <div class="example-desc">Scriptless payment channel. Cooperative close via MuSig, unilateral close with PTLC adaptor sig + CSV timeout.</div>
           <div class="example-rungs">
@@ -1737,7 +1719,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=20" class="example-card">
+        <a href="ladder-engine.html?example=20" class="example-card">
           <div class="example-title">CLTV_SIG VESTING SCHEDULE</div>
           <div class="example-desc">Quarterly vesting unlocks at specific block heights using CLTV_SIG compound blocks with amount locks.</div>
           <div class="example-rungs">
@@ -1759,7 +1741,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=21" class="example-card">
+        <a href="ladder-engine.html?example=21" class="example-card">
           <div class="example-title">TIMELOCKED_MULTISIG VAULT</div>
           <div class="example-desc">Hot wallet spend, 2-of-3 board recovery after 1-week cooling period, emergency cold key sweep.</div>
           <div class="example-rungs">
@@ -1789,7 +1771,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=22" class="example-card">
+        <a href="ladder-engine.html?example=22" class="example-card">
           <div class="example-title">HTLC COMPACT SWAP</div>
           <div class="example-desc">Atomic swap using the HTLC compound block &mdash; hash + timelock + sig in a single block. Saves 16 bytes over decomposed blocks.</div>
           <div class="example-rungs">
@@ -1810,7 +1792,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=23" class="example-card">
+        <a href="ladder-engine.html?example=23" class="example-card">
           <div class="example-title">HASH_SIG ATOMIC CLAIM</div>
           <div class="example-desc">Preimage reveal + signature in one compound block. Ideal for atomic swap claim paths with hash verification and authorization together.</div>
           <div class="example-rungs">
@@ -1832,7 +1814,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=24" class="example-card">
+        <a href="ladder-engine.html?example=24" class="example-card">
           <div class="example-title">GOVERNANCE-GATED TREASURY</div>
           <div class="example-desc">Treasury restricted by governance: spending windows, I/O fanout limits, weight cap, and anti-siphon ratio enforcement.</div>
           <div class="example-rungs">
@@ -1858,7 +1840,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=25" class="example-card">
+        <a href="ladder-engine.html?example=25" class="example-card">
           <div class="example-title">ACCUMULATOR ALLOWLIST</div>
           <div class="example-desc">Merkle set membership proof. Destination must be in a pre-committed allowlist. Combines with SIG and AMOUNT_LOCK for full access control.</div>
           <div class="example-rungs">
@@ -1881,15 +1863,15 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=26" class="example-card">
+        <a href="ladder-engine.html?example=26" class="example-card">
           <div class="example-title">CLTV_TIME CALENDAR LOCK</div>
-          <div class="example-desc">Date-locked payment using absolute Unix timestamp. Funds locked until January 1, 2027. HASH160 preimage adds shared-secret gate.</div>
+          <div class="example-desc">Date-locked payment using absolute Unix timestamp. Funds locked until January 1, 2027. TAGGED_HASH adds domain-separated attestation gate.</div>
           <div class="example-rungs">
             <div class="example-rung">
               <div class="example-rung-label">UNLOCK</div>
               <div class="example-rail"></div><div class="example-wire"></div>
               <div class="example-block time">CLTV_TIME</div><div class="example-wire"></div>
-              <div class="example-block hash">HASH160</div><div class="example-wire"></div>
+              <div class="example-block hash">TAGGED</div><div class="example-wire"></div>
               <div class="example-block sig">SIG</div><div class="example-wire"></div>
               <div class="example-coil">( UNLOCK )</div>
               <div class="example-wire"></div><div class="example-rail"></div>
@@ -1905,7 +1887,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=27" class="example-card">
+        <a href="ladder-engine.html?example=27" class="example-card">
           <div class="example-title">TIMER WATCHDOG</div>
           <div class="example-desc">Continuous timer requires N consecutive blocks of activity. Off-delay holds authorization after trigger. Tagged hash proves attestation.</div>
           <div class="example-rungs">
@@ -1937,7 +1919,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=28" class="example-card">
+        <a href="ladder-engine.html?example=28" class="example-card">
           <div class="example-title">PRESET COUNTER BOARD VOTE</div>
           <div class="example-desc">Multi-party approval accumulator. Counter tracks board approvals; once preset reached, funds release. Value band limits payout size.</div>
           <div class="example-rungs">
@@ -1969,7 +1951,7 @@
           </div>
         </a>
 
-        <a href="engine/index.html?example=29" class="example-card">
+        <a href="ladder-engine.html?example=29" class="example-card">
           <div class="example-title">ANCHORED CHANNEL + RECURSE_UNTIL</div>
           <div class="example-desc">Lightning channel with anchor binding and recursive state until target block height. Bounds protocol lifetime on-chain.</div>
           <div class="example-rungs">
@@ -2012,14 +1994,14 @@
       <div class="section-num">// 10</div>
       <h2 class="section-title">Documentation</h2>
       <div class="section-content">
-        <p>Full documentation covering the BIP proposal, technical specification, MLSC Merkle specification, whitepaper, block library, integration guide, examples, and more.</p>
+        <p>Full documentation covering the BIP proposal, technical specification, MLSC Merkle specification, block library, integration guide, examples, and more.</p>
       </div>
 
       <div style="margin-top: 24px; display: flex; gap: 16px; flex-wrap: wrap;">
         <a href="docs/#SUMMARY" class="btn btn-primary" style="padding: 14px 32px; font-size: 16px;">Read the Documentation</a>
         <a href="docs/#MERKLE-UTXO-SPEC" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">MLSC Specification</a>
         <a href="docs/#BLOCKS" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Block Reference</a>
-        <a href="engine/index.html" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Open Builder</a>
+        <a href="ladder-engine.html" class="btn btn-secondary" style="padding: 14px 32px; font-size: 16px;">Open Builder</a>
       </div>
     </div>
   </section>

@@ -15,18 +15,19 @@
 
 namespace rung {
 
-/** Maximum number of rungs per ladder witness (policy, not consensus). */
-static constexpr size_t MAX_RUNGS = 16;
-/** Maximum number of blocks per rung (policy, not consensus). */
+/** Maximum number of rungs per ladder witness. */
+static constexpr size_t MAX_RUNGS = 8;
+/** Maximum number of blocks per rung. */
 static constexpr size_t MAX_BLOCKS_PER_RUNG = 8;
 /** Maximum number of fields per block. */
 static constexpr size_t MAX_FIELDS_PER_BLOCK = 16;
 /** Maximum total ladder witness size in bytes (must accommodate PQ signatures). */
 static constexpr size_t MAX_LADDER_WITNESS_SIZE = 100000;
-/** Maximum number of preimage-bearing blocks (HASH_PREIMAGE, HASH160_PREIMAGE,
- *  TAGGED_HASH) per ladder witness. Limits user-chosen data to ~504 bytes
- *  (2 * 252 bytes PREIMAGE max) while covering all legitimate use cases. */
-static constexpr size_t MAX_PREIMAGE_BLOCKS_PER_WITNESS = 2;
+/** Maximum number of PREIMAGE fields per ladder witness (consensus).
+ *  Counts all PREIMAGE-type fields across all block types including compounds
+ *  (HTLC, HASH_SIG, P2SH_LEGACY, P2WSH_LEGACY, P2TR_SCRIPT_LEGACY).
+ *  Limits user-chosen data to ~504 bytes (2 * 252 bytes PREIMAGE max). */
+static constexpr size_t MAX_PREIMAGE_FIELDS_PER_WITNESS = 2;
 /** Maximum number of relays per ladder witness. */
 static constexpr size_t MAX_RELAYS = 8;
 /** Maximum number of relay requirements per rung or relay. */

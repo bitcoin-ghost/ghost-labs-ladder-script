@@ -1,152 +1,74 @@
 # Ladder Script
 
-**Typed Structured Transaction Conditions for Bitcoin**
-
-Ladder Script is a transaction condition system that replaces Bitcoin Script's
-stack-based opcode interpreter with a typed, structured, declarative model.
-Spending conditions are organised into rungs (AND-combined blocks) and ladders
-(OR-combined rungs), following the visual and logical conventions of
-Programmable Logic Controller (PLC) ladder diagrams. Every byte in a Ladder
-Script transaction belongs to a known data type with enforced size constraints,
-eliminating arbitrary data embedding and enabling machine-verifiable
-composability of complex spending policies, covenants, post-quantum
-cryptography, and stateful smart contracts.
-
----
-
-## Document Index
-
-| Document | Description |
-|----------|-------------|
-| [SUMMARY.md](SUMMARY.md) | One-page executive summary of Ladder Script's design and capabilities |
-| [WHITEPAPER.md](WHITEPAPER.md) | Vision, motivation, and architecture: the case for structured conditions |
-| [BIP-XXXX.md](BIP-XXXX.md) | Formal Bitcoin Improvement Proposal for v4 RUNG_TX transactions |
-| [SPECIFICATION.md](SPECIFICATION.md) | Complete technical specification: wire format, evaluation rules, sighash |
-| [BLOCK_LIBRARY.md](BLOCK_LIBRARY.md) | Block type reference with field layouts, evaluation semantics, and examples |
-| [GLOSSARY.md](GLOSSARY.md) | Terminology definitions for Ladder Script concepts |
-| [EXAMPLES.md](EXAMPLES.md) | Worked examples with ASCII diagrams, JSON wire format, and evaluation walkthroughs |
-| [INTEGRATION.md](INTEGRATION.md) | Bitcoin integration guide: consensus changes, script interpreter, mempool policy |
-| [MERKLE-UTXO-SPEC.md](MERKLE-UTXO-SPEC.md) | Merkelised Ladder Script Conditions (MLSC): Merkle root outputs, witness reveal, data embedding resistance |
-| [SOFT_FORK_GUIDE.md](SOFT_FORK_GUIDE.md) | Activation strategy and deployment considerations |
-| [FAQ.md](FAQ.md) | Frequently asked questions organised by topic |
-| [REVIEW_GUIDE.md](REVIEW_GUIDE.md) | Reviewer quick-start: recommended reading order, file map, what to look for |
-
----
-
-## Quick Start
-
-1. **Open the Ladder Engine.**
-   Load `tools/ladder-engine/index.html` in a browser. The tool runs entirely
-   client-side with no build step required.
-
-2. **Load an example.**
-   Click the **EXAMPLES** button in the header bar. Select a pre-built program
-   (e.g., "2-of-3 MULTISIG VAULT" or "ATOMIC SWAP (HTLC)"). The ladder diagram
-   populates with the example's rungs, blocks, and transaction structure.
-
-3. **Export JSON.**
-   The right panel displays the `createrungtx` RPC JSON in real time. Copy the
-   JSON and submit it to a Ghost node via `ghost-cli createrungtx '<json>'` to
-   create a v4 transaction. Use `signrungtx` to sign and `sendrawtransaction`
-   to broadcast.
-
----
-
-## Block Type Overview
-
-Ladder Script defines 60 block types across 10 families. Each block evaluates a
-single spending condition within a rung.
-
-| Family | Range | Block Types |
-|--------|-------|-------------|
-| **Signature** | 0x0001-0x00FF | `SIG`, `MULTISIG`, `ADAPTOR_SIG`, `MUSIG_THRESHOLD`, `KEY_REF_SIG` |
-| **Timelock** | 0x0100-0x01FF | `CSV`, `CSV_TIME`, `CLTV`, `CLTV_TIME` |
-| **Hash** | 0x0200-0x02FF | `HASH_PREIMAGE`, `HASH160_PREIMAGE`, `TAGGED_HASH` |
-| **Covenant** | 0x0300-0x03FF | `CTV`, `VAULT_LOCK`, `AMOUNT_LOCK` |
-| **Recursion** | 0x0400-0x04FF | `RECURSE_SAME`, `RECURSE_MODIFIED`, `RECURSE_UNTIL`, `RECURSE_COUNT`, `RECURSE_SPLIT`, `RECURSE_DECAY` |
-| **Anchor** | 0x0500-0x05FF | `ANCHOR`, `ANCHOR_CHANNEL`, `ANCHOR_POOL`, `ANCHOR_RESERVE`, `ANCHOR_SEAL`, `ANCHOR_ORACLE` |
-| **PLC** | 0x0600-0x06FF | `HYSTERESIS_FEE`, `HYSTERESIS_VALUE`, `TIMER_CONTINUOUS`, `TIMER_OFF_DELAY`, `LATCH_SET`, `LATCH_RESET`, `COUNTER_DOWN`, `COUNTER_PRESET`, `COUNTER_UP`, `COMPARE`, `SEQUENCER`, `ONE_SHOT`, `RATE_LIMIT`, `COSIGN` |
-| **Compound** | 0x0700-0x07FF | `TIMELOCKED_SIG`, `HTLC`, `HASH_SIG`, `PTLC`, `CLTV_SIG`, `TIMELOCKED_MULTISIG` |
-| **Governance** | 0x0800-0x08FF | `EPOCH_GATE`, `WEIGHT_LIMIT`, `INPUT_COUNT`, `OUTPUT_COUNT`, `RELATIVE_VALUE`, `ACCUMULATOR` |
-
-Each block type accepts typed fields (PUBKEY, HASH256, NUMERIC, SCHEME, etc.)
-with enforced size constraints. See [BLOCK_LIBRARY.md](BLOCK_LIBRARY.md) for
-complete field layouts and evaluation semantics.
-
----
-
-## Data Types
-
-Every field in a Ladder Script transaction is typed. The following data types
-are defined:
-
-| Type | Byte | Size | Allowed In |
-|------|------|------|------------|
-| PUBKEY | 0x01 | 1-2048 bytes | Conditions, Witness |
-| PUBKEY_COMMIT | 0x02 | 32 bytes (fixed) | Conditions |
-| HASH256 | 0x03 | 32 bytes (fixed) | Conditions |
-| HASH160 | 0x04 | 20 bytes (fixed) | Conditions |
-| PREIMAGE | 0x05 | 1-252 bytes | Witness only |
-| SIGNATURE | 0x06 | 1-50000 bytes | Witness only |
-| SPEND_INDEX | 0x07 | 4 bytes (fixed) | Conditions |
-| NUMERIC | 0x08 | 1-4 bytes | Conditions, Witness |
-| SCHEME | 0x09 | 1 byte (fixed) | Conditions |
-
----
-
-## Evaluation Model
+A typed transaction format for Bitcoin, derived from industrial PLC ladder logic.
 
 ```
-  UTXO Output
-       |
-       |  0xC1 (Inline): conditions deserialised from scriptPubKey
-       |  0xC2 (MLSC):   Merkle root in UTXO, conditions + proof in witness
-       |
-       v
-  +-----------+
-  |  Relay 0  |--[ Block R ]--[ Block S ]-->  ◇ RELAY_A     (shared sub-condition)
-  +-----------+
-  |  Relay 1  |--[ Block T ]-->  ◇ RELAY_B                  (shared sub-condition)
-  +-----------+
-       |
-       |  Relays evaluated first; results available to all rungs via relay_refs
-       v
-  +---------+
-  | Rung 0  |--[ Block A ]--[ Block B ]--[ ◇ RELAY_A ]-->  ( ) Coil  --> SATISFIED
-  +---------+                                                   |
-       | (if any block fails)                                   |
-       v                                                        |
-  +---------+                                                   |
-  | Rung 1  |--[ Block C ]--[ ◇ RELAY_B ]-->  ( ) Coil  ------+------> SATISFIED
-  +---------+                                                   |
-       | (if any block fails)                                   |
-       v                                                        |
-  +---------+                                                   |
-  | Rung N  |--[ Block D ]-->  ( ) Coil  ---------------------+------> SATISFIED
-  +---------+                                                   |
-       |                                                        |
-       v                                                        v
-  UNSATISFIED                                          (first match wins)
-
-  Coil types:  ( ) UNLOCK   (L) LATCH   (U) UNLATCH   (M) RETENTIVE   (/) NEGATED
-  Attestation: INLINE (0xC1) or MLSC (0xC2)
-  Scheme:      SCHNORR | ECDSA | FALCON512 | FALCON1024 | DILITHIUM3 | SPHINCS_SHA
+  RUNG 0: ──[ SIG: Alice ]──[ CSV: 144 ]──────────────( UNLOCK )──
+  RUNG 1: ──[ MULTISIG: 2-of-3 ]──────────────────────( UNLOCK )──
+  RUNG 2: ──[ /CSV: 144 ]──[ SIG: Bob ]───────────────( UNLOCK )──   ← breach remedy
 ```
 
-- **AND** within a rung: all blocks must be SATISFIED.
-- **OR** across rungs: first satisfied rung wins.
-- **Relays**: shared sub-condition rungs referenced by other rungs via `relay_refs`. Evaluated first; their results cascade into referencing rungs.
-- **Inversion**: per-block flag that flips SATISFIED/UNSATISFIED.
-- **MLSC**: for `0xC2` outputs, only the exercised rung, coil, referenced relays, and Merkle proof are revealed. Unused paths stay hidden.
-- **Fail-closed**: unknown block types return UNSATISFIED.
+Bitcoin Script is a stack machine where every element is an opaque byte array. A public key, a hash, a timelock, and a JPEG are indistinguishable at the protocol level. Each new capability requires a new opcode, a soft fork, and years of coordination.
 
----
+Ladder Script replaces this with **typed function blocks** organised into **rungs**. Every byte has a declared type. Every condition is a named block with validated fields. Evaluation is deterministic: AND within rungs, OR across rungs, first satisfied rung wins. Untyped data is a parse error -- not policy, not non-standard, a *parse error*.
+
+The format is a single soft fork that subsumes OP_CTV, OP_VAULT, OP_CAT, and every pending covenant proposal as individual block types within a unified system.
+
+## What makes it different
+
+**Contact inversion.** Non-key blocks can be inverted. `[/CSV: 144]` means "spend BEFORE 144 blocks" -- a primitive Bitcoin has never had. Key-consuming blocks (SIG, MULTISIG, etc.) cannot be inverted, closing the garbage-pubkey data embedding vector. This enables breach remedies, dead man's switches, governance vetoes, and time-bounded escrows natively.
+
+**Spam is structural.** Nine data types, enforced at the deserialiser before any cryptographic operation. Conditions contain zero user-chosen bytes -- every field is a hash digest or bounded numeric. Public keys are folded into the Merkle leaf hash (merkle_pub_key), not stored in conditions. Preimage fields are limited to 2 per witness. There is no push-data opcode. If it doesn't parse as a typed field, it doesn't enter the mempool.
+
+**Post-quantum ready.** FALCON-512 signatures work today. All keys are folded into the Merkle leaf (merkle_pub_key) -- zero key bytes in the UTXO set regardless of key size. The COSIGN pattern lets a single PQ anchor protect unlimited child UTXOs.
+
+**Human readable.** A CFO can audit a ladder diagram. A PLC engineer can read it immediately. No stack simulation required.
+
+## 59 Block Types
+
+| Category | Blocks |
+|----------|--------|
+| Signature | SIG, MULTISIG, ADAPTOR_SIG, MUSIG_THRESHOLD, KEY_REF_SIG |
+| Timelock | CSV, CSV_TIME, CLTV, CLTV_TIME |
+| Hash | TAGGED_HASH |
+| Covenant | CTV, VAULT_LOCK, AMOUNT_LOCK |
+| Recursion | RECURSE_SAME, RECURSE_MODIFIED, RECURSE_UNTIL, RECURSE_COUNT, RECURSE_SPLIT, RECURSE_DECAY |
+| Anchor | ANCHOR, ANCHOR_CHANNEL, ANCHOR_POOL, ANCHOR_RESERVE, ANCHOR_SEAL, ANCHOR_ORACLE, DATA_RETURN |
+| PLC | HYSTERESIS_FEE, HYSTERESIS_VALUE, TIMER_CONTINUOUS, TIMER_OFF_DELAY, LATCH_SET, LATCH_RESET, COUNTER_DOWN, COUNTER_PRESET, COUNTER_UP, COMPARE, SEQUENCER, ONE_SHOT, RATE_LIMIT, COSIGN |
+| Compound | TIMELOCKED_SIG, HTLC, HASH_SIG, PTLC, CLTV_SIG, TIMELOCKED_MULTISIG |
+| Governance | EPOCH_GATE, WEIGHT_LIMIT, INPUT_COUNT, OUTPUT_COUNT, RELATIVE_VALUE, ACCUMULATOR |
+| Legacy | P2PK_LEGACY, P2PKH_LEGACY, P2SH_LEGACY, P2WPKH_LEGACY, P2WSH_LEGACY, P2TR_LEGACY, P2TR_SCRIPT_LEGACY |
+
+## Try it
+
+Open `tools/ladder-engine/index.html` in a browser. Load an example, switch to SIMULATE, step through evaluation. The RPC tab shows the wire-format JSON.
+
+Or use the hosted version at [bitcoinghost.org/labs/ladder-engine.html](https://bitcoinghost.org/labs/ladder-engine.html).
+
+## Repository
+
+```
+src/rung/          C++ reference implementation (20 files)
+tests/             Unit tests, fuzz target, 4 functional test suites
+patches/           Diff for applying to Bitcoin Core v30
+docs/              BIP draft, block library, examples, FAQ, glossary
+tools/             Visual builder and simulator
+proxy/             FastAPI signet proxy for live testing
+```
+
+## Documentation
+
+- [Block Library](docs/BLOCK_LIBRARY.md) -- all 59 blocks with fields and semantics
+- [BIP Draft](docs/BIP-XXXX.md) -- formal Bitcoin Improvement Proposal
+- [Examples](docs/EXAMPLES.md) -- 8 worked scenarios with JSON
+- [Implementation Notes](docs/IMPLEMENTATION_NOTES.md) -- spec deviations and why
 
 ## Links
 
 | Resource | Path |
 |----------|------|
 | Ladder Engine (visual tool) | `tools/ladder-engine/index.html` |
+| Block Reference (visual docs) | `tools/block-docs/index.html` |
 | Rung evaluator (C++) | `src/rung/evaluator.cpp` |
 | Rung types and enums | `src/rung/types.h` |
 | Conditions (de)serialization | `src/rung/conditions.cpp` |
@@ -157,9 +79,7 @@ are defined:
 | Adaptor signature support | `src/rung/adaptor.cpp` |
 | Policy validation | `src/rung/policy.cpp` |
 | Unit tests | `src/test/rung_tests.cpp` |
-| Functional tests | `test/functional/rung_basic.py` |
-| MLSC functional tests | `test/functional/rung_mlsc.py` |
-| PQ functional tests | `test/functional/rung_pq_block.py` |
-| P2P relay tests | `test/functional/rung_p2p.py` |
-| Fuzz target | `src/test/fuzz/rung_deserialize.cpp` |
-| Scenario test results | `docs/LADDER_SCRIPT_SCENARIOS.md` |
+
+## License
+
+MIT

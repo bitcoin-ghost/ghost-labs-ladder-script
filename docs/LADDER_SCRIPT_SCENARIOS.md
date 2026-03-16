@@ -467,8 +467,8 @@ size limits and semantic validation. The following tests prove each defense laye
 Even in the worst case where an attacker burns funds:
 - Max PUBKEY: 2048 bytes per field, but must start with valid prefix (02/03/04)
 - Max NUMERIC: 4 bytes per field
-- Max fields/block: 16, max blocks/rung: 8, max rungs: 16
-- Theoretical max: ~2048 × 16 × 8 × 16 ≈ 4MB per UTXO — but this exceeds
+- Max fields/block: 16, max blocks/rung: 8, max rungs: 8
+- Theoretical max: ~2048 × 16 × 8 × 8 ≈ 2MB per UTXO — but this exceeds
   standard transaction size limits. In practice, the 100KB witness limit and
   standard tx size limit cap actual data at far less, and every byte costs
   real satoshis that are permanently burned.

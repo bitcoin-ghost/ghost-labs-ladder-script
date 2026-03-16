@@ -43,24 +43,34 @@ BLOCK_FAMILY = {
 }
 
 FAMILY_COLORS = {
-    "sig":     ("#e6a817", "rgba(230, 168, 23, 0.08)", "rgba(230, 168, 23, 0.2)"),
-    "adaptor": ("#ff6b9d", "rgba(255, 107, 157, 0.08)", "rgba(255, 107, 157, 0.2)"),
-    "hash":    ("#00d4ff", "rgba(0, 212, 255, 0.08)", "rgba(0, 212, 255, 0.2)"),
-    "time":    ("#f7931a", "rgba(247, 147, 26, 0.08)", "rgba(247, 147, 26, 0.2)"),
-    "plc":     ("#a855f7", "rgba(168, 85, 247, 0.08)", "rgba(168, 85, 247, 0.2)"),
-    "cov":     ("#00d4ff", "rgba(0, 212, 255, 0.08)", "rgba(0, 212, 255, 0.2)"),
-    "rec":     ("#e6a817", "rgba(230, 168, 23, 0.08)", "rgba(230, 168, 23, 0.2)"),
-    "anchor":  ("#00ff88", "rgba(0, 255, 136, 0.08)", "rgba(0, 255, 136, 0.2)"),
-    "val":     ("#888888", "rgba(136, 136, 136, 0.08)", "rgba(136, 136, 136, 0.2)"),
+    "sig":     ("#ff1744", "rgba(255, 23, 68, 0.08)", "rgba(255, 23, 68, 0.2)"),
+    "adaptor": ("#ff1744", "rgba(255, 23, 68, 0.08)", "rgba(255, 23, 68, 0.2)"),
+    "hash":    ("#00e676", "rgba(0, 230, 118, 0.08)", "rgba(0, 230, 118, 0.2)"),
+    "time":    ("#ff6d00", "rgba(255, 109, 0, 0.08)", "rgba(255, 109, 0, 0.2)"),
+    "plc":     ("#ff4081", "rgba(255, 64, 129, 0.08)", "rgba(255, 64, 129, 0.2)"),
+    "cov":     ("#2979ff", "rgba(41, 121, 255, 0.08)", "rgba(41, 121, 255, 0.2)"),
+    "rec":     ("#aa00ff", "rgba(170, 0, 255, 0.08)", "rgba(170, 0, 255, 0.2)"),
+    "anchor":  ("#ffea00", "rgba(255, 234, 0, 0.08)", "rgba(255, 234, 0, 0.2)"),
+    "val":     ("#9e9e9e", "rgba(158, 158, 158, 0.08)", "rgba(158, 158, 158, 0.2)"),
 }
 
 FAMILY_WITNESS_COLOR = {
-    "sig": ("w-sig", "#00ff88"), "adaptor": ("w-adaptor", "#ff6b9d"),
-    "hash": ("w-hash", "#00d4ff"), "time": ("w-time", "#f7931a"),
-    "plc": ("w-plc", "#a855f7"), "cov": ("w-cov", "#00d4ff"),
-    "rec": ("w-rec", "#e6a817"), "anchor": ("w-anchor", "#00ff88"),
-    "val": ("w-val", "#888"), "overhead": ("w-overhead", "#4a4a4a"),
+    "sig": ("w-sig", "#ff1744"), "adaptor": ("w-adaptor", "#ff1744"),
+    "hash": ("w-hash", "#00e676"), "time": ("w-time", "#ff6d00"),
+    "plc": ("w-plc", "#ff4081"), "cov": ("w-cov", "#2979ff"),
+    "rec": ("w-rec", "#aa00ff"), "anchor": ("w-anchor", "#ffea00"),
+    "val": ("w-val", "#9e9e9e"), "overhead": ("w-overhead", "#4a4a4a"),
     "pubkey": ("w-pubkey", "#f7931a"), "signature": ("w-sig", "#00ff88"),
+}
+
+# PQ signature/pubkey sizes (approximate)
+PQ_WITNESS_SIZES = {
+    "DILITHIUM3":  {"pubkey": 1952, "signature": 3293},
+    "FALCON512":   {"pubkey": 897,  "signature": 690},
+    "FALCON1024":  {"pubkey": 1793, "signature": 1800},
+    "SPHINCS_SHA": {"pubkey": 32,   "signature": 49856},
+    "SCHNORR":     {"pubkey": 33,   "signature": 64},
+    "ECDSA":       {"pubkey": 33,   "signature": 72},
 }
 
 BLOCK_SHORT = {
@@ -748,7 +758,21 @@ def block_css_class(btype):
     return BLOCK_FAMILY.get(btype, "val")
 
 
-def json_highlight(obj, indent=2):
+def json_highlight(obj, indent=2, truncate_witness=True):
+    # Truncate long hex strings before serializing
+    if truncate_witness:
+        obj = copy.deepcopy(obj)
+        for vin in obj.get("vin", []):
+            wit = vin.get("txinwitness", [])
+            for i, w in enumerate(wit):
+                if isinstance(w, str) and len(w) > 128:
+                    wit[i] = w[:128] + f"...({len(w)//2} bytes total)"
+        for vout in obj.get("vout", []):
+            spk = vout.get("scriptPubKey", {})
+            for field in ("hex", "asm"):
+                val = spk.get(field, "")
+                if isinstance(val, str) and len(val) > 100:
+                    spk[field] = val[:100] + "..."
     raw = json.dumps(obj, indent=indent)
     raw = html.escape(raw)
     raw = re.sub(r'&quot;(\w+)&quot;(\s*:)', r'<span class="json-key">&quot;\1&quot;</span>\2', raw)
@@ -794,21 +818,21 @@ def generate_doc(preset, result):
     if compact_rungs:
         css_families.add("sig")
 
-    # Scheme badges
+    # Scheme badges — show block names only, no raw type codes
     scheme_badges = []
     for btype in all_block_types:
-        tc = BLOCK_TYPE_CODES.get(btype, "")
         fam = BLOCK_FAMILY.get(btype, "val")
         color, bg, border = FAMILY_COLORS.get(fam, FAMILY_COLORS["val"])
         label = BLOCK_SHORT.get(btype, btype)
-        badge_label = f"{label} &middot; TYPE {tc}" if tc else label
-        scheme_badges.append((badge_label, color, bg, border))
+        scheme_badges.append((label, color, bg, border))
     # Add scheme badge
     scheme_colors = {
         "SCHNORR": ("#00d4ff", "rgba(0, 212, 255, 0.1)", "rgba(0, 212, 255, 0.25)"),
         "ECDSA": ("#f7931a", "rgba(247, 147, 26, 0.1)", "rgba(247, 147, 26, 0.25)"),
         "FALCON512": ("#00ff88", "rgba(0, 255, 136, 0.1)", "rgba(0, 255, 136, 0.25)"),
+        "FALCON1024": ("#00ff88", "rgba(0, 255, 136, 0.1)", "rgba(0, 255, 136, 0.25)"),
         "DILITHIUM3": ("#a855f7", "rgba(168, 85, 247, 0.1)", "rgba(168, 85, 247, 0.25)"),
+        "SPHINCS_SHA": ("#ff4081", "rgba(255, 64, 129, 0.1)", "rgba(255, 64, 129, 0.25)"),
     }
     sc = scheme_colors.get(scheme, scheme_colors["SCHNORR"])
     scheme_badges.append((f"{scheme} &middot; SCHEME", sc[0], sc[1], sc[2]))
@@ -877,7 +901,8 @@ def generate_doc(preset, result):
 
                 inner_blocks = ""
                 if is_compact:
-                    inner_blocks = '<div class="rung-block" style="background: rgba(230, 168, 23, 0.1); color: #e6a817; border: 1px solid rgba(230, 168, 23, 0.2);">COMPACT_SIG</div>'
+                    sig_c, sig_bg, sig_bd = FAMILY_COLORS["sig"]
+                    inner_blocks = f'<div class="rung-block" style="background: {sig_bg}; color: {sig_c}; border: 1px solid {sig_bd};">COMPACT_SIG</div>'
                 else:
                     parts = []
                     for b in blocks:
@@ -1029,12 +1054,22 @@ def generate_doc(preset, result):
         <div class="tx-field-value highlight">{'DRY RUN' if status == 'DRY_RUN' else '1'}</div>
       </div>"""
 
-    # Witness breakdown bar
+    # Witness breakdown bar — use scheme-aware sizes
     witness_bar_html = ""
     if spend_decoded and rungs:
         target_blocks = rungs[0].get("blocks", [])
         if is_compact_eligible(target_blocks, scheme):
             target_blocks = [{"type": "SIG", "values": target_blocks[0].get("values", {})}]
+
+        # Get actual witness size from the spending TX
+        actual_witness_bytes = 0
+        spend_vin = spend_decoded.get("vin", [])
+        if spend_vin and spend_vin[0].get("txinwitness"):
+            witness_hex = spend_vin[0]["txinwitness"][0] if spend_vin[0]["txinwitness"] else ""
+            actual_witness_bytes = len(witness_hex) // 2
+
+        # Get scheme-aware sizes
+        pq_sizes = PQ_WITNESS_SIZES.get(scheme, PQ_WITNESS_SIZES["SCHNORR"])
 
         segments = [("overhead", "HDR", 4)]
         legend_items = []
@@ -1042,28 +1077,41 @@ def generate_doc(preset, result):
 
         for block in target_blocks:
             btype = block["type"]
-            wit_fields = BLOCK_WITNESS_BYTES.get(btype, [])
-            if wit_fields:
-                for fname, fbytes in wit_fields:
-                    segments.append((fname, f"{fbytes}B", fbytes))
+            # Blocks that carry signature witness
+            if btype in ("SIG", "ADAPTOR_SIG", "MUSIG_THRESHOLD", "TIMELOCKED_SIG",
+                         "CLTV_SIG", "VAULT_LOCK", "PTLC", "TIMELOCKED_MULTISIG"):
+                segments.append(("pubkey", f"{pq_sizes['pubkey']}B", pq_sizes["pubkey"]))
+                segments.append(("signature", f"{pq_sizes['signature']}B", pq_sizes["signature"]))
+            elif btype in ("HTLC", "HASH_SIG"):
+                segments.append(("pubkey", f"{pq_sizes['pubkey']}B", pq_sizes["pubkey"]))
+                segments.append(("signature", f"{pq_sizes['signature']}B", pq_sizes["signature"]))
+                segments.append(("hash", "32B", 32))
+            elif btype in ("MULTISIG",):
+                # Variable — use actual witness minus overhead
+                pass
             else:
-                fam = BLOCK_FAMILY.get(btype, "val")
-                short = BLOCK_SHORT.get(btype, btype)
-                segments.append((fam, short[:3], 1))
+                wit_fields = BLOCK_WITNESS_BYTES.get(btype, [])
+                if wit_fields:
+                    for fname, fbytes in wit_fields:
+                        segments.append((fname, f"{fbytes}B", fbytes))
+                # Validation-only blocks contribute 0 bytes — skip
 
         segments.append(("overhead", "COIL", 6))
 
         # Build witness bar
         total = sum(s[2] for s in segments)
         witness_bar_html = '<div class="doc-section">\n  <div class="section-label">Spending Witness Breakdown</div>\n'
-        witness_bar_html += '  <p class="section-text">The ladder witness provides data for each block in the rung. Blocks that need no witness data (validation-only blocks) contribute zero bytes.</p>\n'
+        witness_bar_html += f'  <p class="section-text">The ladder witness carries data for each block in the rung. Total witness: <strong>{actual_witness_bytes:,} bytes</strong>.'
+        if scheme not in ("SCHNORR", "ECDSA"):
+            witness_bar_html += f' {scheme} keys and signatures are larger than classical Schnorr ({pq_sizes["pubkey"]:,}B pubkey + {pq_sizes["signature"]:,}B signature).'
+        witness_bar_html += '</p>\n'
         witness_bar_html += '  <div class="witness-bar">\n'
         for seg_type, seg_label, seg_bytes in segments:
             color_map = {
                 "pubkey": "#f7931a", "signature": "#00ff88", "hash": "#00d4ff",
-                "overhead": "#4a4a4a", "plc": "#a855f7", "rec": "#e6a817",
-                "cov": "#00d4ff", "time": "#f7931a", "sig": "#00ff88",
-                "adaptor": "#ff6b9d", "anchor": "#00ff88", "val": "#888",
+                "overhead": "#4a4a4a", "plc": "#ff4081", "rec": "#aa00ff",
+                "cov": "#2979ff", "time": "#ff6d00", "sig": "#ff1744",
+                "adaptor": "#ff1744", "anchor": "#ffea00", "val": "#9e9e9e",
             }
             color = color_map.get(seg_type, "#4a4a4a")
             flex = max(seg_bytes, 1)
@@ -1081,8 +1129,12 @@ def generate_doc(preset, result):
     # Verification grid
     verify_html = ""
     if fund_decoded and spend_decoded:
-        fund_vout_0 = fund_decoded.get("vout", [{}])[0]
-        input_sats = round(float(fund_vout_0.get("value", 0)) * 1e8)
+        # Determine which fund vout was actually spent
+        spend_vin = spend_decoded.get("vin", [])
+        spent_vout_idx = spend_vin[0].get("vout", 0) if spend_vin else 0
+        fund_vouts = fund_decoded.get("vout", [{}])
+        fund_vout_spent = fund_vouts[spent_vout_idx] if spent_vout_idx < len(fund_vouts) else fund_vouts[0]
+        input_sats = round(float(fund_vout_spent.get("value", 0)) * 1e8)
         total_spend_out = sum(round(float(vo.get("value", 0)) * 1e8) for vo in spend_decoded.get("vout", []))
         fee_sats = input_sats - total_spend_out if input_sats > total_spend_out else 0
 
@@ -1110,7 +1162,7 @@ def generate_doc(preset, result):
         verify_html += f"""    <div class="verify-item">
       <div class="verify-label">Input Amount</div>
       <div class="verify-value">{input_sats:,} sats</div>
-      <div class="verify-check">vout[0] of fund TX</div>
+      <div class="verify-check">vout[{spent_vout_idx}] of fund TX</div>
     </div>
     <div class="verify-item">
       <div class="verify-label">Output Amount</div>
@@ -1273,7 +1325,8 @@ def generate_doc(preset, result):
 <!-- Rung Diagram -->
 <div class="doc-section">
   <div class="section-label">Rung Structure</div>
-  <p class="section-text">{esc(rung_desc) if rung_desc else f'{len(rungs)} rung(s) define the spending conditions.'}</p>
+  <p class="section-text" style="margin-bottom: 8px;">{esc(rung_desc) if rung_desc else f'{len(rungs)} rung(s) define the spending conditions.'}</p>
+  <p class="section-text" style="font-size: 12px; color: #666; margin-bottom: 12px;">Each row is a <strong style="color: #aaa;">rung</strong> (spending path). Rungs are <strong style="color: #aaa;">OR</strong> &mdash; satisfy any one rung to spend. Blocks within a rung are joined by <span style="color: #444; font-weight: 600;">+</span> meaning <strong style="color: #aaa;">AND</strong> &mdash; all must pass.</p>
 
   <div class="rung-diagram">
 {rung_diagram_html}  </div>

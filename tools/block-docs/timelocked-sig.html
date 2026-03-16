@@ -36,18 +36,18 @@
       <line x1="20" y1="10" x2="20" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <line x1="600" y1="10" x2="600" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <!-- Wire -->
-      <line x1="20" y1="60" x2="140" y2="60" stroke="#e6a817" stroke-width="2"/>
-      <line x1="460" y1="60" x2="600" y2="60" stroke="#e6a817" stroke-width="2"/>
+      <line x1="20" y1="60" x2="140" y2="60" stroke="#ff1744" stroke-width="2"/>
+      <line x1="460" y1="60" x2="600" y2="60" stroke="#ff1744" stroke-width="2"/>
       <!-- Block body -->
-      <rect x="140" y="20" width="320" height="80" rx="2" fill="#2a2a2a" stroke="#e6a817" stroke-width="1.5"/>
+      <rect x="140" y="20" width="320" height="80" rx="2" fill="#2a2a2a" stroke="#ff1744" stroke-width="1.5"/>
       <!-- Block label -->
-      <text x="300" y="38" text-anchor="middle" fill="#e6a817" font-family="Share Tech Mono" font-size="13" letter-spacing="2">TIMELOCKED_SIG</text>
+      <text x="300" y="38" text-anchor="middle" fill="#ff1744" font-family="Share Tech Mono" font-size="13" letter-spacing="2">TIMELOCKED_SIG</text>
       <!-- Internal components -->
       <rect x="160" y="48" width="130" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="225" y="66" text-anchor="middle" fill="#2d7dd2" font-family="IBM Plex Mono" font-size="10" font-weight="600">SIG VERIFY</text>
+      <text x="225" y="66" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="10" font-weight="600">SIG VERIFY</text>
       <text x="300" y="66" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="12">+</text>
       <rect x="310" y="48" width="130" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="375" y="66" text-anchor="middle" fill="#39a5b7" font-family="IBM Plex Mono" font-size="10" font-weight="600">CSV CHECK</text>
+      <text x="375" y="66" text-anchor="middle" fill="#ff6d00" font-family="IBM Plex Mono" font-size="10" font-weight="600">CSV CHECK</text>
       <!-- Annotation -->
       <text x="300" y="125" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">Both must pass for block to be SATISFIED</text>
     </svg>
@@ -70,6 +70,13 @@
         <td class="field-desc">SHA-256 commitment to the signing public key</td>
       </tr>
       <tr>
+        <td class="field-name">scheme</td>
+        <td class="field-type">SCHEME</td>
+        <td class="field-size">1 B</td>
+        <td class="field-side-c">Conditions</td>
+        <td class="field-desc">Signature scheme identifier (0x01 = Schnorr, 0x02 = ECDSA). Routes to post-quantum verifier when PQ scheme set.</td>
+      </tr>
+      <tr>
         <td class="field-name">timelock</td>
         <td class="field-type">NUMERIC</td>
         <td class="field-size">1-4 B</td>
@@ -90,13 +97,6 @@
         <td class="field-side-w">Witness</td>
         <td class="field-desc">Schnorr signature (64B) or with sighash byte (65B)</td>
       </tr>
-      <tr>
-        <td class="field-name">scheme</td>
-        <td class="field-type">SCHEME</td>
-        <td class="field-size">1 B</td>
-        <td class="field-side-w">Witness (opt)</td>
-        <td class="field-desc">Optional PQ signature scheme identifier for post-quantum routing</td>
-      </tr>
     </tbody>
   </table>
 </div>
@@ -110,10 +110,11 @@
     <div class="wire-row">
       <span class="wire-segment wire-type" style="min-width:60px">0x0701</span>
       <span class="wire-segment wire-inv">0</span>
-      <span class="wire-segment wire-count">2</span>
+      <span class="wire-segment wire-count">3</span>
       <span class="wire-segment wire-field-pubkey" style="min-width:160px">PUBKEY_COMMIT &middot; 32B</span>
+      <span class="wire-segment wire-field-sig" style="min-width:80px">SCHEME &middot; 1B</span>
       <span class="wire-segment wire-field-num" style="min-width:100px">NUMERIC &middot; 3B</span>
-      <span class="wire-bytes">= 43 bytes</span>
+      <span class="wire-bytes">= 44 bytes</span>
     </div>
   </div>
 
@@ -130,7 +131,7 @@
 
     <div class="wire-total">
       <span class="wire-total-label">Total (conditions + witness)</span>
-      <span class="wire-total-bytes">149 bytes</span>
+      <span class="wire-total-bytes">150 bytes</span>
     </div>
   </div>
 
@@ -196,6 +197,7 @@
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
     { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"SCHEME"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"01"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">144</span> }
   ]
 }</pre></div>
@@ -206,7 +208,8 @@
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
     { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"SIGNATURE"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"30440...64 bytes"</span> }
+    { <span class="json-key">"type"</span>: <span class="json-str">"SIGNATURE"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"30440...64 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">144</span> }
   ]
 }</pre></div>
 </div>

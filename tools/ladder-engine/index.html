@@ -2324,7 +2324,7 @@ const { useState, useReducer, useContext, useCallback, useMemo, useRef, useEffec
 
 const BLOCK_FAMILIES = [
   {
-    name: 'SIGNATURE', color: '#e6a817',
+    name: 'SIGNATURE', color: '#ff1744',
     blocks: [
       { type: 'SIG', label: 'SIG', desc: 'Single signature check — Schnorr, ECDSA, or post-quantum', fields: [
         { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '02abcdef...' },
@@ -2351,7 +2351,7 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'TIMELOCK', color: '#2d7dd2',
+    name: 'TIMELOCK', color: '#ff6d00',
     blocks: [
       { type: 'CSV', label: 'CSV', desc: 'Relative timelock in blocks (BIP-68)', fields: [
         { name: 'blocks', dataType: 'NUMERIC', label: 'Blocks', placeholder: '144' }
@@ -2368,15 +2368,15 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'HASH', color: '#39a5b7',
+    name: 'HASH', color: '#00e676',
     blocks: [
-      { type: 'HASH_PREIMAGE', label: 'HASH_PRE', desc: 'SHA-256 hash preimage reveal — provide preimage, node computes hash', fields: [
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Preimage (secret)', placeholder: 'Hex data — node computes SHA256 hash commitment' },
-        { name: 'hash', dataType: 'HASH256', label: 'Hash (read-only)', placeholder: 'Auto-computed by node from preimage', computed: true }
+      { type: 'HASH_PREIMAGE', label: 'HASH_PRE', desc: 'DEPRECATED: Use HTLC or HASH_SIG instead', deprecated: true, fields: [
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Preimage (secret)', placeholder: 'Hex data' },
+        { name: 'hash', dataType: 'HASH256', label: 'Hash (read-only)', placeholder: 'Auto-computed', computed: true }
       ]},
-      { type: 'HASH160_PREIMAGE', label: 'HASH160', desc: 'HASH160 preimage reveal — provide preimage, node computes hash', fields: [
-        { name: 'preimage', dataType: 'PREIMAGE', label: 'Preimage (secret)', placeholder: 'Hex data — node computes HASH160 commitment' },
-        { name: 'hash', dataType: 'HASH160', label: 'Hash (read-only)', placeholder: 'Auto-computed by node from preimage', computed: true }
+      { type: 'HASH160_PREIMAGE', label: 'HASH160', desc: 'DEPRECATED: Use HTLC or HASH_SIG instead', deprecated: true, fields: [
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Preimage (secret)', placeholder: 'Hex data' },
+        { name: 'hash', dataType: 'HASH160', label: 'Hash (read-only)', placeholder: 'Auto-computed', computed: true }
       ]},
       { type: 'TAGGED_HASH', label: 'TAGGED', desc: 'BIP-340 tagged hash verification', fields: [
         { name: 'tag', dataType: 'HASH256', label: 'Tag Hash', placeholder: '32-byte hex' },
@@ -2385,7 +2385,7 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'COVENANT', color: '#2ea043',
+    name: 'COVENANT', color: '#2979ff',
     blocks: [
       { type: 'CTV', label: 'CTV', desc: 'CheckTemplateVerify covenant (BIP-119)', fields: [
         { name: 'template_hash', dataType: 'HASH256', label: 'Template Hash', placeholder: '32-byte hex' }
@@ -2402,7 +2402,7 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'RECURSION', color: '#a855f7',
+    name: 'RECURSION', color: '#aa00ff',
     blocks: [
       { type: 'RECURSE_SAME', label: 'REC_SAME', desc: 'Re-encumber output with identical conditions', fields: [
         { name: 'max_depth', dataType: 'NUMERIC', label: 'Max Depth', placeholder: '10' }
@@ -2432,7 +2432,7 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'ANCHOR', color: '#888888',
+    name: 'ANCHOR', color: '#ffea00',
     blocks: [
       { type: 'ANCHOR', label: 'ANCHOR', desc: 'Generic protocol anchor tag', fields: [
         { name: 'data', dataType: 'HASH256', label: 'Data', placeholder: '32-byte hex' }
@@ -2456,10 +2456,13 @@ const BLOCK_FAMILIES = [
       { type: 'ANCHOR_ORACLE', label: 'A_ORACLE', desc: 'Oracle attestation anchor', fields: [
         { name: 'oracle_pk', dataType: 'PUBKEY', label: 'Oracle Key', placeholder: '02abc...' }
       ]},
+      { type: 'DATA_RETURN', label: 'DATA_RET', desc: 'On-chain data (max 80 bytes) appended to MLSC output, replaces OP_RETURN', fields: [
+        { name: 'data', dataType: 'DATA', label: 'Data', placeholder: 'hex data (max 80 bytes)' }
+      ]},
     ]
   },
   {
-    name: 'PLC', color: '#c43030',
+    name: 'PLC', color: '#ff4081',
     blocks: [
       { type: 'HYSTERESIS_FEE', label: 'HYST_FEE', desc: 'Fee rate band constraint [low, high] sat/vB', fields: [
         { name: 'high_sat_vb', dataType: 'NUMERIC', label: 'High (sat/vB)', placeholder: '100' },
@@ -2522,7 +2525,7 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'COMPOUND', color: '#f59e0b',
+    name: 'COMPOUND', color: '#ffffff',
     blocks: [
       { type: 'TIMELOCKED_SIG', label: 'TL_SIG', desc: 'SIG + CSV combined — signature with relative timelock', fields: [
         { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '02abcdef...' },
@@ -2560,7 +2563,7 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'GOVERNANCE', color: '#8b5cf6',
+    name: 'GOVERNANCE', color: '#9e9e9e',
     blocks: [
       { type: 'EPOCH_GATE', label: 'EPOCH', desc: 'Periodic spending window — spendable only in epoch windows', fields: [
         { name: 'epoch_size', dataType: 'NUMERIC', label: 'Epoch Size (blocks)', placeholder: '2016' },
@@ -2588,7 +2591,7 @@ const BLOCK_FAMILIES = [
     ]
   },
   {
-    name: 'LEGACY', color: '#e91e90',
+    name: 'LEGACY', color: '#00e5ff',
     blocks: [
       { type: 'P2PK_LEGACY', label: 'P2PK', desc: 'P2PK wrapped — public key + signature verification (same as SIG)', fields: [
         { name: 'pubkey', dataType: 'PUBKEY', label: 'Public Key', placeholder: '33-byte compressed pubkey hex' },
@@ -2601,7 +2604,7 @@ const BLOCK_FAMILIES = [
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
       { type: 'P2SH_LEGACY', label: 'P2SH', desc: 'P2SH wrapped — provide inner conditions, node computes HASH160', fields: [
-        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 10KB) — node computes HASH160' },
+        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 520 bytes) — node computes HASH160' },
         { name: 'hash160', dataType: 'HASH160', label: 'Script Hash (read-only)', placeholder: 'Auto-computed by node from inner conditions', computed: true }
       ]},
       { type: 'P2WPKH_LEGACY', label: 'P2WPKH', desc: 'P2WPKH wrapped — provide pubkey, node computes HASH160 (segwit version)', fields: [
@@ -2610,7 +2613,7 @@ const BLOCK_FAMILIES = [
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
       { type: 'P2WSH_LEGACY', label: 'P2WSH', desc: 'P2WSH wrapped — provide inner conditions, node computes SHA256', fields: [
-        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 10KB) — node computes SHA256' },
+        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 520 bytes) — node computes SHA256' },
         { name: 'hash256', dataType: 'HASH256', label: 'Script Hash (read-only)', placeholder: 'Auto-computed by node from inner conditions', computed: true }
       ]},
       { type: 'P2TR_LEGACY', label: 'P2TR', desc: 'P2TR key-path wrapped — public key + signature (same as SIG)', fields: [
@@ -2619,9 +2622,9 @@ const BLOCK_FAMILIES = [
         { name: 'scheme', dataType: 'SCHEME', label: 'Scheme', placeholder: '01=Schnorr', optional: true }
       ]},
       { type: 'P2TR_SCRIPT_LEGACY', label: 'P2TR_S', desc: 'P2TR script-path wrapped — provide inner conditions + internal key, node computes hashes', fields: [
-        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Script Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 10KB) — node computes Merkle root' },
+        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Script Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 520 bytes) — node computes Merkle root' },
         { name: 'hash256', dataType: 'HASH256', label: 'Script Tree Root (read-only)', placeholder: 'Auto-computed by node from script leaf', computed: true },
-        { name: 'internal_key', dataType: 'PUBKEY', label: 'Internal Public Key', placeholder: '33-byte compressed pubkey (node computes PUBKEY_COMMIT)' }
+        { name: 'internal_key', dataType: 'PUBKEY', label: 'Internal Public Key', placeholder: '33-byte compressed pubkey (folded into Merkle leaf)' }
       ]},
     ]
   },
@@ -2641,13 +2644,14 @@ ALL_BLOCK_DEFS['OUTPUT_REF'] = OUTPUT_REF_BLOCK;
 function getBlockDef(type) { return ALL_BLOCK_DEFS[type] || { type, label: type, fields: [], familyColor: '#888' }; }
 
 const DATA_TYPE_SIZES = {
-  PUBKEY: { min: 1, max: 2048, note: 'Witness-only. 32B x-only, 33B compressed, or PQ up to 1793B. Conditions use PUBKEY_COMMIT.' },
-  PUBKEY_COMMIT: { min: 32, max: 32, note: 'SHA-256 commitment to a public key' },
+  PUBKEY: { min: 1, max: 2048, note: 'Witness-only. 32B x-only, 33B compressed, or PQ up to 1793B. Folded into Merkle leaf.' },
+  PUBKEY_COMMIT: { min: 32, max: 32, note: 'Reserved. No longer used in conditions or witness (merkle_pub_key).' },
   HASH256: { min: 32, max: 32, note: 'SHA-256 digest' },
   HASH160: { min: 20, max: 20, note: 'RIPEMD160(SHA256()) digest' },
   PREIMAGE: { min: 1, max: 252, note: 'Hash preimage (witness only)' },
-  SCRIPT_BODY: { min: 1, max: 10000, note: 'Serialized inner conditions for P2SH/P2WSH/P2TR_SCRIPT (witness only, exceeds PREIMAGE 252B limit)' },
-  SIGNATURE: { min: 1, max: 50000, note: 'Schnorr 64-65B, ECDSA 8-72B, PQ up to ~3300B' },
+  SCRIPT_BODY: { min: 1, max: 520, note: 'Serialized inner conditions for P2SH/P2WSH/P2TR_SCRIPT (witness only)' },
+  SIGNATURE: { min: 1, max: 50000, note: 'Schnorr 64-65B, ECDSA 8-72B, PQ up to ~49216B' },
+  DATA: { min: 1, max: 80, note: 'Raw data for DATA_RETURN. Appended to MLSC scriptPubKey (0x0B)' },
   SPEND_INDEX: { min: 4, max: 4, note: 'uint32 LE index reference' },
   NUMERIC: { min: 1, max: 4, note: 'Unsigned 32-bit integer, little-endian' },
   SCHEME: { min: 1, max: 1, note: 'Signature scheme selector byte' },
@@ -2655,17 +2659,17 @@ const DATA_TYPE_SIZES = {
 };
 
 const BLOCK_RULES = {
-  SIG: 'Verifies a single signature against the public key. Schnorr (64-65B) or ECDSA (8-72B) detected by size. With PUBKEY_COMMIT, the key must hash to the commitment (commit-reveal for PQ migration). With SCHEME field, routes to PQ verification.',
+  SIG: 'Verifies a single signature against the public key. Schnorr (64-65B) or ECDSA (8-72B) detected by size. Pubkey folded into Merkle leaf (merkle_pub_key). With SCHEME field, routes to PQ verification.',
   MULTISIG: 'M-of-N threshold: first NUMERIC is M, followed by N public keys and signatures. Exactly M valid signatures from distinct keys required.',
   ADAPTOR_SIG: 'Adaptor signature verification for atomic swaps. Second PUBKEY is the adaptor point T. Signature verified under combined challenge H(R+T || P || m).',
   MUSIG_THRESHOLD: 'MuSig2/FROST aggregate threshold signature. M-of-N signers produce a single Schnorr signature off-chain. On-chain footprint identical to single-sig. Schnorr-only (no PQ path).',
-  KEY_REF_SIG: 'Signature using a key commitment from a relay block. References PUBKEY_COMMIT + SCHEME from relays[relay_index].blocks[block_index]. Saves ~30 bytes per rung vs duplicating the commitment. The rung must declare relay_refs including the referenced relay.',
+  KEY_REF_SIG: 'Signature using a key from a relay block. References the pubkey folded into the relay Merkle leaf. Saves ~30 bytes per rung vs duplicating the key. The rung must declare relay_refs including the referenced relay.',
   CSV: 'Relative timelock in blocks (BIP-68). Satisfied when input sequence meets the required delay. Disable flag bypasses check.',
   CSV_TIME: 'Relative timelock in seconds (BIP-68 time-based). Same logic as CSV but with time flag.',
   CLTV: 'Absolute timelock by block height (BIP-65). Satisfied when nLockTime >= specified height.',
   CLTV_TIME: 'Absolute timelock by median-time-past. Same logic as CLTV but compared against MTP.',
-  HASH_PREIMAGE: 'Satisfied when SHA256(preimage) equals the committed hash.',
-  HASH160_PREIMAGE: 'Satisfied when RIPEMD160(SHA256(preimage)) equals the committed hash.',
+  HASH_PREIMAGE: 'DEPRECATED. Rejected at consensus. Use HTLC (hash + dual-key + timelock) or HASH_SIG (hash + signature) instead.',
+  HASH160_PREIMAGE: 'DEPRECATED. Rejected at consensus. Use HTLC (hash + dual-key + timelock) or HASH_SIG (hash + signature) instead.',
   TAGGED_HASH: 'BIP-340 tagged hash: SHA256(tag || tag || preimage) must equal expected hash.',
   CTV: 'BIP-119 CheckTemplateVerify. Spending transaction must match the committed template hash exactly.',
   VAULT_LOCK: 'Two-path vault: recovery key sweeps immediately, hot key requires CSV delay. No SIGNATURE = ERROR.',
@@ -2682,6 +2686,7 @@ const BLOCK_RULES = {
   ANCHOR_RESERVE: 'Reserve anchor: N-of-M guardian set. Requires N <= M.',
   ANCHOR_SEAL: 'Seal anchor: permanently binds UTXO to a data commitment.',
   ANCHOR_ORACLE: 'Oracle anchor: requires oracle pubkey and quorum count.',
+  DATA_RETURN: 'On-chain data (max 80 bytes) appended to MLSC output (0xC2 + root + data). Visible at fund time. Replaces OP_RETURN at 4 WU/byte. Max 1 per tx, zero-value.',
   HYSTERESIS_FEE: 'Satisfied when tx fee rate falls within [low, high] sat/vB.',
   HYSTERESIS_VALUE: 'Satisfied when output amount falls within [low, high] sats.',
   TIMER_CONTINUOUS: 'Satisfied when accumulated >= target blocks.',
@@ -2700,13 +2705,13 @@ const BLOCK_RULES = {
   CLTV_SIG: 'SIG + CLTV combined. Signature verification with absolute block-height timelock. Saves 8 bytes vs separate blocks.',
   TIMELOCKED_MULTISIG: 'MULTISIG + CSV combined. M-of-N threshold signatures with relative timelock. Used for penalty branches and vault recovery.',
   OUTPUT_REF: 'References a named output coil from another rung.',
-  P2PK_LEGACY: 'Legacy P2PK wrapped as a Ladder Script block. Same evaluation as SIG — PUBKEY_COMMIT verified, then Schnorr/ECDSA/PQ signature check. Closes arbitrary data surfaces by requiring typed fields.',
+  P2PK_LEGACY: 'Legacy P2PK wrapped as a Ladder Script block. Same evaluation as SIG. Pubkey folded into Merkle leaf, then Schnorr/ECDSA/PQ signature check. Closes arbitrary data surfaces by requiring typed fields.',
   P2PKH_LEGACY: 'Legacy P2PKH wrapped. Computes HASH160(pubkey) and compares to the committed hash. If match, verifies signature. Bridges legacy pay-to-pubkey-hash semantics into typed fields.',
-  P2SH_LEGACY: 'Legacy P2SH wrapped. HASH160 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 10KB) that are deserialized and evaluated. Prevents arbitrary script embedding.',
+  P2SH_LEGACY: 'Legacy P2SH wrapped. HASH160 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 520 bytes) that are deserialized and evaluated. Prevents arbitrary script embedding.',
   P2WPKH_LEGACY: 'Legacy P2WPKH wrapped. Identical evaluation to P2PKH — HASH160(pubkey) check + signature verify. Represents the segwit migration path.',
-  P2WSH_LEGACY: 'Legacy P2WSH wrapped. SHA256 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 10KB). Same pattern as P2SH but with SHA256 hash.',
+  P2WSH_LEGACY: 'Legacy P2WSH wrapped. SHA256 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 520 bytes). Same pattern as P2SH but with SHA256 hash.',
   P2TR_LEGACY: 'Legacy P2TR key-path wrapped. Same evaluation as SIG — key-path Taproot spend with typed fields. Closes key-path data surfaces.',
-  P2TR_SCRIPT_LEGACY: 'Legacy P2TR script-path wrapped. HASH256 is Merkle root of script tree, PUBKEY_COMMIT is internal key. Revealed leaf (SCRIPT_BODY) must be valid Ladder Script conditions (up to 10KB). Closes the primary inscription/data-embedding vector.',
+  P2TR_SCRIPT_LEGACY: 'Legacy P2TR script-path wrapped. HASH256 is Merkle root of script tree, internal key folded into Merkle leaf. Revealed leaf (SCRIPT_BODY) must be valid Ladder Script conditions (up to 520 bytes). Closes the primary inscription/data-embedding vector.',
 };
 
 // Realistic test data for every block type — deterministic fake keys/hashes
@@ -2732,7 +2737,7 @@ function uid() { return ++_id; }
 // Block types that support inner conditions (script-hash legacy blocks)
 const INNER_CONDITION_TYPES = new Set(['P2SH_LEGACY', 'P2WSH_LEGACY', 'P2TR_SCRIPT_LEGACY']);
 // Block types allowed as inner conditions (no recursion, no complex compound types)
-const ALLOWED_INNER_TYPES = ['SIG', 'MULTISIG', 'HASH_PREIMAGE', 'HASH160_PREIMAGE', 'CSV', 'CLTV', 'CSV_TIME', 'CLTV_TIME', 'TIMELOCKED_SIG', 'CLTV_SIG'];
+const ALLOWED_INNER_TYPES = ['SIG', 'MULTISIG', 'CSV', 'CLTV', 'CSV_TIME', 'CLTV_TIME', 'TIMELOCKED_SIG', 'CLTV_SIG'];
 
 function createBlock(type) {
   const def = getBlockDef(type);
@@ -3474,8 +3479,8 @@ function validateLadder(rungs, txInputs, txOutputs, locktime) {
   if (rungs.length === 0 || (rungs.length === 1 && rungs[0].blocks.length === 0)) {
     errors.push('No conditions defined — add at least one block to a rung');
   }
-  if (rungs.length > 16) {
-    errors.push(`${rungs.length} rungs exceeds maximum of 16`);
+  if (rungs.length > 8) {
+    errors.push(`${rungs.length} rungs exceeds maximum of 8`);
   }
 
   // Track which outputs have at least one rung assigned
@@ -4010,7 +4015,7 @@ function wireFieldsToValues(wireBlock) {
       values[fd.name] = wf.hex;
       fi++;
     } else if (wf.type === 'PUBKEY_COMMIT') {
-      // PUBKEY_COMMIT from wire — store the commit hash (read-only in UI)
+      // Legacy PUBKEY_COMMIT from wire decode (no longer produced, but may appear in old data)
       values[fd.name] = wf.hex;
       fi++;
     } else if (fd.dataType === 'PREIMAGE' && wf.type === 'PREIMAGE') {
@@ -5271,9 +5276,9 @@ function LadderView({ scanSequence, fullSimState, energizedOutputs, energizedRun
     const blocks = [...r.blocks, newBlock].sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
     return { ...r, blocks };
   }) }), [dispatch]);
-  const onAddRung = useCallback(() => dispatch({ type: 'UPDATE_RUNGS', fn: prev => prev.length >= 16 ? prev : [...prev, createRung()] }), [dispatch]);
+  const onAddRung = useCallback(() => dispatch({ type: 'UPDATE_RUNGS', fn: prev => prev.length >= 8 ? prev : [...prev, createRung()] }), [dispatch]);
   const onAddRungWithBlock = useCallback((blockType) => dispatch({ type: 'UPDATE_RUNGS', fn: prev => {
-    if (prev.length >= 16) return prev;
+    if (prev.length >= 8) return prev;
     const rung = createRung(); rung.blocks = [createBlock(blockType)]; return [...prev, rung];
   } }), [dispatch]);
   const onAddChangeRung = useCallback(() => dispatch({ type: 'ADD_CHANGE_RUNG', outputId: uid() }), [dispatch]);
@@ -5565,7 +5570,7 @@ function LadderView({ scanSequence, fullSimState, energizedOutputs, energizedRun
               />
             ))
           )}
-          {!simMode && rungs.length < 16 && <div
+          {!simMode && rungs.length < 8 && <div
             className="add-rung-btn"
             onClick={onAddRung}
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; e.currentTarget.style.borderColor = 'var(--amber)'; e.currentTarget.style.color = 'var(--amber)'; }}
@@ -5591,9 +5596,9 @@ const FIELD_TOOLTIP = {
   HASH256: 'SHA-256 hash — 32 bytes (64 hex chars)',
   HASH160: 'HASH160 = RIPEMD160(SHA256(data)) — 20 bytes (40 hex chars)',
   PREIMAGE: 'Preimage data that hashes to the commitment — revealed at spend time (max 252 bytes)',
-  SCRIPT_BODY: 'Serialized inner conditions — up to 10KB, used for P2SH/P2WSH/P2TR_SCRIPT inner scripts',
+  SCRIPT_BODY: 'Serialized inner conditions — up to 520 bytes, used for P2SH/P2WSH/P2TR_SCRIPT inner scripts',
   SCHEME: 'Signature scheme — SCHNORR (default), ECDSA, or post-quantum (FALCON, DILITHIUM, SPHINCS+)',
-  PUBKEY_COMMIT: 'SHA-256 commitment to a public key — computed automatically by the node',
+  PUBKEY_COMMIT: 'Reserved. No longer used (pubkeys folded into Merkle leaf).',
   BLOCK_HEIGHT: 'Bitcoin block height — e.g. 860000',
   TIMESTAMP: 'Unix timestamp in seconds — e.g. 1700000000',
   BLOCK_COUNT: 'Number of blocks to wait (relative timelock)',
@@ -5608,7 +5613,7 @@ const FIELD_TOOLTIP = {
   group_size: 'Total number of signers in the MuSig group',
   hash: 'Hash value — the preimage must hash to this to satisfy the condition',
   hash160: 'HASH160 of the public key — RIPEMD160(SHA256(pubkey)), 20 bytes (40 hex chars)',
-  script_body: 'Serialized Ladder Script conditions — the inner script for P2SH/P2WSH/P2TR_SCRIPT (up to 10KB)',
+  script_body: 'Serialized Ladder Script conditions — the inner script for P2SH/P2WSH/P2TR_SCRIPT (up to 520 bytes)',
   hash256: 'SHA-256 hash commitment — 32 bytes (64 hex chars)',
   blocks: 'Number of blocks to wait before this condition can be satisfied',
   height: 'Block height at which this condition becomes valid',
@@ -5816,7 +5821,7 @@ function getTypeHex(type) {
     RECURSE_SAME:'0401',RECURSE_MODIFIED:'0402',RECURSE_UNTIL:'0403',
     RECURSE_COUNT:'0404',RECURSE_SPLIT:'0405',RECURSE_DECAY:'0406',
     ANCHOR:'0501',ANCHOR_CHANNEL:'0502',ANCHOR_POOL:'0503',
-    ANCHOR_RESERVE:'0504',ANCHOR_SEAL:'0505',ANCHOR_ORACLE:'0506',
+    ANCHOR_RESERVE:'0504',ANCHOR_SEAL:'0505',ANCHOR_ORACLE:'0506',DATA_RETURN:'0507',
     HYSTERESIS_FEE:'0601',HYSTERESIS_VALUE:'0602',
     TIMER_CONTINUOUS:'0611',TIMER_OFF_DELAY:'0612',
     LATCH_SET:'0621',LATCH_RESET:'0622',
@@ -6807,12 +6812,11 @@ const EXAMPLES = [
   },
   {
     title: 'ATOMIC SWAP (HTLC)',
-    desc: 'Cross-chain atomic swap via hash time-locked contract. Alice claims with preimage; Bob recovers after 144 blocks if unclaimed.\n\nCLAIM: Alice reveals the SHA-256 preimage and signs to claim.\nREFUND: After 144 blocks (~1 day), Bob can reclaim with his key.',
-    tags: [['HASH_PRE', 'hash'], ['SIG', 'sig'], ['CSV', 'time']],
+    desc: 'Cross-chain atomic swap via hash time-locked contract. Alice claims with preimage + signature; Bob recovers after 144 blocks if unclaimed.\n\nCLAIM: HASH_SIG requires Alice to reveal the SHA-256 preimage and sign.\nREFUND: After 144 blocks (~1 day), Bob can reclaim with his key.',
+    tags: [['HASH_SIG', 'hash'], ['SIG', 'sig'], ['CSV', 'time']],
     rungs: [
       { label: 'CLAIM', blocks: [
-        { type: 'HASH_PREIMAGE', values: { preimage: FAKE.preimage1 } },
-        { type: 'SIG', values: { pubkey: FAKE.pk1 } },
+        { type: 'HASH_SIG', values: { preimage: FAKE.preimage1, pubkey: FAKE.pk1 } },
       ], output: { name: 'ALICE_CLAIM', type: 'standard' } },
       { label: 'REFUND', blocks: [
         { type: 'CSV', values: { blocks: '144' } },
@@ -7376,13 +7380,12 @@ const EXAMPLES = [
 
   {
     title: 'CLTV_TIME CALENDAR LOCK',
-    desc: 'Date-locked payment using absolute Unix timestamp. Funds cannot move until January 1, 2027. HASH160 preimage adds a shared-secret gate.\n\nUNLOCK: CLTV_TIME enforces Jan 1 2027 timestamp, HASH160_PREIMAGE requires shared-secret reveal, SIG authorizes.\nCANCEL: Two SIG blocks — both parties must cooperate to cancel before the date.',
-    tags: [['CLTV_TIME', 'time'], ['HASH160', 'hash'], ['SIG', 'sig']],
+    desc: 'Date-locked payment using absolute Unix timestamp. Funds cannot move until January 1, 2027. HASH_SIG adds a hash-gated signature requirement.\n\nUNLOCK: CLTV_TIME enforces Jan 1 2027 timestamp, HASH_SIG requires preimage reveal + signature.\nCANCEL: Two SIG blocks, both parties must cooperate to cancel before the date.',
+    tags: [['CLTV_TIME', 'time'], ['HASH_SIG', 'hash'], ['SIG', 'sig']],
     rungs: [
       { label: 'UNLOCK', blocks: [
         { type: 'CLTV_TIME', values: { timestamp: '1798761600' } },
-        { type: 'HASH160_PREIMAGE', values: { hash: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0' } },
-        { type: 'SIG', values: { pubkey: FAKE.pk1 } },
+        { type: 'HASH_SIG', values: { preimage: FAKE.preimage1, pubkey: FAKE.pk1 } },
       ], output: { name: 'DATE_UNLOCK', type: 'standard' } },
       { label: 'CANCEL', blocks: [
         { type: 'SIG', values: { pubkey: FAKE.pk2 } },
@@ -7534,7 +7537,7 @@ const EXAMPLES = [
 
   {
     title: 'SINGLE SIG (FALCON512)',
-    desc: 'Post-quantum single signature using NIST FIPS 206 FALCON-512 (FN-DSA). Compact lattice-based signatures (~900 bytes). Full block encoding with SCHEME field routing to PQ verification.',
+    desc: 'Post-quantum single signature using NIST FIPS 206 FALCON-512 (FN-DSA). Compact lattice-based signatures (~666 bytes). Full block encoding with SCHEME field routing to PQ verification.',
     tags: [['FALCON512', 'sig'], ['PQ', 'hash']],
     rungs: [
       { label: 'SPEND', blocks: [
@@ -7550,7 +7553,7 @@ const EXAMPLES = [
 
   {
     title: 'SINGLE SIG (FALCON1024)',
-    desc: 'Post-quantum single signature using NIST FIPS 206 FALCON-1024 (FN-DSA). Higher-security lattice-based signatures (~1,800 bytes). Full block encoding with SCHEME field. NIST Security Level 5.',
+    desc: 'Post-quantum single signature using NIST FIPS 206 FALCON-1024 (FN-DSA). Higher-security lattice-based signatures (~1,280 bytes). Full block encoding with SCHEME field. NIST Security Level 5.',
     tags: [['FALCON1024', 'sig'], ['PQ', 'hash']],
     rungs: [
       { label: 'SPEND', blocks: [
@@ -7570,11 +7573,11 @@ const EXAMPLES = [
     tags: [['P2PKH', 'legacy'], ['CSV', 'time'], ['SIG', 'sig']],
     rungs: [
       { label: 'SPEND', blocks: [
-        { type: 'P2PKH_LEGACY', values: { pubkey: FAKE.pk1, signature: '' } },
+        { type: 'P2PKH_LEGACY', values: { pubkey: FAKE.pk1, signature: '', scheme: 'SCHNORR' } },
       ], output: { name: 'NORMAL_SPEND', type: 'standard' } },
       { label: 'RECOVER', blocks: [
         { type: 'CSV', values: { blocks: '52560' } },
-        { type: 'SIG', values: { pubkey: FAKE.pk2 } },
+        { type: 'SIG', values: { pubkey: FAKE.pk2, scheme: 'SCHNORR' } },
       ], output: { name: 'RECOVERY', type: 'standard' } },
     ],
     txInputs: [{ txid: FAKE.txid1, vout: 0 }],
@@ -7591,15 +7594,15 @@ const EXAMPLES = [
     tags: [['P2SH', 'legacy'], ['P2WPKH', 'legacy'], ['CLTV', 'time']],
     rungs: [
       { label: 'HOT', blocks: [
-        { type: 'P2WPKH_LEGACY', values: { pubkey: FAKE.pk1, signature: '' } },
+        { type: 'P2WPKH_LEGACY', values: { pubkey: FAKE.pk1, signature: '', scheme: 'SCHNORR' } },
       ], output: { name: 'HOT_SPEND', type: 'standard' } },
       { label: 'VAULT', blocks: [
         { type: 'P2SH_LEGACY', values: { script_body: '' },
-          innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk2 } }] },
+          innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk2, scheme: 'SCHNORR' } }] },
       ], output: { name: 'VAULT_UNLOCK', type: 'standard' } },
       { label: 'COLD', blocks: [
         { type: 'CLTV', values: { height: '900000' } },
-        { type: 'SIG', values: { pubkey: FAKE.pk3 } },
+        { type: 'SIG', values: { pubkey: FAKE.pk3, scheme: 'SCHNORR' } },
       ], output: { name: 'COLD_SWEEP', type: 'standard' } },
     ],
     txInputs: [{ txid: FAKE.txid2, vout: 0 }],
@@ -7617,11 +7620,11 @@ const EXAMPLES = [
     tags: [['P2TR', 'legacy'], ['P2TR_S', 'legacy'], ['SIG', 'sig']],
     rungs: [
       { label: 'KEY', blocks: [
-        { type: 'P2TR_LEGACY', values: { pubkey: FAKE.pk1, signature: '' } },
+        { type: 'P2TR_LEGACY', values: { pubkey: FAKE.pk1, signature: '', scheme: 'SCHNORR' } },
       ], output: { name: 'KEY_PATH', type: 'standard' } },
       { label: 'SCRIPT', blocks: [
         { type: 'P2TR_SCRIPT_LEGACY', values: { script_body: '', internal_key: FAKE.pk2 },
-          innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk3 } }] },
+          innerBlocks: [{ id: uid(), type: 'SIG', values: { pubkey: FAKE.pk3, scheme: 'SCHNORR' } }] },
       ], output: { name: 'SCRIPT_PATH', type: 'standard' } },
       { label: 'PQ_SAFE', blocks: [
         { type: 'CSV', values: { blocks: '26000' } },
@@ -7639,7 +7642,7 @@ const EXAMPLES = [
 
   {
     title: 'SINGLE SIG (SPHINCS+)',
-    desc: 'Post-quantum single signature using NIST FIPS 205 SPHINCS+-SHA2 (SLH-DSA). Hash-based stateless signatures (~50,000 bytes). Most conservative PQ assumption — security relies only on hash function strength, not lattice hardness.',
+    desc: 'Post-quantum single signature using NIST FIPS 205 SPHINCS+-SHA2 (SLH-DSA). Hash-based stateless signatures (~49,216 bytes). Most conservative PQ assumption — security relies only on hash function strength, not lattice hardness.',
     tags: [['SPHINCS+', 'sig'], ['PQ', 'hash']],
     rungs: [
       { label: 'SPEND', blocks: [
@@ -7927,7 +7930,6 @@ function deleteRecord(txid) {
 const SIGNET_API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'http://localhost:8801'
   : 'https://bitcoinghost.org';
-console.log('%c[ENGINE v3] rungSnapshot + vout tracking active', 'color: lime; font-weight: bold');
 
 // ═══════════════════════════════════════════════════════════════
 // SHARED API CLIENT
@@ -8106,10 +8108,10 @@ function planFund(rungs, txOutputs, options) {
   }
 
   // ── 4. Fee estimate + output minimum enforcement ──
-  // PQ witness sizes: Falcon-512 ~897B, Falcon-1024 ~1793B, Dilithium3 ~3293B, SPHINCS ~49856B
+  // PQ witness sizes (pubkey + sig): Falcon-512 ~1563B, Falcon-1024 ~3073B, Dilithium3 ~5245B, SPHINCS ~49248B
   // Fee accounts for witness weight (segwit: witness bytes / 4 in vB)
   const isPQ = scheme !== 'SCHNORR' && scheme !== 'ECDSA';
-  const pqWitnessExtra = { FALCON512: 900, FALCON1024: 1800, DILITHIUM3: 3300, SPHINCS_SHA: 50000 };
+  const pqWitnessExtra = { FALCON512: 1563, FALCON1024: 3073, DILITHIUM3: 5245, SPHINCS_SHA: 49248 };
   const witnessBytes = pqWitnessExtra[scheme] || 0;
   const outputCount = validTxOutputs.length;
   const numBlocks = rungs.reduce((s, r) => s + r.blocks.length, 0);
@@ -8119,12 +8121,10 @@ function planFund(rungs, txOutputs, options) {
   // Ensure output amounts are sufficient for their rung constraints
   // Spend fee must also account for PQ witness size
   const spendFeeEstimate = Math.max(1000, Math.ceil(witnessBytes / 4) + 500);
-  console.log('%c[planFund] rungsByOutput keys:', 'color: yellow', [...rungsByOutput.keys()]);
-  console.log('%c[planFund] validTxOutputs ids:', 'color: yellow', validTxOutputs.map(o => o.id));
+
   for (const txOut of validTxOutputs) {
     const outputRungs = rungsByOutput.get(txOut.id) || [];
-    console.log('%c[planFund] output', 'color: yellow', txOut.id, 'amount:', txOut.amount, 'rungs:', outputRungs.length, 'blocks:', outputRungs.flatMap(r => r.blocks.map(b => b.type)));
-    let minRequired = spendFeeEstimate + 546; // at minimum: spendable after fee
+    let minRequired = spendFeeEstimate + 1000; // at minimum: spendable after fee (1000 sats floor avoids dust)
     for (const rung of outputRungs) {
       // RECURSE_SPLIT: needs min_sats * 2 + fee
       const splitBlock = rung.blocks.find(b => b.type === 'RECURSE_SPLIT');
@@ -8135,24 +8135,19 @@ function planFund(rungs, txOutputs, options) {
       // AMOUNT_LOCK: output must hold at least min + fee (so spend can meet the lock)
       const amtBlock = rung.blocks.find(b => b.type === 'AMOUNT_LOCK');
       if (amtBlock) {
-        console.log('%c[planFund] AMOUNT_LOCK found:', 'color: orange', 'values:', JSON.stringify(amtBlock.values), 'min:', amtBlock.values?.min);
         const lockMin = parseInt(amtBlock.values?.min) || 0;
         if (lockMin > 0) minRequired = Math.max(minRequired, lockMin + spendFeeEstimate);
       }
     }
     const currentAmount = parseInt(txOut.amount) || 0;
-    console.log('%c[planFund] minRequired:', 'color: orange', minRequired, 'currentAmount:', currentAmount, 'bump?', currentAmount < minRequired);
     if (currentAmount < minRequired) {
       txOut.amount = minRequired;
-      console.log('%c[planFund] BUMPED output', 'color: red', txOut.id, 'to', minRequired);
     }
   }
 
   const totalOutputSats = validTxOutputs.reduce((sum, o) => sum + (parseInt(o.amount) || 0), 0);
   const needSats = totalOutputSats > 0 ? totalOutputSats + feeSats : 0;
 
-  console.log('%c[planFund] Output amounts after enforcement:', 'color: cyan', validTxOutputs.map(o => ({ id: o.id, amount: o.amount })));
-  console.log('%c[planFund] totalOutputSats:', 'color: cyan', totalOutputSats, 'feeSats:', feeSats, 'needSats:', needSats);
 
   return {
     pubkeyFields,
@@ -8509,7 +8504,7 @@ function planSpend(record, options) {
 
       if (result) {
         // Track preimage consumption
-        const preimageTypes = ['HASH_PREIMAGE', 'HASH160_PREIMAGE', 'TAGGED_HASH', 'HASH_SIG', 'HTLC'];
+        const preimageTypes = ['TAGGED_HASH', 'HASH_SIG', 'HTLC'];
         if (preimageTypes.includes(b.type) && result.preimage) {
           preimageIdx++;
         }
@@ -8588,13 +8583,10 @@ function planSpend(record, options) {
       }
 
       // Preimage-only types where buildSigner returned null (missing preimage)
-      const preimageOnlyTypes = ['HASH_PREIMAGE', 'HASH160_PREIMAGE', 'TAGGED_HASH'];
+      const preimageOnlyTypes = ['TAGGED_HASH'];
       if (preimageOnlyTypes.includes(b.type)) {
-        if (b.type === 'TAGGED_HASH') {
-          signerBlocks.push({ type: b.type });
-          continue;
-        }
-        errors.push(b.type + ' block requires a preimage but none was stored. Re-create the transaction with preimage values.');
+        signerBlocks.push({ type: b.type });
+        continue;
         continue;
       }
 
@@ -8938,8 +8930,6 @@ function SignetPanel() {
           relays: recordRelays,
           ctvOutputsMap: signingData.ctvOutputsMap,
         });
-        console.log('%c[BROADCAST] hasSnapshot:', 'color: orange', !!signingData.rungSnapshot,
-          'record.rungs:', JSON.stringify(record.rungs.map(r => ({ label: r.label, vout: r.vout, blocks: r.blocks.map(b => b.type) }))));
         saveRecord(record);
       }
     }
@@ -9085,7 +9075,6 @@ function SignetPanel() {
           values: { ...block.values, preimage: preimageHex }
         };
         rungs[ri] = updatedRungs[ri];
-        console.log('%c[FUND] Inner conditions serialized for', 'color: magenta', block.type, 'preimage:', preimageHex.length / 2, 'bytes (node computes hash)');
       }
     }
 
@@ -9172,7 +9161,6 @@ function SignetPanel() {
               }));
               rungs[ri].blocks[bi].values.template_hash = ctvResult.hash;
               ctvOutputsMap.set(`${ri}:${bi}`, { outputs: templateOutputs });
-              console.log('[CTV] Auto-computed template hash for rung ' + ri + ': ' + ctvResult.hash.substring(0, 16) + '...');
             }
           }
         } catch (ctvErr) {
@@ -9256,7 +9244,6 @@ function SignetPanel() {
         });
       }
     }
-    console.log('%c[FUND] rungSnapshot:', 'color: lime', JSON.stringify(rungSnapshot.map(r => ({ label: r.label, vout: r.vout, blocks: r.blocks.map(b => b.type) }))));
     setSigningData({
       keypairs,
       walletKey,
@@ -9964,12 +9951,12 @@ function SpendPanel() {
       }
 
       // 4. Build the spending transaction
-      // PQ witness: Falcon-512 ~900B, Falcon-1024 ~1800B, Dilithium3 ~3300B, SPHINCS ~50000B
-      const pqWitnessMap = { FALCON512: 900, FALCON1024: 1800, DILITHIUM3: 3300, SPHINCS_SHA: 50000 };
+      // PQ witness (pubkey + sig): Falcon-512 ~1563B, Falcon-1024 ~3073B, Dilithium3 ~5245B, SPHINCS ~49248B
+      const pqWitnessMap = { FALCON512: 1563, FALCON1024: 3073, DILITHIUM3: 5245, SPHINCS_SHA: 49248 };
       const witnessOverhead = pqWitnessMap[scheme] || 0;
       const feeSats = Math.max(1000, 500 + Math.ceil(witnessOverhead / 4));
       const sendSats = utxoAmountSats - feeSats;
-      if (sendSats < 546) throw new Error('UTXO too small to spend after fees (' + utxoAmountSats + ' sats, fee ' + feeSats + ')');
+      if (sendSats < 1000) throw new Error('UTXO too small to spend after fees (' + utxoAmountSats + ' sats, fee ' + feeSats + ')');
 
       addLog('Building spending tx (' + sendSats.toLocaleString() + ' sats after ' + feeSats + ' fee)...');
 
@@ -10106,9 +10093,9 @@ function SpendPanel() {
                 }
               }
             }
-            // Condition-type fields match C++ IsConditionDataType: PUBKEY_COMMIT, HASH256, HASH160, NUMERIC, SCHEME
-            // In wire format PUBKEY → PUBKEY_COMMIT on the node, so count PUBKEY as condition field
-            const isConditionField = (t) => t === 'PUBKEY' || t === 'HASH256' || t === 'HASH160' || t === 'NUMERIC' || t === 'SCHEME';
+            // Condition-type fields match C++ IsConditionDataType: HASH256, HASH160, NUMERIC, SCHEME, DATA
+            // PUBKEY is folded into Merkle leaf (merkle_pub_key), not stored as condition field
+            const isConditionField = (t) => t === 'HASH256' || t === 'HASH160' || t === 'NUMERIC' || t === 'SCHEME' || t === 'DATA';
             for (const mb of mutationBlocks) {
               const blockIdx = parseInt(mb.values?.block_idx) || 0;
               const paramIdx = parseInt(mb.values?.param_idx) || 0;
@@ -10761,7 +10748,7 @@ function appReducer(state, action) {
 
     // Compound: add change rung (creates output + rung together)
     case 'ADD_CHANGE_RUNG': {
-      if (state.rungs.length >= 16) return state;
+      if (state.rungs.length >= 8) return state;
       const outputId = action.outputId;
       const rung = createRung();
       rung.label = 'CHANGE';
@@ -11109,12 +11096,12 @@ function App() {
   }, []);
 
   const handleAddRung = useCallback(() => {
-    dispatch({ type: 'UPDATE_RUNGS', fn: prev => prev.length >= 16 ? prev : [...prev, createRung()] });
+    dispatch({ type: 'UPDATE_RUNGS', fn: prev => prev.length >= 8 ? prev : [...prev, createRung()] });
   }, []);
 
   const handleAddRungWithBlock = useCallback((blockType) => {
     dispatch({ type: 'UPDATE_RUNGS', fn: prev => {
-      if (prev.length >= 16) return prev;
+      if (prev.length >= 8) return prev;
       const rung = createRung();
       rung.blocks = [createBlock(blockType)];
       return [...prev, rung];
@@ -11952,7 +11939,7 @@ ${ladderRows.map(r => `
           <div className={`status-dot ${totalBlocks > 0 ? 'green' : 'amber'}`} />
           {rungs.length} RUNGS
         </div>
-        <div className="status-item">{totalBlocks} BLOCKS (8/RUNG MAX, 16 RUNGS MAX)</div>
+        <div className="status-item">{totalBlocks} BLOCKS (8/RUNG MAX, 8 RUNGS MAX)</div>
         {isSimMode && (
           <div className="status-item">
             <div className={`status-dot ${energizedCount > 0 ? 'amber' : 'red'}`} />

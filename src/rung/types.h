@@ -16,13 +16,13 @@ namespace rung {
  *  Each block evaluates a single spending condition within a rung.
  *  Encoded as uint16_t in the wire format (little-endian 2 bytes).
  *
- *  Ranges (10 families, 60 block types):
+ *  Ranges (10 families, 61 block types):
  *    0x0001-0x00FF  Signature family (SIG, MULTISIG, ADAPTOR_SIG, MUSIG_THRESHOLD, KEY_REF_SIG)
  *    0x0100-0x01FF  Timelock family (CSV, CSV_TIME, CLTV, CLTV_TIME)
  *    0x0200-0x02FF  Hash family (HASH_PREIMAGE, HASH160_PREIMAGE, TAGGED_HASH)
  *    0x0300-0x03FF  Covenant family (CTV, VAULT_LOCK, AMOUNT_LOCK)
  *    0x0400-0x04FF  Recursion family (RECURSE_SAME, _MODIFIED, _UNTIL, _COUNT, _SPLIT, _DECAY)
- *    0x0500-0x05FF  Anchor family (ANCHOR, _CHANNEL, _POOL, _RESERVE, _SEAL, _ORACLE)
+ *    0x0500-0x05FF  Anchor family (ANCHOR, _CHANNEL, _POOL, _RESERVE, _SEAL, _ORACLE, DATA_RETURN)
  *    0x0600-0x06FF  PLC family (HYSTERESIS_*, TIMER_*, LATCH_*, COUNTER_*, COMPARE, SEQUENCER, ONE_SHOT, RATE_LIMIT, COSIGN)
  *    0x0700-0x07FF  Compound family (TIMELOCKED_SIG, HTLC, HASH_SIG, PTLC, CLTV_SIG, TIMELOCKED_MULTISIG)
  *    0x0800-0x08FF  Governance family (EPOCH_GATE, WEIGHT_LIMIT, INPUT_COUNT, OUTPUT_COUNT, RELATIVE_VALUE, ACCUMULATOR)
@@ -66,6 +66,7 @@ enum class RungBlockType : uint16_t {
     ANCHOR_RESERVE   = 0x0504, //!< Reserve anchor (guardian set)
     ANCHOR_SEAL      = 0x0505, //!< Seal anchor
     ANCHOR_ORACLE    = 0x0506, //!< Oracle anchor
+    DATA_RETURN      = 0x0507, //!< Unspendable data commitment (max 80 bytes, replaces OP_RETURN)
 
     // Compound family (collapsed multi-block patterns)
     TIMELOCKED_SIG   = 0x0701, //!< SIG + CSV combined: pubkey + sig + block-height timelock
@@ -123,7 +124,8 @@ enum class RungDataType : uint8_t {
     SPEND_INDEX   = 0x07, //!< Spend index reference: 4 bytes
     NUMERIC       = 0x08, //!< Numeric value (threshold, locktime, etc.): 1-4 bytes
     SCHEME        = 0x09, //!< Signature scheme selector: 1 byte
-    SCRIPT_BODY   = 0x0A, //!< Serialized inner conditions: 1-10000 bytes (witness-only; node computes hash for conditions)
+    SCRIPT_BODY   = 0x0A, //!< Serialized inner conditions: 1-520 bytes (witness-only; node computes hash for conditions)
+    DATA          = 0x0B, //!< Opaque data: 1-80 bytes (DATA_RETURN block only)
 };
 
 // Backward-compatible alias
@@ -159,6 +161,7 @@ inline bool IsKnownBlockType(uint16_t b)
     case RungBlockType::ANCHOR_RESERVE:
     case RungBlockType::ANCHOR_SEAL:
     case RungBlockType::ANCHOR_ORACLE:
+    case RungBlockType::DATA_RETURN:
     // Recursion
     case RungBlockType::RECURSE_SAME:
     case RungBlockType::RECURSE_MODIFIED:
@@ -211,7 +214,7 @@ inline bool IsKnownBlockType(uint16_t b)
 /** Returns true if the byte is a known RungDataType. */
 inline bool IsKnownDataType(uint8_t b)
 {
-    return b >= 0x01 && b <= 0x0A;
+    return b >= 0x01 && b <= 0x0B;
 }
 
 // Backward-compatible alias
@@ -231,6 +234,7 @@ inline size_t FieldMinSize(RungDataType type)
     case RungDataType::SPEND_INDEX:   return 4;
     case RungDataType::NUMERIC:       return 1;
     case RungDataType::SCHEME:        return 1;
+    case RungDataType::DATA:          return 1;
     }
     return 0;
 }
@@ -244,11 +248,12 @@ inline size_t FieldMaxSize(RungDataType type)
     case RungDataType::HASH256:       return 32;
     case RungDataType::HASH160:       return 20;
     case RungDataType::PREIMAGE:      return 252;
-    case RungDataType::SCRIPT_BODY:   return 10000;
+    case RungDataType::SCRIPT_BODY:   return 520;
     case RungDataType::SIGNATURE:     return 50000;
     case RungDataType::SPEND_INDEX:   return 4;
     case RungDataType::NUMERIC:       return 4;
     case RungDataType::SCHEME:        return 1;
+    case RungDataType::DATA:          return 80;
     }
     return 0;
 }
@@ -284,6 +289,7 @@ inline std::string BlockTypeName(RungBlockType type)
     case RungBlockType::ANCHOR_RESERVE:   return "ANCHOR_RESERVE";
     case RungBlockType::ANCHOR_SEAL:      return "ANCHOR_SEAL";
     case RungBlockType::ANCHOR_ORACLE:    return "ANCHOR_ORACLE";
+    case RungBlockType::DATA_RETURN:      return "DATA_RETURN";
     case RungBlockType::HYSTERESIS_FEE:   return "HYSTERESIS_FEE";
     case RungBlockType::HYSTERESIS_VALUE: return "HYSTERESIS_VALUE";
     case RungBlockType::TIMER_CONTINUOUS: return "TIMER_CONTINUOUS";
@@ -335,6 +341,7 @@ inline std::string DataTypeName(RungDataType type)
     case RungDataType::SPEND_INDEX:   return "SPEND_INDEX";
     case RungDataType::NUMERIC:       return "NUMERIC";
     case RungDataType::SCHEME:        return "SCHEME";
+    case RungDataType::DATA:          return "DATA";
     }
     return "UNKNOWN";
 }
@@ -577,8 +584,10 @@ inline constexpr uint16_t MICRO_HEADER_TABLE[MICRO_HEADER_SLOTS] = {
     0x0905, // 0x39: P2WSH_LEGACY
     0x0906, // 0x3A: P2TR_LEGACY
     0x0907, // 0x3B: P2TR_SCRIPT_LEGACY
+    // Slot 60: Anchor family (late-added)
+    0x0507, // 0x3C: DATA_RETURN
     // Remaining slots unused
-    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x3C-0x3F
+    0xFFFF, 0xFFFF, 0xFFFF, // 0x3D-0x3F
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x40-0x47
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x48-0x4F
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x50-0x57
@@ -711,8 +720,9 @@ inline constexpr ImplicitFieldLayout MUSIG_THRESHOLD_CONDITIONS = {3, {
     {RungDataType::NUMERIC, 0},  // group size N
 }};
 
-/** ANCHOR_SEAL conditions: [HASH256(32)] */
-inline constexpr ImplicitFieldLayout ANCHOR_SEAL_CONDITIONS = {1, {
+/** ANCHOR_SEAL conditions: [HASH256(32), HASH256(32)] */
+inline constexpr ImplicitFieldLayout ANCHOR_SEAL_CONDITIONS = {2, {
+    {RungDataType::HASH256, 32},
     {RungDataType::HASH256, 32},
 }};
 
@@ -730,6 +740,11 @@ inline constexpr ImplicitFieldLayout P2WSH_LEGACY_CONDITIONS = {1, {
 inline constexpr ImplicitFieldLayout P2TR_SCRIPT_LEGACY_CONDITIONS = {2, {
     {RungDataType::HASH256, 32},
     {RungDataType::PUBKEY_COMMIT, 32},
+}};
+
+/** DATA_RETURN conditions: [DATA(var, max 80)] — unspendable data commitment */
+inline constexpr ImplicitFieldLayout DATA_RETURN_CONDITIONS = {1, {
+    {RungDataType::DATA, 0},
 }};
 
 // -- Witness context implicit field layouts --
@@ -822,6 +837,7 @@ inline const ImplicitFieldLayout& GetImplicitLayout(RungBlockType type, uint8_t 
         case RungBlockType::CLTV_SIG:         return CLTV_SIG_CONDITIONS;
         case RungBlockType::EPOCH_GATE:       return EPOCH_GATE_CONDITIONS;
         case RungBlockType::ANCHOR_SEAL:      return ANCHOR_SEAL_CONDITIONS;
+        case RungBlockType::DATA_RETURN:      return DATA_RETURN_CONDITIONS;
         // Legacy family
         case RungBlockType::P2PK_LEGACY:      return SIG_CONDITIONS;
         case RungBlockType::P2PKH_LEGACY:     return P2PKH_LEGACY_CONDITIONS;
@@ -886,6 +902,7 @@ inline bool VerifyImplicitLayoutPairing()
         RungBlockType::P2TR_SCRIPT_LEGACY,
         RungBlockType::EPOCH_GATE, RungBlockType::ANCHOR_SEAL,
         RungBlockType::AMOUNT_LOCK, RungBlockType::CTV,
+        RungBlockType::DATA_RETURN,
     };
 
     for (uint32_t code = 0; code <= 0x0FFF; ++code) {

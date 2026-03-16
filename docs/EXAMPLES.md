@@ -43,8 +43,10 @@ R000 +--[ SIG: 02a1b2...f0a1 ]----------------------( )--+
      +------------------------------------------------+
 ```
 
-One rung, one block, one coil. The `SIG` block contains a single PUBKEY field.
-To spend, the witness must contain a valid Schnorr signature for that public key.
+One rung, one block, one coil. The RPC accepts a PUBKEY field and folds it into the
+Merkle leaf hash (merkle_pub_key). The public key never appears in the on-chain conditions.
+At spend time, the witness provides the full public key alongside a valid Schnorr signature.
+The Merkle proof binds the key to the committed root.
 
 ### Wire Representation (createrungtx JSON)
 
@@ -76,12 +78,13 @@ To spend, the witness must contain a valid Schnorr signature for that public key
 ### Evaluation Walkthrough
 
 1. The node receives a spending transaction referencing this UTXO.
-2. The scriptPubKey begins with `0xc1` (RUNG_CONDITIONS_PREFIX), so the node
-   deserialises it as rung conditions rather than interpreting Bitcoin Script.
+2. The scriptPubKey begins with `0xC2` (MLSC prefix), so the node verifies
+   the Merkle proof against the committed root.
 3. The evaluator calls `EvalLadder`, which iterates over rungs in order.
 4. **Rung 0**: Contains one block of type `SIG` (0x0001).
-   - `EvalSigBlock` extracts the PUBKEY field from the conditions.
-   - The witness provides a SIGNATURE field.
+   - The witness provides a PUBKEY and a SIGNATURE field.
+   - The Merkle proof verification has already confirmed this pubkey matches
+     the one folded into the leaf hash at fund time (merkle_pub_key).
    - The evaluator computes `SignatureHashLadder` (tagged hash: `"LadderSighash"`),
      which commits to the transaction version, locktime, prevouts, amounts,
      sequences, outputs, input index, and the serialised conditions hash.
@@ -195,14 +198,14 @@ Note: The NUMERIC field `50cd0000` is 52560 encoded as a 4-byte little-endian in
 
 ---
 
-## 3. Hash Time-Locked Contract (HTLC)
+## 3. Atomic Swap (HASH_SIG)
 
 ### Scenario
 
 A cross-chain atomic swap between Alice and Bob. The UTXO has two spending paths:
 
-- **Rung 0 (CLAIM)**: Alice reveals a hash preimage and provides her signature.
-  This is the happy path for completing the swap.
+- **Rung 0 (CLAIM)**: Alice reveals a hash preimage and provides her signature
+  using a single HASH_SIG compound block. This is the happy path for completing the swap.
 - **Rung 1 (REFUND)**: After 144 blocks (~1 day), Bob can reclaim the funds
   with his signature alone. This is the safety net if Alice never claims.
 
@@ -211,9 +214,9 @@ A cross-chain atomic swap between Alice and Bob. The UTXO has two spending paths
 ```
      L+                                                              L-
      |                                                                |
-R000 +--[ HASH_PREIMAGE: a1b2...b2 ]---[ SIG: 02a1b2...f0a1 ]-----( )--+
+R000 +--[ HASH_SIG: hash=a1b2...b2, pk=02a1b2...f0a1 ]-------------( )--+
      |         (ALICE CLAIM)                                          |
-R001 +--[ CSV: 144 blocks ]---[ SIG: 03f9e8...c1b0 ]-----------( )--+
+R001 +--[ CSV: 144 blocks ]---[ SIG: 03f9e8...c1b0 ]---------------( )--+
      |         (BOB REFUND)                                           |
      +----------------------------------------------------------------+
 ```
@@ -232,14 +235,9 @@ R001 +--[ CSV: 144 blocks ]---[ SIG: 03f9e8...c1b0 ]-----------( )--+
         {
           "blocks": [
             {
-              "type": "HASH_PREIMAGE",
+              "type": "HASH_SIG",
               "fields": [
-                { "type": "HASH256", "hex": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2" }
-              ]
-            },
-            {
-              "type": "SIG",
-              "fields": [
+                { "type": "PREIMAGE", "hex": "48656c6c6f204c616464657221" },
                 { "type": "PUBKEY", "hex": "02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1" }
               ]
             }
@@ -272,12 +270,10 @@ R001 +--[ CSV: 144 blocks ]---[ SIG: 03f9e8...c1b0 ]-----------( )--+
 **Path A (Alice claims, rung 0):**
 
 1. Alice's witness provides a PREIMAGE field and a SIGNATURE field.
-2. `EvalHashPreimageBlock`: computes `SHA256(preimage)` and compares it to the
-   HASH256 field in the conditions.
-   - Match: **SATISFIED**.
-3. `EvalSigBlock`: verifies Alice's Schnorr signature against her PUBKEY.
-   - Valid: **SATISFIED**.
-4. Both blocks pass (AND). Rung 0 wins. Alice receives the funds.
+2. `EvalHashSigBlock`: computes `SHA256(preimage)` and compares it to the
+   committed hash. Then verifies Alice's Schnorr signature against her pubkey.
+   - Hash match + valid signature: **SATISFIED**.
+3. Single block passes. Rung 0 wins. Alice receives the funds.
 
 **Path B (Bob refunds, rung 1):**
 
@@ -629,7 +625,7 @@ PQ signatures on each UTXO.
 ```
      L+                                                                                  L-
      |                                                                                    |
-R000 +--[ SIG: FALCON512 ]--[ PUBKEY_COMMIT: 7f3a...9e ]--[ RECURSE_SAME: depth=1000 ]--( R )--+
+R000 +--[ SIG: FALCON512, pk=7f3a...9e ]--[ RECURSE_SAME: depth=1000 ]--( R )--+
      |                                                                                    |
      +------------------------------------------------------------------------------------+
 ```
@@ -667,7 +663,7 @@ spent scriptPubKey hashes to this value.
               "type": "SIG",
               "fields": [
                 { "type": "SCHEME", "hex": "10" },
-                { "type": "PUBKEY_COMMIT", "hex": "7f3a8b2c9d0e1f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e9e" }
+                { "type": "PUBKEY", "hex": "7f3a8b2c...897-byte FALCON-512 public key hex..." }
               ]
             },
             {
@@ -728,10 +724,9 @@ The spending transaction includes both inputs:
 **Anchor input (input 0):**
 
 1. `EvalSigBlock`: the SCHEME field (0x10 = FALCON512) selects PQ verification.
-   The PUBKEY_COMMIT field contains a 32-byte SHA-256 commitment. The witness
-   provides the full 897-byte FALCON-512 public key via `pq_pubkey`.
-   - The evaluator computes `SHA256(witness_pubkey)` and compares it to the
-     PUBKEY_COMMIT value. Match: proceed.
+   The witness provides the full 897-byte FALCON-512 public key. The Merkle
+   proof has already confirmed this key matches the one folded into the leaf
+   hash at fund time (merkle_pub_key).
    - The evaluator computes `SignatureHashLadder` and verifies the FALCON-512
      signature against the full public key.
    - **SATISFIED**.
@@ -967,8 +962,8 @@ Savings scale with witness complexity: a MULTISIG(3-of-5) witness saves ~60% per
 |------|-------|----------|
 | AND | Within a rung | All blocks must be SATISFIED |
 | OR | Across rungs | First satisfied rung wins |
-| Inversion | Per block | `inverted=true` flips SATISFIED to UNSATISFIED and vice versa |
-| Fail-closed | Unknown blocks | Unknown block types return UNSATISFIED (not ERROR) |
+| Inversion | Per block | `inverted=true` flips SATISFIED to UNSATISFIED. Only non-key-consuming blocks can be inverted (selective inversion). |
+| Fail-closed | Unknown blocks | Unknown block types are rejected at consensus (deserialization). |
 | Covenants | Per output | Recursion blocks constrain the spending transaction's outputs |
 | State | Per UTXO | PLC blocks carry state in their NUMERIC fields across covenant spends |
 
@@ -984,7 +979,7 @@ NUMERIC values are encoded on the wire as `CompactSize(value)` (varint). After d
 | 3 | `03` | `03000000` | RECURSE_COUNT remaining |
 | 5 | `05` | `05000000` | HYSTERESIS_FEE low bound |
 | 50 | `32` | `32000000` | HYSTERESIS_FEE high bound |
-| 144 | `9000` (fd prefix not needed; `90` < 253) | `90000000` | CSV 144 blocks |
+| 144 | `90` (single byte; 144 < 253) | `90000000` | CSV 144 blocks |
 | 1000 | `fde803` | `e8030000` | RECURSE_SAME depth |
 | 10,000 | `fd1027` | `10270000` | AMOUNT_LOCK min |
 | 50,000 | `fd50c3` | `50c30000` | AMOUNT_LOCK min (DCA) |

@@ -36,21 +36,21 @@
       <line x1="20" y1="10" x2="20" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <line x1="600" y1="10" x2="600" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <!-- Wire -->
-      <line x1="20" y1="60" x2="100" y2="60" stroke="#f59e0b" stroke-width="2"/>
-      <line x1="500" y1="60" x2="600" y2="60" stroke="#f59e0b" stroke-width="2"/>
+      <line x1="20" y1="60" x2="100" y2="60" stroke="#ffffff" stroke-width="2"/>
+      <line x1="500" y1="60" x2="600" y2="60" stroke="#ffffff" stroke-width="2"/>
       <!-- Block body -->
-      <rect x="100" y="20" width="400" height="80" rx="2" fill="#2a2a2a" stroke="#f59e0b" stroke-width="1.5"/>
+      <rect x="100" y="20" width="400" height="80" rx="2" fill="#2a2a2a" stroke="#ffffff" stroke-width="1.5"/>
       <!-- Block label -->
-      <text x="300" y="38" text-anchor="middle" fill="#f59e0b" font-family="Share Tech Mono" font-size="13" letter-spacing="2">PTLC</text>
+      <text x="300" y="38" text-anchor="middle" fill="#ffffff" font-family="Share Tech Mono" font-size="13" letter-spacing="2">PTLC</text>
       <!-- Internal components -->
       <rect x="120" y="48" width="110" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="175" y="66" text-anchor="middle" fill="#2d7dd2" font-family="IBM Plex Mono" font-size="10" font-weight="600">ADAPTOR PT</text>
+      <text x="175" y="66" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="10" font-weight="600">ADAPTOR PT</text>
       <text x="240" y="66" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="12">+</text>
       <rect x="250" y="48" width="110" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="305" y="66" text-anchor="middle" fill="#2d7dd2" font-family="IBM Plex Mono" font-size="10" font-weight="600">SIG VERIFY</text>
+      <text x="305" y="66" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="10" font-weight="600">SIG VERIFY</text>
       <text x="370" y="66" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="12">+</text>
       <rect x="380" y="48" width="100" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="430" y="66" text-anchor="middle" fill="#39a5b7" font-family="IBM Plex Mono" font-size="10" font-weight="600">CSV CHECK</text>
+      <text x="430" y="66" text-anchor="middle" fill="#ff6d00" font-family="IBM Plex Mono" font-size="10" font-weight="600">CSV CHECK</text>
       <!-- Annotation -->
       <text x="300" y="125" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">Adaptor sig + timelock: all three must pass</text>
     </svg>
@@ -78,13 +78,6 @@
         <td class="field-size">32 B</td>
         <td class="field-side-c">Conditions</td>
         <td class="field-desc">Commitment to the adaptor point (the secret-bearing curve point)</td>
-      </tr>
-      <tr>
-        <td class="field-name">scheme</td>
-        <td class="field-type">SCHEME</td>
-        <td class="field-size">1 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">Signature scheme selector (Schnorr)</td>
       </tr>
       <tr>
         <td class="field-name">timelock</td>
@@ -167,7 +160,6 @@
   <span class="json-key">"fields"</span>: [
     { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"d4e5f6...32 bytes"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"SCHEME"</span>, <span class="json-key">"value"</span>: <span class="json-num">1</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">144</span> }
   ]
 }</pre></div>

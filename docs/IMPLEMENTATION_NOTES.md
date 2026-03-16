@@ -131,7 +131,7 @@ Block layout: [NUMERIC threshold] [PUBKEY key_1] ... [PUBKEY key_N] [SIGNATURE s
 
 **Spec implies:** Base blocks standard, covenant/recursion/PLC blocks non-standard until activation.
 
-**Implementation:** All 48 block types pass `IsStandardRungTx()` policy checks. Family classification functions (`IsBaseBlockType`, `IsCovenantBlockType`, `IsStatefulBlockType`) exist but are not used as policy gates.
+**Implementation:** All 61 block types pass `IsStandardRungTx()` policy checks. Family classification functions (`IsBaseBlockType`, `IsCovenantBlockType`, `IsStatefulBlockType`) exist but are not used as policy gates.
 
 **Rationale:** Ghost Core operates on its own signet where all nodes run the same software. All block types are consensus-valid from genesis. The classification functions are retained for documentation and for potential mainnet activation logic.
 
@@ -189,7 +189,7 @@ RungConditions in scriptPubKey:
 
 | Limit | Value |
 |-------|-------|
-| Max rungs per ladder | 16 |
+| Max rungs per ladder | 8 |
 | Max blocks per rung | 8 |
 | Max fields per block | 16 |
 | Max ladder witness size | 100,000 bytes |

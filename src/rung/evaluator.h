@@ -194,6 +194,18 @@ bool EvalLadder(const LadderWitness& ladder,
 /** Compute the BIP-119 CTV template hash for a transaction at a given input index. */
 uint256 ComputeCTVHash(const CTransaction& tx, uint32_t input_index);
 
+/** Rung verification flags (use high bits to avoid collision with SCRIPT_VERIFY_* flags). */
+static constexpr unsigned int RUNG_VERIFY_MLSC_ONLY = (1U << 28); //!< Reject 0xC1 inline conditions (mainnet)
+
+/** Consensus: validate all outputs of a v4 RUNG_TX transaction.
+ *  Every output must be a valid Ladder Script output:
+ *    - 0xC2 + 32-byte MLSC root
+ *    - 0xC1 + valid rung conditions (only if RUNG_VERIFY_MLSC_ONLY not set)
+ *    - DATA_RETURN block (exactly one per transaction, max 80 bytes)
+ *  No raw OP_RETURN, no legacy scriptPubKey types.
+ *  Returns false with error on any invalid output. */
+bool ValidateRungOutputs(const CTransaction& tx, unsigned int flags, std::string& error);
+
 /** Top-level verification entry point for v4 RUNG_TX transactions. */
 bool VerifyRungTx(const CTransaction& tx,
                   unsigned int nIn,

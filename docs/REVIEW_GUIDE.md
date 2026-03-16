@@ -1,6 +1,6 @@
 # Ladder Script Review Guide
 
-This document is a starting point for reviewers. Ladder Script is 60 block types across 10 families, but each block type is a self-contained unit that can be reviewed independently.
+This document is a starting point for reviewers. Ladder Script is 61 block types across 10 families, but each block type is a self-contained unit that can be reviewed independently.
 
 ## Where to Start
 
@@ -8,7 +8,7 @@ This document is a starting point for reviewers. Ladder Script is 60 block types
 
 **File:** `src/rung/types.h`
 
-This single header defines everything: the `RungBlockType` enum (60 entries), the `RungDataType` enum (10 entries), field size bounds (`FieldMinSize`, `FieldMaxSize`), block type names, micro-header slots, and implicit field layouts.
+This single header defines everything: the `RungBlockType` enum (61 entries), the `RungDataType` enum (11 entries), field size bounds (`FieldMinSize`, `FieldMaxSize`), block type names, micro-header slots, and implicit field layouts.
 
 After reading this file, you know every block type that exists and what data types they use.
 
@@ -48,14 +48,14 @@ Every hash commitment stored in the UTXO set is computed by the node:
 - User provides PREIMAGE/SCRIPT_BODY → node computes HASH256 (SHA-256) or HASH160
 - Raw hash values are rejected for all node-computed block types
 
-No condition field across all 60 block types accepts arbitrary user-chosen bytes.
+No condition field across all 61 block types accepts arbitrary user-chosen bytes.
 
 ## File Map
 
 | File | Lines | What It Does |
 |------|-------|-------------|
 | `types.h` | ~910 | All type definitions, enums, size bounds, micro-header table |
-| `evaluator.cpp` | ~3400 | 60 block evaluators + ladder logic + signature verification |
+| `evaluator.cpp` | ~3400 | 61 block evaluators + ladder logic + signature verification |
 | `serialize.cpp` | ~785 | Wire format serialization/deserialization |
 | `conditions.cpp` | ~920 | Conditions (locking side) parsing and validation |
 | `rpc.cpp` | ~2200 | RPC interface + node-computed hash enforcement |

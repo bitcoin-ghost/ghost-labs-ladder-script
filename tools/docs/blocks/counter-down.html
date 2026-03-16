@@ -38,16 +38,16 @@
       <rect x="160" y="20" width="280" height="80" rx="2" fill="#2a2a2a" stroke="#98c379" stroke-width="1.5"/>
       <text x="300" y="38" text-anchor="middle" fill="#98c379" font-family="Share Tech Mono" font-size="13" letter-spacing="2">COUNTER_DOWN</text>
       <!-- Counter visualization -->
-      <rect x="195" y="50" width="40" height="28" fill="#1a5c28" stroke="#2ea043" stroke-width="1" rx="2"/>
+      <rect x="195" y="50" width="40" height="28" fill="#1a5c28" stroke="#2979ff" stroke-width="1" rx="2"/>
       <text x="215" y="68" text-anchor="middle" fill="#3fb950" font-family="IBM Plex Mono" font-size="11" font-weight="600">5</text>
       <text x="248" y="68" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="12">&rarr;</text>
-      <rect x="260" y="50" width="40" height="28" fill="#1a5c28" stroke="#2ea043" stroke-width="1" rx="2"/>
+      <rect x="260" y="50" width="40" height="28" fill="#1a5c28" stroke="#2979ff" stroke-width="1" rx="2"/>
       <text x="280" y="68" text-anchor="middle" fill="#3fb950" font-family="IBM Plex Mono" font-size="11" font-weight="600">4</text>
       <text x="313" y="68" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="12">&rarr;</text>
-      <rect x="325" y="50" width="40" height="28" fill="#1a5c28" stroke="#2ea043" stroke-width="1" rx="2"/>
+      <rect x="325" y="50" width="40" height="28" fill="#1a5c28" stroke="#2979ff" stroke-width="1" rx="2"/>
       <text x="345" y="68" text-anchor="middle" fill="#3fb950" font-family="IBM Plex Mono" font-size="11" font-weight="600">3</text>
       <text x="380" y="68" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="10">...</text>
-      <rect x="395" y="50" width="40" height="28" fill="#6e1a1a" stroke="#c43030" stroke-width="1" rx="2"/>
+      <rect x="395" y="50" width="40" height="28" fill="#6e1a1a" stroke="#ff4081" stroke-width="1" rx="2"/>
       <text x="415" y="68" text-anchor="middle" fill="#f85149" font-family="IBM Plex Mono" font-size="11" font-weight="600">0</text>
       <!-- Labels -->
       <text x="300" y="125" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">count &gt; 0 &rarr; SATISFIED | count == 0 &rarr; UNSATISFIED</text>
@@ -65,7 +65,7 @@
       <tr><td class="field-name">count</td><td class="field-type">NUMERIC</td><td class="field-size">1-4 B</td><td class="field-side-c">Conditions</td><td class="field-desc">Current counter value (decremented by RECURSE_MODIFIED each spend)</td></tr>
     </tbody>
   </table>
-  <p class="section-text" style="margin-top:12px">Requires a valid signature from the event signer key in the witness to authorize each decrement operation.</p>
+  <p class="section-text" style="margin-top:12px">The event signer key must be present as a PUBKEY or PUBKEY_COMMIT field. The evaluator checks key presence, not signature verification (signature checking is handled by a separate SIG block on the same rung).</p>
 </div>
 
 <!-- Wire Format -->
@@ -99,10 +99,11 @@
 <div class="doc-section">
   <div class="section-label">Evaluation Logic</div>
   <div class="eval-box">
-    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Read <span class="eval-keyword">event_signer</span> (PUBKEY or PUBKEY_COMMIT) and <span class="eval-keyword">count</span> from conditions</span></div>
-    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Verify event signer authorization from witness</span></div>
-    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">If count &gt; 0 &rarr; <span class="eval-result-sat">SATISFIED</span> (counter active, can decrement)</span></div>
-    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">If count == 0 &rarr; <span class="eval-result-unsat">UNSATISFIED</span> (countdown complete)</span></div>
+    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Check for at least 1 <span class="eval-keyword">PUBKEY</span> or <span class="eval-keyword">PUBKEY_COMMIT</span> field. If missing &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Read <span class="eval-keyword">count</span> from NUMERIC field. If no NUMERIC field &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">If count &lt; 0 &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">If count &gt; 0 &rarr; <span class="eval-result-sat">SATISFIED</span> (counter active, can decrement)</span></div>
+    <div class="eval-step"><span class="eval-step-num">5.</span><span class="eval-step-text">If count == 0 &rarr; <span class="eval-result-unsat">UNSATISFIED</span> (countdown complete)</span></div>
   </div>
 </div>
 
@@ -112,8 +113,9 @@
   <table class="result-table">
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
-      <tr><td>Missing PUBKEY/PUBKEY_COMMIT or NUMERIC field</td><td class="r-err">ERROR</td></tr>
-      <tr><td>Event signer authorization fails</td><td class="r-unsat">UNSATISFIED</td></tr>
+      <tr><td>Missing PUBKEY/PUBKEY_COMMIT field</td><td class="r-err">ERROR</td></tr>
+      <tr><td>No NUMERIC field</td><td class="r-err">ERROR</td></tr>
+      <tr><td>count &lt; 0</td><td class="r-err">ERROR</td></tr>
       <tr><td>count == 0 (countdown done)</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>count &gt; 0 (counter active)</td><td class="r-sat">SATISFIED</td></tr>
     </tbody>

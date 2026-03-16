@@ -41,6 +41,8 @@ bool IsBaseBlockType(uint16_t block_type)
     case RungBlockType::P2WSH_LEGACY:
     case RungBlockType::P2TR_LEGACY:
     case RungBlockType::P2TR_SCRIPT_LEGACY:
+    // Utility family
+    case RungBlockType::DATA_RETURN:
         return true;
     default:
         return false;
@@ -106,10 +108,7 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
     // Validate v4 output scriptPubKeys as rung conditions
     for (size_t i = 0; i < tx.vout.size(); ++i) {
         const auto& scriptPubKey = tx.vout[i].scriptPubKey;
-        // Allow OP_RETURN data outputs
-        if (scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN) {
-            continue;
-        }
+        // No raw OP_RETURN — use DATA_RETURN block instead
         // All rung conditions outputs must pass policy
         if (IsRungConditionsScript(scriptPubKey)) {
             std::string output_reason;
@@ -122,7 +121,7 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
         if (IsMLSCScript(scriptPubKey)) {
             continue;
         }
-        // Allow non-conditions outputs (e.g., standard P2TR for change) during bootstrap
+        // Output validation (including DATA_RETURN enforcement) is consensus — see ValidateRungOutputs
     }
 
     // Validate each input's witness as a ladder witness
@@ -152,7 +151,6 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
             return false;
         }
 
-        size_t preimage_block_count = 0;
         for (const auto& rung : ladder.rungs) {
             // Compact rungs: validate compact data, skip block iteration
             if (rung.IsCompact()) {
@@ -184,17 +182,9 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
 
             for (const auto& block : rung.blocks) {
                 uint16_t btype = static_cast<uint16_t>(block.type);
-                // Policy: all known block types are standard
                 if (!IsKnownBlockType(btype)) {
                     reason = "rung-unknown-block-type: " + BlockTypeName(block.type);
                     return false;
-                }
-
-                // Count preimage-bearing blocks (spam surface limit)
-                if (block.type == RungBlockType::HASH_PREIMAGE ||
-                    block.type == RungBlockType::HASH160_PREIMAGE ||
-                    block.type == RungBlockType::TAGGED_HASH) {
-                    preimage_block_count++;
                 }
 
                 for (const auto& field : block.fields) {
@@ -239,12 +229,6 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
                     reason = "rung-relay-unknown-block-type";
                     return false;
                 }
-                // Count preimage blocks in relays too
-                if (block.type == RungBlockType::HASH_PREIMAGE ||
-                    block.type == RungBlockType::HASH160_PREIMAGE ||
-                    block.type == RungBlockType::TAGGED_HASH) {
-                    preimage_block_count++;
-                }
                 for (const auto& field : block.fields) {
                     std::string field_reason;
                     if (!field.IsValid(field_reason)) {
@@ -269,25 +253,8 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
             }
         }
 
-        // Validate relay chain depth
-        if (!ladder.relays.empty()) {
-            // Compute transitive depth for each relay
-            std::vector<size_t> depths(ladder.relays.size(), 0);
-            for (size_t rl = 0; rl < ladder.relays.size(); ++rl) {
-                for (uint16_t req : ladder.relays[rl].relay_refs) {
-                    depths[rl] = std::max(depths[rl], depths[req] + 1);
-                }
-                if (depths[rl] > MAX_RELAY_DEPTH) {
-                    reason = "rung-relay-depth-exceeded: " + std::to_string(depths[rl]);
-                    return false;
-                }
-            }
-        }
-
-        if (preimage_block_count > MAX_PREIMAGE_BLOCKS_PER_WITNESS) {
-            reason = "rung-too-many-preimage-blocks: " + std::to_string(preimage_block_count);
-            return false;
-        }
+        // Note: PREIMAGE field count and relay chain depth are now enforced
+        // at consensus level in DeserializeLadderWitness (serialize.cpp).
     }
 
     return true;

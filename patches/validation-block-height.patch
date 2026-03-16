@@ -102,8 +102,16 @@ index 8190e9c..fd2e858 100644
 +                       int32_t block_height)
  {
      if (tx.IsCoinBase()) return true;
- 
-@@ -2198,7 +2216,7 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
+
++    // LADDER SCRIPT: validate outputs once per transaction (before per-input checks)
++    if (tx.version == CTransaction::RUNG_TX_VERSION) {
++        std::string output_error;
++        if (!rung::ValidateRungOutputs(tx, flags, output_error)) {
++            return state.Invalid(TxValidationResult::TX_CONSENSUS, "rung-invalid-output", output_error);
++        }
++    }
++
+@@ -2198,7 +2223,7 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
          // spent being checked as a part of CScriptCheck.
  
          // Verify signature
@@ -112,7 +120,20 @@ index 8190e9c..fd2e858 100644
          if (pvChecks) {
              pvChecks->emplace_back(std::move(check));
          } else if (auto result = check(); result.has_value()) {
-@@ -2655,10 +2673,10 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state,
+@@ -2393,6 +2411,12 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const CC
+         flags |= SCRIPT_VERIFY_NULLDUMMY;
+     }
+
++    // LADDER SCRIPT: enforce MLSC-only on mainnet (reject 0xC1 inline conditions).
++    // Regtest, signet, and testnet retain 0xC1 for development and testing.
++    if (chainman.GetParams().GetChainType() == ChainType::MAIN) {
++        flags |= rung::RUNG_VERIFY_MLSC_ONLY;
++    }
++
+     return flags;
+ }
+
+@@ -2655,10 +2679,10 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state,
              // they need to be added to control which runs them asynchronously. Otherwise, CheckInputScripts runs the checks before returning.
              if (control) {
                  std::vector<CScriptCheck> vChecks;

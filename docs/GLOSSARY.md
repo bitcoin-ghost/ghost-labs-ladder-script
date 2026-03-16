@@ -95,9 +95,17 @@ An enum (`RungCoilType`, `uint8_t`) that determines the unlock semantics of a ru
 
 A spending requirement embedded in a v4 output's scriptPubKey. Conditions are the
 "locking" side of Ladder Script: they specify what must be satisfied to spend the
-UTXO. Conditions contain only condition data types (PUBKEY, PUBKEY_COMMIT, HASH256,
-HASH160, NUMERIC, SCHEME, SPEND_INDEX) and never contain witness-only types (SIGNATURE,
-PREIMAGE). Serialised with the `RUNG_CONDITIONS_PREFIX` (0xc1) byte.
+UTXO. Conditions contain only condition data types (HASH256, HASH160, NUMERIC, SCHEME,
+DATA) and never contain witness-only types (PUBKEY, SIGNATURE, PREIMAGE). Public keys
+are not stored in conditions -- they are folded into the Merkle leaf hash
+(merkle_pub_key). On mainnet, conditions are always Merkelised (`0xC2` MLSC).
+
+### COSIGN
+
+A PLC family block type (0x0681) that enforces a co-spend constraint. The block
+requires that another input in the same transaction carries a conditions hash matching
+the one committed in this block. Used to link inputs so that one cannot be spent without
+the other, enabling atomic multi-input policies.
 
 ### Contact
 
@@ -134,6 +142,10 @@ identical between input and output conditions.
 
 A witness that inherits its rung and relay structure from another input's witness within the same transaction, providing only field-level diffs and a fresh coil. Triggered when `n_rungs = 0` in the witness deserialisation. The witness-side counterpart to Template Inheritance.
 
+### Diff Conditions
+
+See **Template Inheritance**.
+
 ### Energised
 
 A rung or block that evaluates to SATISFIED. In PLC ladder diagram terminology, current
@@ -149,9 +161,9 @@ The evaluation result enum returned by block and rung evaluators. Four values:
 - **UNSATISFIED:** Conditions are valid but not met. The block or rung fails.
 - **ERROR:** The block is malformed (missing required fields, invalid data). This is a
   consensus failure; the transaction is invalid.
-- **UNKNOWN_BLOCK_TYPE:** The block type code is not recognised. Treated as UNSATISFIED
-  for forward compatibility (allows future soft-fork activation of new block types).
-  When inverted, UNKNOWN_BLOCK_TYPE becomes SATISFIED.
+- **UNKNOWN_BLOCK_TYPE:** The block type code is not recognised. Unknown types are
+  rejected at consensus during deserialization (`IsKnownBlockType()` check), so this
+  result is never reached in practice. Retained as a defense-in-depth fallback.
 
 ### Field
 
@@ -164,6 +176,14 @@ returns true as soon as one rung evaluates to SATISFIED. Remaining rungs are not
 evaluated. This means the first satisfied rung determines the spend path. Defined in
 `EvalLadder()`.
 
+### Implicit Field Layout
+
+A per-block-type schema that defines the expected number, order, and types of fields
+for both conditions and witness sides. When a block's fields match its implicit layout,
+the wire format can omit individual field type tags -- the deserialiser infers them from
+the block type. This reduces per-block overhead by 1 byte per field. Layouts are defined
+in `GetImplicitLayout()` in `src/rung/types.h`.
+
 ### Inversion
 
 A boolean flag (`block.inverted`) on each RungBlock that flips the evaluation result.
@@ -172,11 +192,25 @@ When `inverted` is true:
 - SATISFIED becomes UNSATISFIED
 - UNSATISFIED becomes SATISFIED
 - ERROR remains ERROR (errors never flip)
-- UNKNOWN_BLOCK_TYPE becomes SATISFIED
+- UNKNOWN_BLOCK_TYPE becomes ERROR
 
 Inversion is applied after the raw evaluation via `ApplyInversion()`. In PLC terms,
 an inverted block acts as a normally-closed contact. The inverted flag is taken from
 the conditions side (scriptPubKey), not from the witness.
+
+**Selective inversion:** Key-consuming blocks (SIG, MULTISIG, ADAPTOR_SIG,
+MUSIG_THRESHOLD, KEY_REF_SIG, COSIGN, and all compound/legacy SIG types) cannot be
+inverted. Enforced at deserialization via `IsInvertibleBlockType()`, a fail-closed
+allowlist. This prevents embedding arbitrary data via garbage pubkeys with inverted
+SIG blocks.
+
+### KEY_REF_SIG
+
+A Signature family block type (0x0005) for signature verification using a key bound in
+a relay block. Instead of carrying its own key, the block references a public key from
+a relay via index, allowing multiple blocks across different rungs to share a single
+key binding. The referenced key is folded into the relay's Merkle leaf (merkle_pub_key).
+Reduces conditions size when the same key is used in multiple spending paths.
 
 ### Ladder
 
@@ -211,9 +245,10 @@ BIP-341-style tagged hash domain tags used in MLSC Merkle tree construction. A t
 hash is computed as `SHA256(SHA256(tag) || SHA256(tag) || data)`, where the 64-byte
 prefix of the doubled tag hash provides domain separation.
 
-- **"LadderLeaf"** — Used for leaf nodes: rung leaves, coil leaf, relay leaves, and the
-  empty padding leaf. Pre-computed as `LEAF_HASHER` in `conditions.cpp`.
-- **"LadderInternal"** — Used for interior (branch) nodes. Takes `min(A,B) || max(A,B)`
+- **"LadderLeaf"** -- Used for leaf nodes: rung leaves, coil leaf, relay leaves, and the
+  empty padding leaf. Rung and relay leaves include public keys appended after the
+  serialised blocks (merkle_pub_key). Pre-computed as `LEAF_HASHER` in `conditions.cpp`.
+- **"LadderInternal"** -- Used for interior (branch) nodes. Takes `min(A,B) || max(A,B)`
   as data for canonical sorted construction. Pre-computed as `INTERNAL_HASHER`.
 
 The domain separation ensures a valid leaf hash can never be mistaken for a valid interior
@@ -238,18 +273,26 @@ evaluator processes.
 
 The set of sibling hashes needed to reconstruct the conditions root from a revealed leaf.
 For a tree with M leaves (padded to the next power of 2), the proof contains at most
-`ceil(log2(M))` hashes — e.g., 0 hashes for a single-rung condition, 1 hash for 2 rungs,
+`ceil(log2(M))` hashes -- e.g., 0 hashes for a single-rung condition, 1 hash for 2 rungs,
 4 hashes for 16 rungs. Each proof hash is 32 bytes. The verifier reconstructs the root
 bottom-up using `TaggedHash("LadderInternal", min(A,B) || max(A,B))` at each level and
 checks the result against the UTXO's conditions root.
 
+### Micro-header
+
+A compact wire encoding for block type codes. The first 128 block types (by frequency)
+are assigned slots 0x00-0x7F in a lookup table, allowing them to be encoded as a single
+byte instead of 2 bytes. Less common block types use an escape byte (0x80 for 2-byte
+codes, 0x81 for extended) followed by the full type code. The lookup table is defined in
+`MICRO_HEADER_TABLE` in `src/rung/types.h`.
+
 ### MLSC (Merkelised Ladder Script Conditions)
 
-An output format (`0xC2` prefix) that stores only a 32-byte Merkle root instead of full
-inline conditions. The complete conditions are revealed at spend time in the witness,
-along with a Merkle proof. Key properties:
+An output format (`0xC2` prefix) that stores a 32-byte Merkle root (33 bytes standard,
+or 34-113 bytes with a DATA_RETURN payload appended). The complete conditions are
+revealed at spend time in the witness, along with a Merkle proof. Key properties:
 
-- **Fixed UTXO size:** 40 bytes per entry (value + root) regardless of script complexity
+- **Compact UTXO size:** 33-113 bytes per scriptPubKey regardless of condition complexity
 - **Data embedding resistance:** Fake conditions produce unspendable outputs; since they
   are never spent, the fake data is never published on-chain
 - **MAST privacy:** Only the exercised spending path (one rung) is revealed; unused paths
@@ -265,16 +308,38 @@ Specified in `MERKLE-UTXO-SPEC.md`. Implemented in `src/rung/conditions.cpp`.
 The 32-byte Merkle root stored in an MLSC (`0xC2`) output. Computed as a binary Merkle
 tree over tagged leaf hashes of all rungs, relays, and the coil. Uses sorted interior
 hashing for canonical construction. The root transitively commits to every field of every
-block in every rung — changing any byte in any condition changes the root and invalidates
+block in every rung -- changing any byte in any condition changes the root and invalidates
 all signatures. Defined in `ComputeConditionsRoot()` in `src/rung/conditions.cpp`.
 
 ### MUSIG_THRESHOLD
 
 A Signature family block type (0x0004) for MuSig2/FROST aggregate threshold signatures.
-Conditions contain a PUBKEY_COMMIT (aggregate key hash) and two NUMERIC fields (threshold
-M and group size N, for policy/display). The witness contains the aggregate PUBKEY and
-aggregate SIGNATURE. On-chain, the spend is indistinguishable from a single-sig SIG
-block (~131 bytes regardless of M or N). Schnorr-only; no post-quantum path.
+Conditions contain two NUMERIC fields (threshold M and group size N, for policy/display).
+The aggregate public key is folded into the Merkle leaf (merkle_pub_key). The witness
+contains the aggregate PUBKEY and aggregate SIGNATURE. On-chain, the spend is
+indistinguishable from a single-sig SIG block (~131 bytes regardless of M or N).
+Schnorr-only; no post-quantum path.
+
+### Legacy Family
+
+The 10th block family (0x0900-0x09FF), containing 7 block types that wrap traditional
+Bitcoin transaction types as typed Ladder Script blocks. Each legacy block preserves the
+spending semantics of its original format but enforces typed fields, eliminating the
+arbitrary data surfaces present in raw legacy scripts.
+
+| Code | Block | Wraps |
+|------|-------|-------|
+| 0x0901 | P2PK_LEGACY | Pay-to-Public-Key |
+| 0x0902 | P2PKH_LEGACY | Pay-to-Public-Key-Hash |
+| 0x0903 | P2SH_LEGACY | Pay-to-Script-Hash |
+| 0x0904 | P2WPKH_LEGACY | Pay-to-Witness-Public-Key-Hash |
+| 0x0905 | P2WSH_LEGACY | Pay-to-Witness-Script-Hash |
+| 0x0906 | P2TR_LEGACY | Pay-to-Taproot (key-path) |
+| 0x0907 | P2TR_SCRIPT_LEGACY | Pay-to-Taproot (script-path) |
+
+P2SH, P2WSH, and P2TR_SCRIPT inner scripts must be valid Ladder Script conditions --
+arbitrary bytes are rejected. Legacy blocks compose with all other block types within
+rungs.
 
 ### Latch
 
@@ -317,14 +382,36 @@ the power supply (input conditions to evaluate). The right rail represents the r
 point for block evaluation, and the right rail is reached when all blocks in a rung
 are SATISFIED, activating the coil.
 
-### PUBKEY_COMMIT
+### merkle_pub_key
 
-A 32-byte SHA-256 hash commitment to a full public key, stored as RungDataType 0x02.
-When present in a SIG block, the revealed PUBKEY in the witness must hash to this
-commitment. This allows conditions to commit to a key without revealing it until spend
-time, providing key privacy in the scriptPubKey.
+The scheme by which public keys are bound to conditions without appearing in them.
+Instead of storing a key commitment field in the conditions, the node folds all
+public keys consumed by a rung into the Merkle leaf hash:
 
-Verification: `SHA256(PUBKEY.data) == PUBKEY_COMMIT.data`.
+```
+leaf = TaggedHash("LadderLeaf", SerializeRung(rung) || pk1 || pk2 || ... || pkN)
+```
+
+Keys are appended in block order (left to right), with the count per block determined
+by `PubkeyCountForBlock()`. At spend time, the verifier recomputes the leaf from the
+revealed conditions plus the witness keys. If the recomputed leaf does not match the
+committed Merkle root, verification fails before signature checking begins.
+
+This eliminates all writable surfaces in conditions -- there is no field an attacker
+can fill with arbitrary data. It also provides UTXO efficiency: no key data appears
+in the UTXO set regardless of key size (PQ keys can be 2 KB+).
+
+### Relay
+
+A shared sub-condition block sequence that is evaluated once and referenced by multiple
+rungs via `relay_refs`. Represented by the `Relay` struct, which contains a vector of
+`RungBlock` objects (like a rung but without a coil). Relays are evaluated before any
+rungs. A rung that includes a relay reference inherits its result -- if the relay is
+UNSATISFIED, the referencing rung fails without evaluating its own blocks.
+
+Relays enable AND composition across rungs without duplicating blocks. Forward-only
+indexing is enforced: relay N can only reference relays 0..N-1. In MLSC trees, only
+relays referenced by the exercised rung are revealed.
 
 ### Recursion
 
@@ -371,7 +458,7 @@ single spending condition. Represented by the `RungBlock` struct containing:
 ### RungBlockType
 
 An enum (`uint16_t`) identifying the type of a block. Encoded as 2 bytes (little-endian)
-in the wire format. 60 block types are defined across 10 families. The numeric ranges
+in the wire format. 59 block types are defined across 10 families. The numeric ranges
 partition the type space by family:
 
 | Range | Family |
@@ -385,20 +472,23 @@ partition the type space by family:
 | 0x0600-0x06FF | PLC |
 | 0x0700-0x07FF | Compound |
 | 0x0800-0x08FF | Governance |
+| 0x0900-0x09FF | Legacy |
 
 ### RungConditions
 
 The conditions embedded in a v4 output's scriptPubKey. Represented by the
 `RungConditions` struct, which mirrors the `LadderWitness` structure but contains only
-condition data types (no SIGNATURE or PREIMAGE). Serialised with the
-`RUNG_CONDITIONS_PREFIX` (0xc1) byte as the first byte of the scriptPubKey.
+condition data types (no PUBKEY, SIGNATURE, or PREIMAGE). On mainnet, conditions are
+always Merkelised (`0xC2` MLSC) -- only the Merkle root is in the scriptPubKey. Inline
+`0xC1` encoding exists for regtest/signet testing only.
 
 Contains:
 - `rungs`: Vector of `Rung` objects with condition-only fields
 - `coil`: Output coil with attestation mode, scheme, address, and coil conditions
 
-At spend time, conditions are deserialised from the spent output and merged with the
-witness from the spending input before evaluation.
+At spend time, conditions are deserialised from the spent output (inline) or revealed
+via Merkle proof (MLSC), then merged with the witness from the spending input before
+evaluation.
 
 ### RungDataType
 
@@ -406,19 +496,21 @@ An enum (`uint8_t`) specifying the type of data in a field. Every byte in a Ladd
 Script witness belongs to one of these types; no arbitrary data pushes are possible.
 Nine types are defined:
 
-| Code | Name | Size Range | Description |
-|------|------|------------|-------------|
-| 0x01 | PUBKEY | 1-2048 B | Public key |
-| 0x02 | PUBKEY_COMMIT | 32 B | Public key commitment |
-| 0x03 | HASH256 | 32 B | SHA-256 hash |
-| 0x04 | HASH160 | 20 B | HASH160 digest |
-| 0x05 | PREIMAGE | 1-252 B | Hash preimage (witness only) |
-| 0x06 | SIGNATURE | 1-50000 B | Signature (witness only) |
-| 0x07 | SPEND_INDEX | 4 B | Spend index reference |
-| 0x08 | NUMERIC | 1-4 B | Numeric value (little-endian) |
-| 0x09 | SCHEME | 1 B | Signature scheme selector |
+| Code | Name | Size Range | Context | Description |
+|------|------|------------|---------|-------------|
+| 0x01 | PUBKEY | 1-2048 B | Witness | Public key |
+| 0x03 | HASH256 | 32 B | Both | SHA-256 hash |
+| 0x04 | HASH160 | 20 B | Both | HASH160 digest |
+| 0x05 | PREIMAGE | 1-252 B | Witness | Hash preimage |
+| 0x06 | SIGNATURE | 1-50000 B | Witness | Signature |
+| 0x08 | NUMERIC | 1-4 B | Both | Numeric value (little-endian) |
+| 0x09 | SCHEME | 1 B | Both | Signature scheme selector |
+| 0x0A | SCRIPT_BODY | 1-520 B | Witness | Serialised inner conditions |
+| 0x0B | DATA | 1-80 B | Both | Opaque data (DATA_RETURN payloads) |
 
-Formerly named `RungFieldType` in v1; the alias is retained for backward compatibility.
+Code 0x02 (formerly PUBKEY_COMMIT) is reserved. Public keys are bound to conditions
+via merkle_pub_key (folded into the Merkle leaf hash) rather than stored as condition
+fields.
 
 ### RungField
 
@@ -436,6 +528,15 @@ Transaction version 4, which signals that the transaction uses Ladder Script for
 validation instead of traditional Bitcoin Script. When a node encounters a v4
 transaction, inputs are validated through the rung evaluator (`VerifyRungTx()`) rather
 than the script interpreter.
+
+### SCRIPT_BODY
+
+A data type (0x0A) for serialised inner Ladder Script conditions carried in the witness.
+Size range: 1-520 bytes. Witness-only -- cannot appear in conditions. Used by the
+Legacy family blocks P2SH_LEGACY, P2WSH_LEGACY, and P2TR_SCRIPT_LEGACY to carry the
+inner conditions that must deserialise as valid Ladder Script. Rejecting arbitrary bytes
+in this field closes the data-embedding surface that raw P2SH/P2WSH/taproot script-path
+formats expose.
 
 ### Scheme
 
@@ -472,10 +573,19 @@ transaction. In the context of recursion blocks, "spent" refers to the input sid
 covenant chain: the input UTXO's conditions were satisfied, and the output UTXO
 carries forward the (possibly mutated) conditions for the next spend.
 
+### Template Inheritance
+
+A conditions-side encoding optimisation where one output inherits its rung and relay
+structure from another output in the same transaction, providing only field-level diffs.
+Triggered when `n_rungs == 0` in conditions deserialisation. The conditions-side
+counterpart to **Diff Witness** (which does the same for witness data on the input side).
+Reduces transaction size when multiple outputs share similar condition structures.
+
 ### Wire Format
 
 The serialised byte representation of Ladder Script structures. The wire format is used
-for both scriptPubKey conditions (prefixed with 0xc1) and witness data. Key properties:
+for both conditions and witness data. Inline conditions use `0xC1` prefix (regtest/signet
+only); mainnet uses `0xC2` MLSC. Key properties:
 
 - Block types: 2 bytes, little-endian (uint16_t)
 - Data types: 1 byte (uint8_t)

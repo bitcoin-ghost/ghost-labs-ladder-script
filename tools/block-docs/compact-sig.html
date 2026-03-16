@@ -23,7 +23,7 @@
   <div class="block-type-code">COMPACT TYPE 0x01 &middot; WIRE FORMAT OPTIMISATION</div>
   <h1 class="block-title">COMPACT_SIG</h1>
   <p class="block-subtitle">Compact rung encoding for single-key signature conditions. Stores PUBKEY_COMMIT and SCHEME directly on the rung with no block overhead. Resolves to a standard SIG block at evaluation time. Primarily used for change outputs and single-key spending.</p>
-  <span class="block-family-badge" style="color: #2d7dd2; border-color: #2d7dd240;">Signature</span>
+  <span class="block-family-badge" style="color: #ff1744; border-color: #ff174440;">Signature</span>
   <span class="block-family-badge" style="color: #98c379; border-color: #98c37940;">Compact</span>
 </div>
 
@@ -90,7 +90,7 @@
         <td class="field-type">SCHEME</td>
         <td class="field-size">1 B</td>
         <td class="field-side-c">Conditions</td>
-        <td class="field-desc">Signature scheme: 0x00 Schnorr, 0x01 ECDSA, or PQ scheme</td>
+        <td class="field-desc">Signature scheme: 0x01 Schnorr, 0x02 ECDSA, or PQ scheme</td>
       </tr>
     </tbody>
   </table>
@@ -295,7 +295,7 @@
 
   <div class="use-case">
     <div class="use-case-title">Not a Block Type</div>
-    <div class="use-case-desc">COMPACT_SIG is a <em>compact rung encoding</em>, not a new block type in the RungBlockType enum. It uses the <code>n_blocks == 0</code> sentinel within a rung to signal that the rung carries inline compact data rather than an array of blocks. The 60 block type count is unchanged.</div>
+    <div class="use-case-desc">COMPACT_SIG is a <em>compact rung encoding</em>, not a new block type in the RungBlockType enum. It uses the <code>n_blocks == 0</code> sentinel within a rung to signal that the rung carries inline compact data rather than an array of blocks. The 61 block type count is unchanged.</div>
   </div>
 
   <div class="use-case">

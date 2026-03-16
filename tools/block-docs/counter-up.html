@@ -33,19 +33,19 @@
     <svg width="620" height="190" viewBox="0 0 620 190">
       <line x1="20" y1="10" x2="20" y2="180" stroke="#4a4a4a" stroke-width="3"/>
       <line x1="600" y1="10" x2="600" y2="180" stroke="#4a4a4a" stroke-width="3"/>
-      <line x1="20" y1="60" x2="160" y2="60" stroke="#e6a817" stroke-width="2"/>
-      <line x1="440" y1="60" x2="600" y2="60" stroke="#e6a817" stroke-width="2"/>
+      <line x1="20" y1="60" x2="160" y2="60" stroke="#ff1744" stroke-width="2"/>
+      <line x1="440" y1="60" x2="600" y2="60" stroke="#ff1744" stroke-width="2"/>
       <rect x="160" y="20" width="280" height="100" rx="2" fill="#2a2a2a" stroke="#98c379" stroke-width="1.5"/>
       <text x="300" y="38" text-anchor="middle" fill="#98c379" font-family="Share Tech Mono" font-size="13" letter-spacing="2">COUNTER_UP</text>
       <!-- Signer -->
       <rect x="185" y="48" width="100" height="24" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="235" y="64" text-anchor="middle" fill="#2d7dd2" font-family="IBM Plex Mono" font-size="9" font-weight="600">EVENT SIGNER</text>
+      <text x="235" y="64" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="9" font-weight="600">EVENT SIGNER</text>
       <!-- Counter -->
       <rect x="185" y="80" width="80" height="24" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
       <text x="225" y="96" text-anchor="middle" fill="#98c379" font-family="IBM Plex Mono" font-size="9" font-weight="600">current: 3</text>
       <text x="285" y="96" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="12">&lt;</text>
       <rect x="305" y="80" width="80" height="24" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="345" y="96" text-anchor="middle" fill="#e6a817" font-family="IBM Plex Mono" font-size="9" font-weight="600">target: 10</text>
+      <text x="345" y="96" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="9" font-weight="600">target: 10</text>
       <text x="300" y="155" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">pubkey + current &lt; target &rarr; SATISFIED</text>
     </svg>
   </div>
@@ -95,10 +95,11 @@
 <div class="doc-section">
   <div class="section-label">Evaluation Logic</div>
   <div class="eval-box">
-    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Extract <span class="eval-keyword">PUBKEY</span> or <span class="eval-keyword">PUBKEY_COMMIT</span> field. If missing &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Check for at least 1 <span class="eval-keyword">PUBKEY</span> or <span class="eval-keyword">PUBKEY_COMMIT</span> field. If missing &rarr; <span class="eval-result-err">ERROR</span></span></div>
     <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Read <span class="eval-keyword">current</span> (NUMERIC[0]) and <span class="eval-keyword">target</span> (NUMERIC[1]). If fewer than 2 NUMERIC fields &rarr; <span class="eval-result-err">ERROR</span></span></div>
-    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">If current &lt; target &rarr; <span class="eval-result-sat">SATISFIED</span> (still counting)</span></div>
-    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">If current &ge; target &rarr; <span class="eval-result-unsat">UNSATISFIED</span> (count complete)</span></div>
+    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">If current &lt; 0 or target &lt; 0 &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">If current &lt; target &rarr; <span class="eval-result-sat">SATISFIED</span> (still counting)</span></div>
+    <div class="eval-step"><span class="eval-step-num">5.</span><span class="eval-step-text">If current &ge; target &rarr; <span class="eval-result-unsat">UNSATISFIED</span> (count complete)</span></div>
   </div>
 </div>
 
@@ -110,6 +111,7 @@
     <tbody>
       <tr><td>Missing PUBKEY / PUBKEY_COMMIT field</td><td class="r-err">ERROR</td></tr>
       <tr><td>Fewer than 2 NUMERIC fields</td><td class="r-err">ERROR</td></tr>
+      <tr><td>current &lt; 0 or target &lt; 0</td><td class="r-err">ERROR</td></tr>
       <tr><td>current &ge; target</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>current &lt; target</td><td class="r-sat">SATISFIED</td></tr>
     </tbody>

@@ -6,7 +6,7 @@
 Ghost Labs
 
 ### Status
-Final — Consensus-standard
+Final - Consensus-standard
 
 ---
 
@@ -16,12 +16,12 @@ Merkelised Ladder Script Conditions (MLSC) is the standard output format for Lad
 
 **Key properties:**
 
-1. **Zero user-chosen bytes in the UTXO set** — only a 32-byte Merkle root per output
-2. **Zero conditions on-chain at creation** — outputs contain only `(value, root)`
-3. **Data embedding resistance** — fake conditions are never published (unspendable outputs are never spent, so conditions are never revealed); embedding surface reduced to 32 bytes per output (identical to P2TR/P2WSH)
-4. **MAST privacy** — unused spending paths are never revealed; only the satisfied rung is disclosed at spend time
-5. **Fixed-size UTXO entries** — 40 bytes per output regardless of script complexity
-6. **Witness efficiency** — complex scripts save weight (conditions at 1× witness weight, not 4× output weight)
+1. **Zero user-chosen bytes in the UTXO set** - only a 32-byte Merkle root per output
+2. **Zero conditions on-chain at creation** - outputs contain only `(value, root)`
+3. **Data embedding resistance** - fake conditions are never published (unspendable outputs are never spent, so conditions are never revealed); embedding surface reduced to 32 bytes per output (identical to P2TR/P2WSH)
+4. **MAST privacy** - unused spending paths are never revealed; only the satisfied rung is disclosed at spend time
+5. **Fixed-size UTXO entries** - 40 bytes per output regardless of script complexity
+6. **Witness efficiency** - complex scripts save weight (conditions at 1× witness weight, not 4× output weight)
 
 ---
 
@@ -31,17 +31,17 @@ Merkelised Ladder Script Conditions (MLSC) is the standard output format for Lad
 
 Bitcoin's P2WSH outputs store only a 32-byte script hash. The full script is revealed only at spend time, in the witness. If an output is never spent, the script is never published. This means:
 
-- A spammer who creates an unspendable P2WSH output with embedded data in the script never actually publishes that data — it exists only on their local machine
+- A spammer who creates an unspendable P2WSH output with embedded data in the script never actually publishes that data - it exists only on their local machine
 - The blockchain sees only 32 bytes of hash per output
 - Nobody considers this a data embedding vulnerability
 
-MLSC applies the same principle: outputs contain only the Merkle root of their conditions. The full conditions — including all PUBKEY_COMMITs, hash fields, and typed blocks — are revealed only when the output is spent.
+MLSC applies the same principle: outputs contain only the Merkle root of their conditions. The full conditions, including all hash fields, timelocks, thresholds, and typed blocks, are revealed only when the output is spent. Public keys are folded into the Merkle leaf hash (merkle_pub_key) and never appear in conditions at all.
 
 ### 2.2 Why Merkle Rather Than Flat Hash
 
 A flat hash (like P2WSH) would require revealing all conditions at spend time, including unused rungs. The Merkle tree enables selective disclosure: only the satisfied rung and its relay dependencies are revealed. Unused spending paths remain permanently hidden behind opaque proof hashes.
 
-For a ladder with N rungs, the spending witness includes only O(log N) proof hashes — at most 4 hashes for the maximum 16 rungs.
+For a ladder with N rungs, the spending witness includes only O(log N) proof hashes - at most 4 hashes for the maximum 16 rungs.
 
 ### 2.3 Design Goals
 
@@ -53,12 +53,12 @@ For a ladder with N rungs, the spending witness includes only O(log N) proof has
 | Fixed-size UTXO entries | 40 bytes `(value, root)` regardless of script complexity |
 | MAST path privacy | Binary Merkle tree over rungs; unused paths stay hidden |
 | Witness size reduction | Reveal only exercised path + O(log N) proof hashes |
-| Quantum-safe key hiding | PUBKEY_COMMIT preserved; raw pubkeys never appear until spend |
-| Evaluator compatibility | All 60 block evaluators unchanged |
+| Quantum-safe key hiding | Pubkeys folded into Merkle leaf (merkle_pub_key); never appear until spend |
+| Evaluator compatibility | All 59 block evaluators unchanged |
 
 ### 2.4 Inline Conditions (`0xC1`)
 
-Ladder Script also supports an inline conditions format where the full conditions are stored directly in the scriptPubKey with a `0xC1` prefix. This is useful for debugging, testing, and cases where conditions privacy is not required. MLSC (`0xC2`) is the standard format for production use.
+Ladder Script also supports an inline conditions format where the full conditions are stored directly in the scriptPubKey with a `0xC1` prefix. Inline conditions are rejected on mainnet (`RUNG_VERIFY_MLSC_ONLY` flag). They exist for regtest and signet testing only. MLSC (`0xC2`) is the only accepted format on mainnet.
 
 ---
 
@@ -69,8 +69,8 @@ Ladder Script also supports an inline conditions format where the full condition
 | Term | Definition |
 |------|-----------|
 | **Conditions** | The full set of Ladder Script rungs, blocks, and fields that define spending requirements |
-| **Rung leaf** | `TaggedHash("LadderLeaf", SerializeRung(rung))` — the tagged hash of a serialised rung |
-| **Coil leaf** | `TaggedHash("LadderLeaf", SerializeCoil(coil))` — the tagged hash of serialised coil metadata |
+| **Rung leaf** | `TaggedHash("LadderLeaf", SerializeRung(rung) \|\| pk1 \|\| ... \|\| pkN)` - the tagged hash of a serialised rung with pubkeys appended (merkle_pub_key) |
+| **Coil leaf** | `TaggedHash("LadderLeaf", SerializeCoil(coil))` - the tagged hash of serialised coil metadata |
 | **Conditions root** | The Merkle root computed over all rung leaves and the coil leaf using tagged interior hashes |
 | **Merkle proof** | The sibling hashes needed to prove a leaf belongs to the conditions root |
 
@@ -79,14 +79,20 @@ Ladder Script also supports an inline conditions format where the full condition
 Each output in the creating transaction contains only the value and the Merkle root:
 
 ```
-Output:
+Standard output:
   value:          int64     (8 bytes, satoshis)
   scriptPubKey:   0xC2 || conditions_root    (1 + 32 = 33 bytes)
+
+DATA_RETURN output (optional, max 1 per tx, zero-value):
+  value:          0
+  scriptPubKey:   0xC2 || conditions_root || data    (33 + 1..80 = 34..113 bytes)
 ```
 
-**Total output size: 42 bytes** (8 value + 1 scriptPubKey length + 1 version byte + 32 root).
+**Standard output size: 42 bytes** (8 value + 1 scriptPubKey length + 1 version byte + 32 root).
 
 The `0xC2` version byte identifies MLSC outputs. **There are no conditions in the creating transaction.** The sender computes the Merkle root locally and places only the root in the output. The full conditions exist only in the sender's and recipient's wallets.
+
+DATA_RETURN outputs append up to 80 bytes of data after the root. The data is visible on-chain at fund time (4 WU/byte, conditions weight). This replaces OP_RETURN for Ladder Script transactions.
 
 ### 3.3 UTXO Entry Format
 
@@ -115,7 +121,7 @@ Merkle tree leaves (in order):
 ```
 TaggedHash(tag, data) = SHA256(SHA256(tag) || SHA256(tag) || data)
 
-rung_leaf[i] = TaggedHash("LadderLeaf", SerializeRung(rung[i]))
+rung_leaf[i] = TaggedHash("LadderLeaf", SerializeRung(rung[i]) || pk1 || pk2 || ... || pkN)
 coil_leaf    = TaggedHash("LadderLeaf", SerializeCoil(coil))
 ```
 
@@ -145,7 +151,7 @@ Given M leaves (N rungs + 1 coil): L[0], L[1], ..., L[M-1]
    c. conditions_root = tree root
 ```
 
-**Domain separation (BIP-341 convention):** Leaf nodes use the tag `"LadderLeaf"` and interior nodes use the tag `"LadderInternal"`. The 64-byte tag prefix (`SHA256(tag) || SHA256(tag)`) in each tagged hash ensures cross-domain collisions are computationally infeasible — a valid leaf hash can never be mistaken for a valid interior hash, and vice versa. This follows the same pattern used by BIP-341 (Taproot) for `"TapLeaf"` vs `"TapBranch"`.
+**Domain separation (BIP-341 convention):** Leaf nodes use the tag `"LadderLeaf"` and interior nodes use the tag `"LadderInternal"`. The 64-byte tag prefix (`SHA256(tag) || SHA256(tag)`) in each tagged hash ensures cross-domain collisions are computationally infeasible - a valid leaf hash can never be mistaken for a valid interior hash, and vice versa. This follows the same pattern used by BIP-341 (Taproot) for `"TapLeaf"` vs `"TapBranch"`.
 
 **Empty leaf constant:** `EMPTY_LEAF = TaggedHash("LadderLeaf", "")` is a nothing-up-my-sleeve constant used for power-of-2 padding. It uses the same "LadderLeaf" tag as real leaves but with empty data. It cannot collide with any valid rung or coil leaf because valid serialised rungs/coils have minimum length requirements.
 
@@ -167,7 +173,7 @@ Spending witness:
           [inverted: uint8]
           [n_fields: varint]
             for each field:
-              [data_type: uint8]          (condition types: PUBKEY_COMMIT, HASH256, etc.)
+              [data_type: uint8]          (condition types: HASH256, HASH160, NUMERIC, SCHEME, DATA)
               [data_len: varint]
               [data: bytes]
     [n_witness_fields: varint]            (witness data for this rung's blocks)
@@ -181,7 +187,7 @@ Spending witness:
   for each relay:
     [relay_index: varint]
     [serialized_relay: bytes]
-  [serialized_coil: bytes]                (full coil metadata — always revealed)
+  [serialized_coil: bytes]                (full coil metadata - always revealed)
   [n_proof_hashes: varint]                (Merkle proof sibling hashes)
   for each proof hash:
     [hash: 32 bytes]
@@ -214,12 +220,13 @@ VerifyMLSCSpend(utxo, witness):
      c. If mismatch → REJECT
 
   5. Merge conditions with witness:
-     - Pair condition fields (PUBKEY_COMMIT, HASH256, SCHEME, etc.)
+     - Pair condition fields (HASH256, NUMERIC, SCHEME, etc.)
        with witness fields (PUBKEY, SIGNATURE, PREIMAGE)
+     - Pubkeys from the witness are verified via the Merkle leaf (merkle_pub_key)
 
   6. Evaluate:
      a. Evaluate referenced relays first (forward-only dependencies)
-     b. Evaluate revealed rung blocks (AND logic — all blocks must be SATISFIED)
+     b. Evaluate revealed rung blocks (AND logic - all blocks must be SATISFIED)
      c. If rung is SATISFIED → spend is valid
 
   7. Evaluate coil constraints (output validation) if present
@@ -242,7 +249,7 @@ SignatureHashLadder components:
   [conditions_root: 32 bytes]             ← direct from UTXO
 ```
 
-**Rationale:** The conditions_root already commits to all condition data through the Merkle tree. Signers attest to the root, which is binding on all possible spending paths. Using the root directly (rather than hashing it again) is simpler and equally secure — the root is already a SHA256 output.
+**Rationale:** The conditions_root already commits to all condition data through the Merkle tree. Signers attest to the root, which is binding on all possible spending paths. Using the root directly (rather than hashing it again) is simpler and equally secure - the root is already a SHA256 output.
 
 ### 3.8 Relay Handling
 
@@ -277,24 +284,26 @@ Relay evaluation follows existing forward-only rules: relay N can only reference
 | UTXO set | 32-byte Merkle root | Yes (computed locally) | Yes | Until spent |
 | Creating tx output | 32-byte root only | Yes | Yes (in block) | Prunable |
 | Conditions (legitimate spend) | Full rung + witness | Yes | Yes (in witness) | Prunable |
-| Conditions (fake/spam) | Full rung data | Yes | **NO — never published** | N/A |
+| Conditions (fake/spam) | Full rung data | Yes | **NO - never published** | N/A |
 
 ### 4.2 Why Fake Conditions Never Appear On-Chain
 
-A spammer who creates an output with fake PUBKEY_COMMITs (arbitrary data instead of real key hashes):
+A spammer who creates an output with fake conditions (arbitrary data in hash fields, garbage block parameters):
 
 1. Computes Merkle root locally from fake conditions
 2. Broadcasts creating transaction with 42-byte output `(value, root)`
 3. The fake conditions exist **only on the spammer's machine**
-4. The output is unspendable — no private key corresponds to the fake PUBKEY_COMMITs
+4. The output is unspendable (no valid keys, pubkeys folded into Merkle leaf via merkle_pub_key)
 5. Nobody ever spends it, so the spending witness (which would reveal the fake conditions) is never created
-6. The blockchain never sees the fake data — only the 32-byte root
+6. The blockchain never sees the fake data, only the 32-byte root
 
 **The spam kills itself.** The spammer burns coins for a 32-byte opaque hash in the UTXO set. Their actual spam data never touches the network.
 
+With merkle_pub_key, the attack surface is further reduced: public keys are no longer stored as writable PUBKEY_COMMIT fields in conditions. They are folded into the Merkle leaf hash. An attacker cannot write arbitrary data into a pubkey slot because there is no pubkey slot in the conditions.
+
 ### 4.3 Residual Embedding Surface
 
-The only user-chosen bytes on-chain are the 32-byte conditions_root per output. This is identical to:
+The only user-chosen bytes on-chain are the 32-byte conditions_root per output (or up to 113 bytes for a DATA_RETURN output, which is capped at 80 bytes of data and costs 4 WU/byte). The 32-byte root is identical to:
 - **Bitcoin P2WSH:** 32-byte script hash per output
 - **Bitcoin P2TR:** 32-byte tweaked key per output
 
@@ -380,7 +389,7 @@ This is comparable to Bitcoin P2TR outputs (43 bytes) and identical for all scri
 | 2-of-3 Multisig | 225 vB | P2WSH 2-of-3 | ~201 vB | +12% |
 | HTLC (2 paths) | 199 vB | P2TR scriptpath | ~175 vB | +14% |
 
-MLSC is **12–23% heavier** than equivalent Bitcoin transactions. This overhead comes from typed fields, block headers, and coil metadata — the cost of Ladder Script's richer expressiveness (60 block types, PQ support, covenants, recursion, PLC blocks).
+MLSC is **12-23% heavier** than equivalent Bitcoin transactions. This overhead comes from typed fields, block headers, and coil metadata, the cost of Ladder Script's richer expressiveness (59 block types, PQ support, covenants, recursion, PLC blocks).
 
 ### 5.5 Creating Transaction Savings
 
@@ -394,7 +403,7 @@ MLSC outputs are dramatically smaller than inline (`0xC1`) outputs:
 | 4-path covenant | ~328 B | 42 B | −87% |
 | 15-of-15 Multisig | ~538 B | 42 B | −92% |
 
-Since outputs are at 4× weight, these savings are significant. A 2-of-3 multisig output drops from 480 WU to 168 WU — saving **312 WU per output** in the creating transaction.
+Since outputs are at 4× weight, these savings are significant. A 2-of-3 multisig output drops from 480 WU to 168 WU - saving **312 WU per output** in the creating transaction.
 
 ### 5.6 UTXO Set Impact
 
@@ -426,17 +435,17 @@ MLSC is cheaper across the full lifecycle for every transaction type. The saving
 
 ### 6.1 Quantum Resistance
 
-- Raw pubkeys never appear at creation time — output contains only the 32-byte root
-- `PUBKEY_COMMIT = SHA256(pubkey)` is preserved in the conditions (private until spend)
-- Pubkey revealed only at spend time in witness
-- PQ migration via SCHEME field (FALCON512, FALCON1024, DILITHIUM3, SPHINCS_SHA) is orthogonal and unaffected
-- The quantum threat model is identical to P2TR: pubkeys are hidden until the spending transaction is broadcast
+- Raw pubkeys never appear at creation time. Output contains only the 32-byte root.
+- Pubkeys are folded into the Merkle leaf hash (merkle_pub_key). No pubkey data exists in the on-chain conditions.
+- Pubkey revealed only at spend time in witness.
+- PQ migration via SCHEME field (FALCON512, FALCON1024, DILITHIUM3, SPHINCS_SHA) is orthogonal and unaffected.
+- The quantum threat model is identical to P2TR: pubkeys are hidden until the spending transaction is broadcast.
 
 ### 6.2 Merkle Tree Security
 
-- **Second preimage resistance:** Leaf nodes use `TaggedHash("LadderLeaf", ...)` and interior nodes use `TaggedHash("LadderInternal", ...)`. The 64-byte domain prefix in each tagged hash (BIP-341 convention) makes cross-domain collisions computationally infeasible — a valid leaf hash can never be interpreted as a valid interior node, and vice versa
+- **Second preimage resistance:** Leaf nodes use `TaggedHash("LadderLeaf", ...)` and interior nodes use `TaggedHash("LadderInternal", ...)`. The 64-byte domain prefix in each tagged hash (BIP-341 convention) makes cross-domain collisions computationally infeasible - a valid leaf hash can never be interpreted as a valid interior node, and vice versa
 - **Empty leaf attacks:** `EMPTY_LEAF = TaggedHash("LadderLeaf", "")` cannot collide with valid serialised rungs/coils (minimum length constraints, plus the tagged hash domain prefix prevents any raw-data collision)
-- **Proof soundness:** Sorted interior hashing ensures canonical tree construction — no ambiguity in proof verification
+- **Proof soundness:** Sorted interior hashing ensures canonical tree construction - no ambiguity in proof verification
 - **Consistency with ACCUMULATOR:** Uses the same sorted binary tree convention implemented for the ACCUMULATOR block evaluator
 
 ### 6.3 Sighash Binding
@@ -472,7 +481,7 @@ A malicious sender cannot construct a different set of conditions that hashes to
 
 ### 7.3 Condition Recovery
 
-If a wallet loses its stored conditions, the UTXO cannot be spent — the root in the UTXO set provides no way to recover the conditions (preimage resistance of SHA256).
+If a wallet loses its stored conditions, the UTXO cannot be spent - the root in the UTXO set provides no way to recover the conditions (preimage resistance of SHA256).
 
 **Fallback mechanisms:**
 - Wallet backup (recommended)
@@ -489,7 +498,7 @@ This matches Bitcoin's P2WSH model, where losing the redeemScript makes the outp
 
 | File | Purpose |
 |------|---------|
-| `src/rung/types.h` | `0xC2` version byte constant (`RUNG_MLSC_PREFIX`) |
+| `src/rung/conditions.h` | `0xC2` version byte constant (`RUNG_MLSC_PREFIX`) |
 | `src/rung/serialize.cpp` | `ComputeRungLeaf()`, `ComputeCoilLeaf()` |
 | `src/rung/conditions.cpp` | `ComputeConditionsRoot()`, binary Merkle tree builder |
 | `src/rung/conditions.h` | `conditions_root` field in `RungConditions` |
@@ -503,43 +512,43 @@ This matches Bitcoin's P2WSH model, where losing the redeemScript makes the outp
 
 **Merkle tree builder:**
 ```cpp
-uint256 ComputeRungLeaf(const Rung& rung);
+uint256 ComputeRungLeaf(const Rung& rung, const std::vector<std::vector<uint8_t>>& pubkeys);
 uint256 ComputeCoilLeaf(const RungCoil& coil);
-uint256 ComputeRelayLeaf(const Relay& relay);
-uint256 ComputeConditionsRoot(const RungConditions& conditions);
-bool VerifyMerkleProof(const uint256& leaf, uint32_t index,
-                       const std::vector<uint256>& proof,
-                       const uint256& root);
+uint256 ComputeRelayLeaf(const Relay& relay, const std::vector<std::vector<uint8_t>>& pubkeys);
+uint256 BuildMerkleTree(std::vector<uint256> leaves);
+uint256 ComputeConditionsRoot(const RungConditions& conditions,
+                              const std::vector<std::vector<std::vector<uint8_t>>>& rung_pubkeys,
+                              const std::vector<std::vector<std::vector<uint8_t>>>& relay_pubkeys);
 ```
 
-**Witness deserialiser:**
+**Proof serialisation and verification:**
 ```cpp
-bool DeserializeMLSCWitness(const std::vector<uint8_t>& data,
-                            Rung& revealed_rung,
-                            uint32_t& rung_index,
-                            std::vector<RungField>& witness_fields,
-                            std::vector<Relay>& revealed_relays,
-                            RungCoil& coil,
-                            std::vector<uint256>& proof_hashes);
+bool DeserializeMLSCProof(const std::vector<uint8_t>& data,
+                          MLSCProof& proof, std::string& error);
+std::vector<uint8_t> SerializeMLSCProof(const MLSCProof& proof);
+bool VerifyMLSCProof(const MLSCProof& proof,
+                     const RungCoil& coil,
+                     const uint256& expected_root,
+                     std::string& error);
 ```
 
 ### 8.3 Evaluator Impact
 
-**None.** All 60 block evaluators operate on deserialised `RungBlock` and `RungField` structs. These structs are populated identically whether the source is inline conditions (`0xC1`) or revealed conditions from a spending witness (`0xC2`). The evaluation functions receive the same in-memory structures and produce the same results. No evaluator modifications are needed.
+**None.** All 59 block evaluators operate on deserialised `RungBlock` and `RungField` structs. These structs are populated identically whether the source is inline conditions (`0xC1`) or revealed conditions from a spending witness (`0xC2`). The evaluation functions receive the same in-memory structures and produce the same results. No evaluator modifications are needed.
 
 ### 8.4 Inline Compatibility
 
 Both output formats coexist:
 - **`0xC2` (MLSC):** Standard format. UTXO stores `(value, root)`. Spending requires Merkle proof.
-- **`0xC1` (inline):** Full conditions in scriptPubKey. UTXO stores full conditions. No Merkle proof required at spend time. Useful for debugging and testing.
+- **`0xC1` (inline):** Full conditions in scriptPubKey. UTXO stores full conditions. No Merkle proof required at spend time. Rejected on mainnet; regtest/signet testing only.
 
 ### 8.5 Interaction with Wire Format Optimisations
 
 | Optimisation | Compatibility |
 |-------------|--------------|
-| **Varint NUMERIC** | Fully compatible — affects rung serialisation format, which feeds into leaf computation |
-| **Micro-header + Implicit Fields** | Fully compatible — encoding optimisations reduce the serialised rung size, producing smaller witness data |
-| **RUNG_TEMPLATE_INHERIT** | Compatible — template references are resolved to full conditions before Merkle root computation; the root always reflects fully expanded conditions |
+| **Varint NUMERIC** | Fully compatible - affects rung serialisation format, which feeds into leaf computation |
+| **Micro-header + Implicit Fields** | Fully compatible - encoding optimisations reduce the serialised rung size, producing smaller witness data |
+| **RUNG_TEMPLATE_INHERIT** | Compatible - template references are resolved to full conditions before Merkle root computation; the root always reflects fully expanded conditions |
 
 ---
 
@@ -562,18 +571,18 @@ Coil:   UNLOCK, INLINE attestation, SCHNORR
 ```
 Rung 0 conditions:
   MULTISIG (0x0002), inverted=false
-    PUBKEY_COMMIT: SHA256(pubkey_A)    = 0xaa11...  (32 B)
-    PUBKEY_COMMIT: SHA256(pubkey_B)    = 0xbb22...  (32 B)
-    PUBKEY_COMMIT: SHA256(pubkey_C)    = 0xcc33...  (32 B)
     NUMERIC (threshold): 2             (1 B)
     SCHEME: 0x01 (Schnorr)             (1 B)
+  Pubkeys (folded into Merkle leaf):
+    pubkey_A (33 B), pubkey_B (33 B), pubkey_C (33 B)
 
 Rung 1 conditions:
   Block 0: SIG (0x0001), inverted=false
-    PUBKEY_COMMIT: SHA256(pubkey_D)    = 0xdd44...  (32 B)
     SCHEME: 0x01                        (1 B)
+  Pubkey (folded into Merkle leaf):
+    pubkey_D (33 B)
   Block 1: CSV (0x0101), inverted=false
-    NUMERIC (blocks): 1008             (2 B)
+    NUMERIC (blocks): 1008             (3 B)
 
 Coil:
   coil_type=UNLOCK, attestation=INLINE, scheme=SCHNORR, address=[], conditions=[]
@@ -619,7 +628,7 @@ Output: value=50000, scriptPubKey = 0xC2 || 0xMRMR...
 Revealed rungs: 1
   Rung index: 0
   Rung conditions:
-    MULTISIG block: PUBKEY_COMMIT[A,B,C], threshold=2, scheme=SCHNORR
+    MULTISIG block: threshold=2, scheme=SCHNORR
   Witness data:
     PUBKEY: pubkey_A (33 B), pubkey_B (33 B), pubkey_C (33 B)
     SIGNATURE: sig_A (64 B), sig_B (64 B), (empty for C)
@@ -627,7 +636,7 @@ Revealed rungs: 1
 Coil: UNLOCK, INLINE, SCHNORR
 
 Merkle proof: 1 sibling hash
-  rung_leaf[1]  = 0xR1R1...     (recovery path — opaque hash)
+  rung_leaf[1]  = 0xR1R1...     (recovery path - opaque hash)
 
   (COIL and EMPTY are computed by the verifier since coil is revealed
    and EMPTY_LEAF is a known constant)
@@ -645,9 +654,7 @@ Merkle proof: 1 sibling hash
    root = H(H(R0,R1), H(COIL,EMPTY))
    → 0xMRMR...  matches UTXO.conditions_root  ✓
 5. Merge conditions + witness:
-   SHA256(pubkey_A) == 0xaa11...  ✓
-   SHA256(pubkey_B) == 0xbb22...  ✓
-   SHA256(pubkey_C) == 0xcc33...  ✓
+   Pubkeys A, B, C from witness verified via Merkle leaf (merkle_pub_key)  ✓
    Verify sig_A against pubkey_A  ✓
    Verify sig_B against pubkey_B  ✓
    Valid sigs: 2 >= threshold 2  ✓
@@ -664,8 +671,8 @@ Merkle proof: 1 sibling hash
 |----------|-----------|-----------|
 | **Coil positioning** | Inside the Merkle tree (final leaf) | Keeps UTXO at 40 bytes; coil proof hash is minimal overhead |
 | **Tree type** | Binary Merkle | Cheapest for common case (single-sig: 0 proof hashes); max 4 hashes for 16 rungs |
-| **Conditions at creation** | Not included — output is root only (P2WSH model) | Eliminates fake conditions from ever appearing on-chain |
-| **Pruning / recovery** | Wallet responsibility | Same as P2WSH redeemScript — well-understood trade-off |
+| **Conditions at creation** | Not included - output is root only (P2WSH model) | Eliminates fake conditions from ever appearing on-chain |
+| **Pruning / recovery** | Wallet responsibility | Same as P2WSH redeemScript - well-understood trade-off |
 | **Multi-rung reveals** | Single rung + relays only (consensus enforced) | Maximises privacy; no benefit to revealing unused paths |
 | **Field hardening** | Not needed | Merkle root already makes UTXO opaque; fake conditions are never published; double-hashing adds complexity without benefit |
 
@@ -673,17 +680,17 @@ Merkle proof: 1 sibling hash
 
 ## 11. Summary
 
-Merkelised Ladder Script Conditions (MLSC) is the standard Ladder Script output format. Outputs contain only a 32-byte Merkle root. The full conditions — including all PUBKEY_COMMITs, hash fields, timelocks, thresholds, and coil metadata — exist only in the wallets of the transaction participants. They are revealed on-chain only when the output is spent, in the spending witness, which is prunable.
+Merkelised Ladder Script Conditions (MLSC) is the standard Ladder Script output format. Outputs contain only a 32-byte Merkle root (or up to 113 bytes with DATA_RETURN payload). The full conditions, including hash fields, timelocks, thresholds, and coil metadata, exist only in the wallets of the transaction participants. Public keys are folded into the Merkle leaf hash (merkle_pub_key) and never appear in conditions. Conditions are revealed on-chain only when the output is spent, in the spending witness, which is prunable.
 
-Fake conditions (arbitrary data disguised as PUBKEY_COMMITs) produce unspendable outputs. Since these outputs are never spent, the fake conditions are never revealed. The blockchain sees only 32 bytes of opaque Merkle root — identical to Bitcoin P2WSH and P2TR.
+Fake conditions produce unspendable outputs. Since these outputs are never spent, the fake conditions are never revealed. The blockchain sees only 32 bytes of opaque Merkle root, identical to Bitcoin P2WSH and P2TR.
 
 **The result:**
 
 - **UTXO set:** 40 bytes per entry, fixed, zero user-chosen data
 - **Block data at creation:** 42-byte outputs (value + root), no conditions
 - **Block data at spend:** Conditions in witness, prunable, only the used path
-- **Fake data:** Never touches the network — dies with the spammer
+- **Fake data:** Never touches the network, dies with the spammer
 - **Privacy:** Unused paths permanently hidden behind Merkle proof hashes
-- **Weight:** 12–23% heavier than Bitcoin equivalents; 11–73% lighter than inline Ladder Script over full lifecycle
-- **Evaluators:** All 60 block types unchanged
-- **Quantum resistance:** Preserved — pubkeys hidden until spend time
+- **Weight:** 12-23% heavier than Bitcoin equivalents; 11-73% lighter than inline Ladder Script over full lifecycle
+- **Evaluators:** All 59 block types unchanged
+- **Quantum resistance:** Preserved. Pubkeys folded into Merkle leaf, hidden until spend time

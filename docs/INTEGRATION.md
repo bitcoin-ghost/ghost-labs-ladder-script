@@ -12,7 +12,7 @@ A Ladder Script transaction uses version 4 (`CTransaction::RUNG_TX_VERSION = 4`)
 
 1. **Select inputs.** Any UTXOs can be spent by a v4 transaction, including outputs locked by v1/v2 scripts (bootstrap mode) or prior v4 rung conditions.
 
-2. **Define output conditions.** Each output's `scriptPubKey` is constructed as `0xc1 || serialized_conditions`. The conditions encode the typed blocks and fields that a future spender must satisfy. Only condition-allowed data types (PUBKEY, PUBKEY_COMMIT, HASH256, HASH160, NUMERIC, SCHEME, SPEND_INDEX) may appear. SIGNATURE and PREIMAGE are forbidden in conditions.
+2. **Define output conditions.** Each output's `scriptPubKey` is MLSC (`0xC2 || 32-byte Merkle root`), or inline (`0xC1 || serialized_conditions`) for regtest/signet testing only. The conditions encode the typed blocks and fields that a future spender must satisfy. Only condition-allowed data types (HASH256, HASH160, NUMERIC, SCHEME, DATA) may appear. PUBKEY_COMMIT, SIGNATURE, PREIMAGE, PUBKEY, SPEND_INDEX, and SCRIPT_BODY are forbidden in conditions. Public keys are folded into the Merkle leaf hash (merkle_pub_key).
 
 3. **Construct the transaction.** Use the `createrungtx` RPC, which takes an array of input outpoints and an array of output specifications (amount + conditions JSON). The RPC returns a raw unsigned v4 transaction.
 
@@ -48,11 +48,12 @@ At consensus time, `VerifyRungTx()` is called for each input. It:
 
 1. Extracts the witness from `tx.vin[nIn].scriptWitness.stack[0]`.
 2. Deserializes the witness as a `LadderWitness`.
-3. Attempts to deserialize the spent output's `scriptPubKey` as `RungConditions`.
-4. If conditions are present (rung-to-rung spend), merges conditions with witness.
-5. Constructs a `LadderSignatureChecker` wrapping the standard signature checker.
-6. Calls `EvalLadder()` with `SigVersion::LADDER`.
-7. Returns true if any rung is satisfied (OR logic).
+3. Checks if the spent output is inline (`0xC1`) or MLSC (`0xC2`):
+   - **Inline:** Deserializes conditions from the scriptPubKey. Merges conditions with witness.
+   - **MLSC:** Deserializes the MLSC proof from `stack[1]`. Verifies the Merkle proof against the UTXO root via `VerifyMLSCProof()`. Uses the revealed rung as conditions.
+4. Constructs a `LadderSignatureChecker` wrapping the standard signature checker.
+5. Calls `EvalLadder()` with `SigVersion::LADDER`.
+6. Returns true if any rung is satisfied (OR logic).
 
 ---
 
@@ -68,7 +69,7 @@ if (ptxTo->version == CTransaction::RUNG_TX_VERSION) {
     if (rung::VerifyRungTx(*ptxTo, nIn, m_tx_out, nFlags, checker, *txdata, &error, m_block_height)) {
         return std::nullopt;  // Verification succeeded
     } else {
-        // Verification failed — return script error
+        // Verification failed - return script error
     }
 }
 ```
@@ -79,10 +80,10 @@ This routing is the sole entry point for Ladder Script consensus validation. All
 
 When `PrecomputedTransactionData::Init()` detects a v4 transaction, it initializes ladder-specific caches:
 
-- `m_prevouts_single_hash` — SHA256 of all input prevouts
-- `m_spent_amounts_single_hash` — SHA256 of all spent amounts
-- `m_sequences_single_hash` — SHA256 of all input sequence values
-- `m_outputs_single_hash` — SHA256 of all outputs
+- `m_prevouts_single_hash` - SHA256 of all input prevouts
+- `m_spent_amounts_single_hash` - SHA256 of all spent amounts
+- `m_sequences_single_hash` - SHA256 of all input sequence values
+- `m_outputs_single_hash` - SHA256 of all outputs
 - `m_ladder_ready = true`
 
 The function returns immediately after setting these, skipping BIP-143 and BIP-341 cache initialization. The ladder caches are structurally identical to BIP-341 precomputed hashes but are separated by the `m_ladder_ready` flag.
@@ -102,31 +103,42 @@ For non-LADDER sig versions, the checker falls through to the wrapped `BaseSigna
 A v4 rung conditions output has the following `scriptPubKey` format:
 
 ```
-[0xc1] [serialized conditions using ladder wire format v3]
+[0xC1] [serialized conditions using ladder wire format]
 ```
 
-The `0xc1` prefix byte is defined as `RUNG_CONDITIONS_PREFIX`. The function `IsRungConditionsScript()` performs a quick check: `scriptPubKey.size() >= 2 && scriptPubKey[0] == 0xc1`.
+Two output formats are supported:
+
+- **MLSC (`0xC2`):** `RUNG_MLSC_PREFIX`. A 32-byte Merkle root, optionally followed by up to 80 bytes of DATA_RETURN payload. Detected by `IsMLSCScript()`: `scriptPubKey.size() >= 33 && scriptPubKey.size() <= 113 && scriptPubKey[0] == 0xc2`. Conditions are revealed at spend time in the witness. This is the only accepted format on mainnet.
+- **Inline (`0xC1`):** `RUNG_CONDITIONS_PREFIX`. Full conditions in the scriptPubKey. Detected by `IsRungConditionsScript()`: `scriptPubKey.size() >= 2 && scriptPubKey[0] == 0xc1`. Rejected on mainnet (`RUNG_VERIFY_MLSC_ONLY`); regtest/signet testing only.
+
+The helper `IsRungScript()` returns true for either format.
 
 ### 3.2 Serialization
+
+**Inline (`0xC1`):**
 
 `SerializeRungConditions()` converts a `RungConditions` structure to a `CScript`:
 
 1. Serialize the conditions as a `LadderWitness` (same wire format).
-2. Prepend the `0xc1` prefix byte.
+2. Prepend the `0xC1` prefix byte.
 
 `DeserializeRungConditions()` performs the reverse:
 
-1. Verify the `0xc1` prefix.
+1. Verify the `0xC1` prefix.
 2. Strip the prefix and deserialize as a `LadderWitness`.
-3. Validate that no witness-only data types (SIGNATURE, PREIMAGE) appear in the conditions.
+3. Validate that only condition-allowed data types appear (HASH256, HASH160, NUMERIC, SCHEME, DATA). PUBKEY_COMMIT, SIGNATURE, PREIMAGE, PUBKEY, SPEND_INDEX, and SCRIPT_BODY are rejected.
 
-### 3.3 Non-Conditions Outputs
+**MLSC (`0xC2`):**
 
-A v4 transaction may also include non-conditions outputs:
+`CreateMLSCScript()` takes a 32-byte `conditions_root` and returns `0xC2 || root`. An overload accepts an optional DATA_RETURN payload (1-80 bytes) and returns `0xC2 || root || data`. The root is computed locally by the transaction creator using `ComputeConditionsRoot()`. See MERKLE-UTXO-SPEC.md for full details.
 
-- **OP_RETURN outputs** (data carrier) are permitted.
-- **Standard P2TR outputs** are permitted for change during bootstrap transitions.
-- The mempool policy checks (`IsStandardRungTx`) only validate outputs that begin with `0xc1`.
+### 3.3 Output Restrictions
+
+All outputs in a v4 transaction must be rung conditions outputs (`0xC1` or `0xC2`). Non-rung outputs (OP_RETURN, P2TR, P2WSH, etc.) are rejected by `ValidateRungOutputs()`.
+
+- **DATA_RETURN** is handled by appending data to an MLSC output (`0xC2 || root || data`), not via OP_RETURN.
+- **`0xC1` inline** is rejected on mainnet (`RUNG_VERIFY_MLSC_ONLY`).
+- At most 1 DATA_RETURN output per transaction, with zero value.
 
 ---
 
@@ -150,7 +162,7 @@ This merge step is handled by `MergeConditionsAndWitness()`. If the structures d
 
 ### 4.3 Bootstrap Mode
 
-When a v4 transaction spends a v1/v2 UTXO (one whose `scriptPubKey` does not begin with `0xc1`), no merge is performed. The witness is evaluated directly with empty conditions. This allows v4 transactions to spend existing UTXOs by providing self-contained witness data.
+When a v4 transaction spends a v1/v2 UTXO (one whose `scriptPubKey` does not begin with `0xC1` or `0xC2`), no merge is performed. The witness is evaluated directly with empty conditions. This allows v4 transactions to spend existing UTXOs by providing self-contained witness data.
 
 ---
 
@@ -198,15 +210,15 @@ The mempool policy function `IsStandardRungTx()` validates v4 transactions befor
 
 **Output validation:**
 
-- OP_RETURN outputs are allowed (skipped).
-- Outputs with the `0xc1` prefix must pass `IsStandardRungOutput()`.
-- Non-conditions outputs (e.g., P2TR change) are allowed during bootstrap.
+- MLSC outputs (`0xC2`) are always standard. DATA_RETURN payloads (appended to MLSC) are validated by `ValidateRungOutputs()`.
+- Inline outputs (`0xC1`) must pass `IsStandardRungOutput()` but are rejected on mainnet.
+- Non-rung outputs are rejected in v4 transactions.
 
 **Input witness validation:**
 
 - Each input must have a non-empty witness stack.
 - `stack[0]` must deserialize as a valid `LadderWitness`.
-- Maximum 16 rungs per witness.
+- Maximum 8 rungs per witness.
 - Maximum 8 blocks per rung.
 - All block types must be known (`IsKnownBlockType()`).
 - All fields must pass `RungField::IsValid()` size/content checks.
@@ -215,17 +227,22 @@ Diff witnesses pass mempool standardness checks. The `IsStandardRungTx()` functi
 
 ### 6.2 IsStandardRungOutput()
 
-Validates a `0xc1`-prefixed `scriptPubKey`:
+Validates rung condition outputs:
 
+**Inline (`0xC1`):**
 - Must deserialize as valid `RungConditions`.
-- Maximum 16 rungs, 8 blocks per rung.
+- Maximum 8 rungs, 8 blocks per rung.
 - All block types must be known.
-- All fields must be condition-allowed data types (no SIGNATURE, no PREIMAGE).
+- All fields must be condition-allowed data types (no SIGNATURE, no PREIMAGE, no PUBKEY, no SCRIPT_BODY).
 - All fields must pass size validation.
+
+**MLSC (`0xC2`):**
+- Must be 33-113 bytes (`0xC2` + 32-byte root + optional 1-80 byte DATA_RETURN payload).
+- Always standard. The root is opaque and requires no further validation at the output level.
 
 ### 6.3 Block Type Standardness
 
-All known block types are standard upon activation. The policy implementation accepts all block types across all families (Signature, Timelock, Hash, Covenant, Anchor, Recursion, and PLC).
+All known block types are standard upon activation. The policy implementation accepts all block types across all 10 families (Signature, Timelock, Hash, Covenant, Anchor, Recursion, PLC, Compound, Governance, and Legacy).
 
 ---
 
@@ -269,7 +286,7 @@ A time-bounded covenant. Before `until_height`, the output must be re-encumbered
 
 The helper `FullConditionsEqual()` performs a deep structural comparison of two `RungConditions` objects. For mutated blocks, `VerifyMutatedConditions()` allows declared parameters to differ by the specified delta while requiring all other fields to match exactly.
 
-Only condition data types are compared (PUBKEY, HASH256, etc.). Witness-only types are excluded from comparison since they are never present in conditions.
+Only condition data types are compared (HASH256, HASH160, NUMERIC, SCHEME, DATA). Witness-only types are excluded from comparison since they are never present in conditions.
 
 ---
 
@@ -289,15 +306,15 @@ generatepqkeypair FALCON512
 
 Returns `{pubkey: "...", privkey: "..."}` in hex. Key sizes vary by scheme (897 bytes for FALCON-512 public keys, up to 1952 bytes for Dilithium3).
 
-### 8.3 PUBKEY_COMMIT Pattern
+### 8.3 merkle_pub_key Pattern
 
-Because PQ public keys are large, the recommended pattern for compact outputs is:
+PQ public keys are large (897 bytes for FALCON-512, up to 1952 bytes for Dilithium3). With merkle_pub_key, all public keys (classical and PQ) are folded into the Merkle leaf hash at fund time. No pubkey data appears in the on-chain conditions.
 
-1. Compute `commitment = SHA256(pq_pubkey)` using the `pqpubkeycommit` RPC.
-2. Store a PUBKEY_COMMIT field (32 bytes) in the output conditions instead of the full PUBKEY.
-3. At spend time, include the full PUBKEY in the witness. The evaluator verifies `SHA256(witness_pubkey) == commitment` before checking the signature.
+1. The transaction creator provides pubkeys to `ComputeConditionsRoot()`, which folds them into the leaf: `TaggedHash("LadderLeaf", SerializeRung(rung) || pk1 || ... || pkN)`.
+2. Only the 32-byte Merkle root is stored in the MLSC output.
+3. At spend time, the witness provides the full pubkey. The Merkle proof verification confirms it matches the key committed at fund time.
 
-This keeps output conditions compact (32 bytes per key) regardless of the PQ scheme.
+This keeps outputs at a fixed 33 bytes regardless of the PQ scheme or number of keys.
 
 ### 8.4 SCHEME Field Routing
 
@@ -385,14 +402,14 @@ The ADAPTOR_SIG block (0x0003) verifies the adapted signature at consensus time.
 Version 4 transactions coexist with existing transaction types:
 
 - **v1 transactions** (legacy) continue to be processed through the standard script interpreter.
-- **v2 transactions** (BIP-68/BIP-112/taproot) continue to be processed through BIP-341 tapscript evaluation.
+- **v2 transactions** (BIP-68/BIP-112) continue to be processed through the standard script interpreter, including BIP-341 Taproot evaluation for witness v1 outputs.
 - **v4 transactions** are routed exclusively to `VerifyRungTx()`.
 
 The routing decision is made solely on `tx.version` in `validation.cpp`. There is no interaction between the script interpreter and the rung evaluator.
 
 ### 10.2 Spending v1/v2 UTXOs from v4
 
-A v4 transaction can spend any UTXO, including v1/v2 outputs. When the spent output's `scriptPubKey` does not begin with `0xc1`:
+A v4 transaction can spend any UTXO, including v1/v2 outputs. When the spent output's `scriptPubKey` does not begin with `0xC1` or `0xC2`:
 
 - No conditions merge is performed.
 - The witness is evaluated directly as a self-contained `LadderWitness`.
@@ -403,7 +420,7 @@ This bootstrap path enables migration from existing outputs to Ladder Script wit
 
 ### 10.3 Spending v4 UTXOs from v1/v2
 
-A v1 or v2 transaction cannot spend a v4 rung conditions output. The `0xc1` prefix does not correspond to a valid Bitcoin Script opcode sequence, so any attempt to evaluate it as standard script would fail.
+A v1 or v2 transaction cannot spend a v4 rung conditions output. Neither the `0xC1` nor `0xC2` prefix corresponds to a valid Bitcoin Script opcode sequence, so any attempt to evaluate either format as standard script would fail.
 
 ### 10.4 Block Validation
 

@@ -276,6 +276,8 @@ static bool ParseBlockType(const std::string& name, RungBlockType& out)
     if (name == "P2WSH_LEGACY")     { out = RungBlockType::P2WSH_LEGACY; return true; }
     if (name == "P2TR_LEGACY")      { out = RungBlockType::P2TR_LEGACY; return true; }
     if (name == "P2TR_SCRIPT_LEGACY") { out = RungBlockType::P2TR_SCRIPT_LEGACY; return true; }
+    // Utility family
+    if (name == "DATA_RETURN")        { out = RungBlockType::DATA_RETURN; return true; }
     // Backward compat aliases
     if (name == "HASHLOCK")         { out = RungBlockType::HASH_PREIMAGE; return true; }
     if (name == "ANCHOR_BOND")      { out = RungBlockType::ANCHOR_SEAL; return true; }

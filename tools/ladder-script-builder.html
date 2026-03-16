@@ -744,7 +744,7 @@ const BLOCK_DEFS = {
   SIG:               { category: 'sig',      phase: 1, label: 'SIG',               fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02...'}] },
   MULTISIG:          { category: 'sig',      phase: 1, label: 'MULTISIG',          fields: [{name:'threshold', type:'NUMERIC', placeholder:'2'}, {name:'pubkeys', type:'PUBKEY_LIST', placeholder:'02..., 03...'}] },
   ADAPTOR_SIG:       { category: 'sig',      phase: 1, label: 'ADAPTOR_SIG',       fields: [{name:'signing_key', type:'PUBKEY', placeholder:'02... signing key'}, {name:'adaptor_point', type:'PUBKEY', placeholder:'adaptor point'}] },
-  MUSIG_THRESHOLD:   { category: 'sig',      phase: 1, label: 'MUSIG_THRESHOLD',   fields: [{name:'agg_pubkey', type:'PUBKEY', placeholder:'02... aggregate pubkey'}, {name:'threshold', type:'NUMERIC', placeholder:'2'}, {name:'group_size', type:'NUMERIC', placeholder:'3'}] },
+  MUSIG_THRESHOLD:   { category: 'sig',      phase: 1, label: 'MUSIG_THRESHOLD',   fields: [{name:'aggregate_key', type:'PUBKEY', placeholder:'02... aggregate pubkey'}, {name:'threshold', type:'NUMERIC', placeholder:'2'}, {name:'group_size', type:'NUMERIC', placeholder:'3'}] },
   KEY_REF_SIG:       { category: 'sig',      phase: 1, label: 'KEY_REF_SIG',       fields: [{name:'relay_index', type:'NUMERIC', placeholder:'relay index'}, {name:'block_index', type:'NUMERIC', placeholder:'block index'}] },
 
   // ── TIMELOCK (0x01xx) — Phase 1 ──
@@ -754,71 +754,62 @@ const BLOCK_DEFS = {
   CLTV_TIME:         { category: 'timelock', phase: 1, label: 'CLTV_TIME',         fields: [{name:'timestamp', type:'NUMERIC', placeholder:'1700000000'}] },
 
   // ── HASH (0x02xx) — Phase 1 ──
-  HASH_PREIMAGE:     { category: 'hash',     phase: 1, label: 'HASH_PREIMAGE',     fields: [{name:'hash', type:'HASH256', placeholder:'sha256 hash'}] },
-  HASH160_PREIMAGE:  { category: 'hash',     phase: 1, label: 'HASH160_PREIMAGE',  fields: [{name:'hash', type:'HASH160', placeholder:'ripemd160(sha256) hash'}] },
-  TAGGED_HASH:       { category: 'hash',     phase: 1, label: 'TAGGED_HASH',       fields: [{name:'tag', type:'HASH256', placeholder:'SHA256(tag)'}, {name:'hash', type:'HASH256', placeholder:'expected tagged hash'}] },
+  // HASH_PREIMAGE and HASH160_PREIMAGE are deprecated (use HTLC or HASH_SIG instead)
+  TAGGED_HASH:       { category: 'hash',     phase: 1, label: 'TAGGED_HASH',       fields: [{name:'tag_hash', type:'HASH256', placeholder:'SHA256(tag)'}, {name:'expected', type:'HASH256', placeholder:'expected tagged hash'}] },
 
   // ── COVENANT (0x03xx) — Phase 2 ──
   CTV:               { category: 'covenant', phase: 2, label: 'CTV',               fields: [{name:'template_hash', type:'HASH256', placeholder:'BIP-119 template hash'}] },
-  VAULT_LOCK:        { category: 'covenant', phase: 2, label: 'VAULT_LOCK',        fields: [{name:'recovery_key', type:'PUBKEY', placeholder:'02... recovery key'}, {name:'hot_key', type:'PUBKEY', placeholder:'02... hot key'}, {name:'delay', type:'NUMERIC', placeholder:'unvault delay (blocks)'}] },
-  AMOUNT_LOCK:       { category: 'covenant', phase: 2, label: 'AMOUNT_LOCK',       fields: [{name:'min', type:'NUMERIC', placeholder:'min output sats'}, {name:'max', type:'NUMERIC', placeholder:'max output sats'}] },
+  VAULT_LOCK:        { category: 'covenant', phase: 2, label: 'VAULT_LOCK',        fields: [{name:'recovery_key', type:'PUBKEY', placeholder:'02... recovery key'}, {name:'hot_key', type:'PUBKEY', placeholder:'02... hot key'}, {name:'hot_delay', type:'NUMERIC', placeholder:'unvault delay (blocks)'}] },
+  AMOUNT_LOCK:       { category: 'covenant', phase: 2, label: 'AMOUNT_LOCK',       fields: [{name:'min_sats', type:'NUMERIC', placeholder:'min output sats'}, {name:'max_sats', type:'NUMERIC', placeholder:'max output sats'}] },
 
   // ── ANCHOR L2 (0x05xx) — Phase 2 ──
-  ANCHOR:            { category: 'anchor',   phase: 2, label: 'ANCHOR',            fields: [{name:'data', type:'HASH256', placeholder:'state commitment hash'}] },
-  ANCHOR_CHANNEL:    { category: 'anchor',   phase: 2, label: 'ANCHOR_CHANNEL',    fields: [{name:'local_key', type:'PUBKEY', placeholder:'02... local pubkey'}, {name:'remote_key', type:'PUBKEY', placeholder:'02... remote pubkey'}] },
-  ANCHOR_POOL:       { category: 'anchor',   phase: 2, label: 'ANCHOR_POOL',       fields: [{name:'pool_id', type:'HASH256', placeholder:'pool identifier hash'}] },
-  ANCHOR_RESERVE:    { category: 'anchor',   phase: 2, label: 'ANCHOR_RESERVE',    fields: [{name:'threshold_n', type:'NUMERIC', placeholder:'n'}, {name:'threshold_m', type:'NUMERIC', placeholder:'m'}, {name:'guardian_hash', type:'HASH256', placeholder:'guardian set hash'}] },
-  ANCHOR_SEAL:       { category: 'anchor',   phase: 2, label: 'ANCHOR_SEAL',       fields: [{name:'asset_id', type:'HASH256', placeholder:'asset identifier'}, {name:'state_hash', type:'HASH256', placeholder:'state hash'}] },
-  ANCHOR_ORACLE:     { category: 'anchor',   phase: 2, label: 'ANCHOR_ORACLE',     fields: [{name:'oracle_pk', type:'PUBKEY', placeholder:'02... oracle pubkey'}] },
+  ANCHOR:            { category: 'anchor',   phase: 2, label: 'ANCHOR',            fields: [{name:'state_hash', type:'HASH256', placeholder:'state commitment hash'}] },
+  ANCHOR_CHANNEL:    { category: 'anchor',   phase: 2, label: 'ANCHOR_CHANNEL',    fields: [{name:'local_key', type:'PUBKEY', placeholder:'02... local pubkey'}, {name:'remote_key', type:'PUBKEY', placeholder:'02... remote pubkey'}, {name:'commitment_number', type:'NUMERIC', placeholder:'commitment #'}] },
+  ANCHOR_POOL:       { category: 'anchor',   phase: 2, label: 'ANCHOR_POOL',       fields: [{name:'vtxo_tree_root', type:'HASH256', placeholder:'VTXO tree root'}, {name:'participant_count', type:'NUMERIC', placeholder:'participant count'}] },
+  ANCHOR_RESERVE:    { category: 'anchor',   phase: 2, label: 'ANCHOR_RESERVE',    fields: [{name:'threshold_n', type:'NUMERIC', placeholder:'n'}, {name:'threshold_m', type:'NUMERIC', placeholder:'m'}, {name:'guardian_set_hash', type:'HASH256', placeholder:'guardian set hash'}] },
+  ANCHOR_SEAL:       { category: 'anchor',   phase: 2, label: 'ANCHOR_SEAL',       fields: [{name:'asset_id', type:'HASH256', placeholder:'asset identifier'}, {name:'state_transition', type:'HASH256', placeholder:'state transition hash'}] },
+  ANCHOR_ORACLE:     { category: 'anchor',   phase: 2, label: 'ANCHOR_ORACLE',     fields: [{name:'oracle_key', type:'PUBKEY', placeholder:'02... oracle pubkey'}, {name:'outcome_count', type:'NUMERIC', placeholder:'number of outcomes'}] },
+  DATA_RETURN:       { category: 'anchor',   phase: 2, label: 'DATA_RETURN',       fields: [{name:'data', type:'DATA', placeholder:'hex data (max 80 bytes)'}] },
 
   // ── RECURSION (0x04xx) — Phase 3 ──
   RECURSE_SAME:      { category: 'recurse',  phase: 3, label: 'RECURSE_SAME',      fields: [{name:'max_depth', type:'NUMERIC', placeholder:'max recursion depth'}] },
-  RECURSE_MODIFIED:  { category: 'recurse',  phase: 3, label: 'RECURSE_MODIFIED',  fields: [{name:'max_depth', type:'NUMERIC', placeholder:'max depth'}, {name:'block_idx', type:'NUMERIC', placeholder:'block index'}, {name:'param_idx', type:'NUMERIC', placeholder:'param index'}, {name:'delta', type:'NUMERIC', placeholder:'delta value'}] },
-  RECURSE_UNTIL:     { category: 'recurse',  phase: 3, label: 'RECURSE_UNTIL',     fields: [{name:'target_height', type:'NUMERIC', placeholder:'block height to terminate'}] },
-  RECURSE_COUNT:     { category: 'recurse',  phase: 3, label: 'RECURSE_COUNT',     fields: [{name:'remaining', type:'NUMERIC', placeholder:'countdown value'}] },
-  RECURSE_SPLIT:     { category: 'recurse',  phase: 3, label: 'RECURSE_SPLIT',     fields: [{name:'max_splits', type:'NUMERIC', placeholder:'max output splits'}, {name:'min_sats', type:'NUMERIC', placeholder:'min sats per output'}] },
-  RECURSE_DECAY:     { category: 'recurse',  phase: 3, label: 'RECURSE_DECAY',     fields: [{name:'max_depth', type:'NUMERIC', placeholder:'max depth'}, {name:'block_idx', type:'NUMERIC', placeholder:'block index'}, {name:'param_idx', type:'NUMERIC', placeholder:'param index'}, {name:'decay_per_step', type:'NUMERIC', placeholder:'decay amount'}] },
+  RECURSE_MODIFIED:  { category: 'recurse',  phase: 3, label: 'RECURSE_MODIFIED',  fields: [{name:'max_depth', type:'NUMERIC', placeholder:'max depth'}, {name:'mutation_block_idx', type:'NUMERIC', placeholder:'block index'}, {name:'mutation_param_idx', type:'NUMERIC', placeholder:'param index'}, {name:'mutation_delta', type:'NUMERIC', placeholder:'delta value'}] },
+  RECURSE_UNTIL:     { category: 'recurse',  phase: 3, label: 'RECURSE_UNTIL',     fields: [{name:'until_height', type:'NUMERIC', placeholder:'block height to terminate'}] },
+  RECURSE_COUNT:     { category: 'recurse',  phase: 3, label: 'RECURSE_COUNT',     fields: [{name:'max_count', type:'NUMERIC', placeholder:'countdown value'}] },
+  RECURSE_SPLIT:     { category: 'recurse',  phase: 3, label: 'RECURSE_SPLIT',     fields: [{name:'max_splits', type:'NUMERIC', placeholder:'max output splits'}, {name:'min_split_sats', type:'NUMERIC', placeholder:'min sats per output'}] },
+  RECURSE_DECAY:     { category: 'recurse',  phase: 3, label: 'RECURSE_DECAY',     fields: [{name:'max_depth', type:'NUMERIC', placeholder:'max depth'}, {name:'decay_block_idx', type:'NUMERIC', placeholder:'block index'}, {name:'decay_param_idx', type:'NUMERIC', placeholder:'param index'}, {name:'decay_per_step', type:'NUMERIC', placeholder:'decay amount'}] },
 
   // ── PLC (0x06xx) — Phase 3 ──
   HYSTERESIS_FEE:    { category: 'plc',      phase: 3, label: 'HYSTERESIS_FEE',    fields: [{name:'high_sat_vb', type:'NUMERIC', placeholder:'high fee threshold'}, {name:'low_sat_vb', type:'NUMERIC', placeholder:'low fee threshold'}] },
   HYSTERESIS_VALUE:  { category: 'plc',      phase: 3, label: 'HYSTERESIS_VALUE',  fields: [{name:'high_sats', type:'NUMERIC', placeholder:'high value band'}, {name:'low_sats', type:'NUMERIC', placeholder:'low value band'}] },
-  TIMER_CONTINUOUS:  { category: 'plc',      phase: 3, label: 'TIMER_CONTINUOUS',  fields: [{name:'accumulated', type:'NUMERIC', placeholder:'accumulated blocks'}, {name:'target', type:'NUMERIC', placeholder:'target blocks'}] },
-  TIMER_OFF_DELAY:   { category: 'plc',      phase: 3, label: 'TIMER_OFF_DELAY',   fields: [{name:'remaining', type:'NUMERIC', placeholder:'blocks remaining'}] },
-  LATCH_SET:         { category: 'plc',      phase: 3, label: 'LATCH_SET',         fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... setter pubkey'}, {name:'state', type:'NUMERIC', placeholder:'0'}] },
-  LATCH_RESET:       { category: 'plc',      phase: 3, label: 'LATCH_RESET',       fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... resetter pubkey'}, {name:'state', type:'NUMERIC', placeholder:'1'}, {name:'delay', type:'NUMERIC', placeholder:'reset delay (blocks)'}] },
-  COUNTER_DOWN:      { category: 'plc',      phase: 3, label: 'COUNTER_DOWN',      fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... event signer'}, {name:'count', type:'NUMERIC', placeholder:'initial count'}] },
-  COUNTER_PRESET:    { category: 'plc',      phase: 3, label: 'COUNTER_PRESET',    fields: [{name:'current', type:'NUMERIC', placeholder:'current count'}, {name:'preset', type:'NUMERIC', placeholder:'preset target'}] },
-  COUNTER_UP:        { category: 'plc',      phase: 3, label: 'COUNTER_UP',        fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... event signer'}, {name:'current', type:'NUMERIC', placeholder:'current count'}, {name:'target', type:'NUMERIC', placeholder:'target count'}] },
+  TIMER_CONTINUOUS:  { category: 'plc',      phase: 3, label: 'TIMER_CONTINUOUS',  fields: [{name:'required_blocks', type:'NUMERIC', placeholder:'consecutive blocks required'}] },
+  TIMER_OFF_DELAY:   { category: 'plc',      phase: 3, label: 'TIMER_OFF_DELAY',   fields: [{name:'hold_blocks', type:'NUMERIC', placeholder:'blocks to hold after trigger'}] },
+  LATCH_SET:         { category: 'plc',      phase: 3, label: 'LATCH_SET',         fields: [{name:'setter_key', type:'PUBKEY', placeholder:'02... setter pubkey'}] },
+  LATCH_RESET:       { category: 'plc',      phase: 3, label: 'LATCH_RESET',       fields: [{name:'resetter_key', type:'PUBKEY', placeholder:'02... resetter pubkey'}, {name:'reset_delay', type:'NUMERIC', placeholder:'reset delay (blocks)'}] },
+  COUNTER_DOWN:      { category: 'plc',      phase: 3, label: 'COUNTER_DOWN',      fields: [{name:'event_signer', type:'PUBKEY', placeholder:'02... event signer'}, {name:'initial_count', type:'NUMERIC', placeholder:'initial count'}] },
+  COUNTER_PRESET:    { category: 'plc',      phase: 3, label: 'COUNTER_PRESET',    fields: [{name:'preset_count', type:'NUMERIC', placeholder:'required approvals'}, {name:'window_blocks', type:'NUMERIC', placeholder:'window (blocks)'}] },
+  COUNTER_UP:        { category: 'plc',      phase: 3, label: 'COUNTER_UP',        fields: [{name:'event_signer', type:'PUBKEY', placeholder:'02... event signer'}, {name:'target_count', type:'NUMERIC', placeholder:'target count'}] },
   COMPARE:           { category: 'plc',      phase: 3, label: 'COMPARE',           fields: [{name:'operator', type:'NUMERIC', placeholder:'01=EQ 03=GT 04=LT 07=RANGE'}, {name:'value_b', type:'NUMERIC', placeholder:'threshold value'}, {name:'value_c', type:'NUMERIC', placeholder:'upper bound (RANGE only)'}] },
-  SEQUENCER:         { category: 'plc',      phase: 3, label: 'SEQUENCER',         fields: [{name:'current', type:'NUMERIC', placeholder:'current step'}, {name:'total', type:'NUMERIC', placeholder:'total steps'}] },
-  ONE_SHOT:          { category: 'plc',      phase: 3, label: 'ONE_SHOT',          fields: [{name:'state', type:'NUMERIC', placeholder:'state (0=ready)'}, {name:'commitment', type:'HASH256', placeholder:'activation commitment'}] },
-  RATE_LIMIT:        { category: 'plc',      phase: 3, label: 'RATE_LIMIT',        fields: [{name:'max_per_block', type:'NUMERIC', placeholder:'max sats per block'}, {name:'acc_cap', type:'NUMERIC', placeholder:'accumulation cap'}, {name:'refill_blocks', type:'NUMERIC', placeholder:'refill period (blocks)'}] },
+  SEQUENCER:         { category: 'plc',      phase: 3, label: 'SEQUENCER',         fields: [{name:'current_step', type:'NUMERIC', placeholder:'current step'}, {name:'total_steps', type:'NUMERIC', placeholder:'total steps'}] },
+  ONE_SHOT:          { category: 'plc',      phase: 3, label: 'ONE_SHOT',          fields: [{name:'duration_blocks', type:'NUMERIC', placeholder:'activation window (blocks)'}, {name:'commitment', type:'HASH256', placeholder:'activation commitment'}] },
+  RATE_LIMIT:        { category: 'plc',      phase: 3, label: 'RATE_LIMIT',        fields: [{name:'max_per_block', type:'NUMERIC', placeholder:'max sats per block'}, {name:'accumulation_cap', type:'NUMERIC', placeholder:'accumulation cap'}, {name:'refill_blocks', type:'NUMERIC', placeholder:'refill period (blocks)'}] },
   COSIGN:            { category: 'plc',      phase: 3, label: 'COSIGN',            fields: [{name:'conditions_hash', type:'HASH256', placeholder:'SHA256 of co-input scriptPubKey'}] },
 
   // ── COMPOUND (0x07xx) — Phase 1 ──
-  TIMELOCKED_SIG:    { category: 'compound', phase: 1, label: 'TIMELOCKED_SIG',    fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... signing key'}, {name:'blocks', type:'NUMERIC', placeholder:'144'}] },
-  HTLC:              { category: 'compound', phase: 1, label: 'HTLC',              fields: [{name:'hash', type:'HASH256', placeholder:'SHA256 payment hash'}, {name:'pubkey', type:'PUBKEY', placeholder:'02... signing key'}, {name:'blocks', type:'NUMERIC', placeholder:'144'}] },
-  HASH_SIG:          { category: 'compound', phase: 1, label: 'HASH_SIG',          fields: [{name:'hash', type:'HASH256', placeholder:'SHA256 hash'}, {name:'pubkey', type:'PUBKEY', placeholder:'02... signing key'}] },
-  PTLC:              { category: 'compound', phase: 1, label: 'PTLC',              fields: [{name:'signing_key', type:'PUBKEY', placeholder:'02... signing key'}, {name:'adaptor_point', type:'PUBKEY', placeholder:'32-byte adaptor point'}, {name:'blocks', type:'NUMERIC', placeholder:'144'}] },
-  CLTV_SIG:          { category: 'compound', phase: 1, label: 'CLTV_SIG',          fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... signing key'}, {name:'height', type:'NUMERIC', placeholder:'850000'}] },
-  TIMELOCKED_MULTISIG: { category: 'compound', phase: 1, label: 'TIMELOCKED_MULTISIG', fields: [{name:'threshold', type:'NUMERIC', placeholder:'2'}, {name:'pubkeys', type:'PUBKEY_LIST', placeholder:'02..., 03...'}, {name:'blocks', type:'NUMERIC', placeholder:'144'}] },
+  TIMELOCKED_SIG:    { category: 'compound', phase: 1, label: 'TIMELOCKED_SIG',    fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... signing key'}, {name:'csv_delay', type:'NUMERIC', placeholder:'144'}] },
+  HTLC:              { category: 'compound', phase: 1, label: 'HTLC',              fields: [{name:'sender_key', type:'PUBKEY', placeholder:'02... sender key'}, {name:'receiver_key', type:'PUBKEY', placeholder:'02... receiver key'}, {name:'hash_lock', type:'HASH256', placeholder:'SHA256 hash lock'}, {name:'csv_delay', type:'NUMERIC', placeholder:'144'}] },
+  HASH_SIG:          { category: 'compound', phase: 1, label: 'HASH_SIG',          fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... signing key'}, {name:'hash_lock', type:'HASH256', placeholder:'SHA256 hash lock'}] },
+  PTLC:              { category: 'compound', phase: 1, label: 'PTLC',              fields: [{name:'signing_key', type:'PUBKEY', placeholder:'02... signing key'}, {name:'adaptor_point', type:'PUBKEY', placeholder:'32-byte adaptor point'}, {name:'csv_delay', type:'NUMERIC', placeholder:'144'}] },
+  CLTV_SIG:          { category: 'compound', phase: 1, label: 'CLTV_SIG',          fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... signing key'}, {name:'cltv_height', type:'NUMERIC', placeholder:'850000'}] },
+  TIMELOCKED_MULTISIG: { category: 'compound', phase: 1, label: 'TIMELOCKED_MULTISIG', fields: [{name:'threshold', type:'NUMERIC', placeholder:'2'}, {name:'pubkeys', type:'PUBKEY_LIST', placeholder:'02..., 03...'}, {name:'csv_delay', type:'NUMERIC', placeholder:'144'}] },
 
   // ── GOVERNANCE (0x08xx) — Phase 2 ──
   EPOCH_GATE:        { category: 'govern',   phase: 2, label: 'EPOCH_GATE',        fields: [{name:'epoch_size', type:'NUMERIC', placeholder:'144'}, {name:'window_size', type:'NUMERIC', placeholder:'72'}] },
   WEIGHT_LIMIT:      { category: 'govern',   phase: 2, label: 'WEIGHT_LIMIT',      fields: [{name:'max_weight', type:'NUMERIC', placeholder:'4000'}] },
-  INPUT_COUNT:       { category: 'govern',   phase: 2, label: 'INPUT_COUNT',       fields: [{name:'min', type:'NUMERIC', placeholder:'1'}, {name:'max', type:'NUMERIC', placeholder:'5'}] },
-  OUTPUT_COUNT:      { category: 'govern',   phase: 2, label: 'OUTPUT_COUNT',      fields: [{name:'min', type:'NUMERIC', placeholder:'1'}, {name:'max', type:'NUMERIC', placeholder:'3'}] },
+  INPUT_COUNT:       { category: 'govern',   phase: 2, label: 'INPUT_COUNT',       fields: [{name:'min_inputs', type:'NUMERIC', placeholder:'1'}, {name:'max_inputs', type:'NUMERIC', placeholder:'5'}] },
+  OUTPUT_COUNT:      { category: 'govern',   phase: 2, label: 'OUTPUT_COUNT',      fields: [{name:'min_outputs', type:'NUMERIC', placeholder:'1'}, {name:'max_outputs', type:'NUMERIC', placeholder:'3'}] },
   RELATIVE_VALUE:    { category: 'govern',   phase: 2, label: 'RELATIVE_VALUE',    fields: [{name:'numerator', type:'NUMERIC', placeholder:'9'}, {name:'denominator', type:'NUMERIC', placeholder:'10'}] },
-  ACCUMULATOR:       { category: 'govern',   phase: 2, label: 'ACCUMULATOR',       fields: [{name:'merkle_root', type:'HASH256', placeholder:'Merkle root hash'}] },
-
-  // ── LEGACY (0x09xx) — Phase 1 ──
-  P2PK_LEGACY:       { category: 'legacy',   phase: 1, label: 'P2PK_LEGACY',       fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... public key'}] },
-  P2PKH_LEGACY:      { category: 'legacy',   phase: 1, label: 'P2PKH_LEGACY',      fields: [{name:'hash160', type:'HASH160', placeholder:'RIPEMD160(SHA256(pubkey))'}] },
-  P2SH_LEGACY:       { category: 'legacy',   phase: 1, label: 'P2SH_LEGACY',       fields: [{name:'hash160', type:'HASH160', placeholder:'RIPEMD160(SHA256(script))'}] },
-  P2WPKH_LEGACY:     { category: 'legacy',   phase: 1, label: 'P2WPKH_LEGACY',     fields: [{name:'hash160', type:'HASH160', placeholder:'RIPEMD160(SHA256(pubkey))'}] },
-  P2WSH_LEGACY:      { category: 'legacy',   phase: 1, label: 'P2WSH_LEGACY',      fields: [{name:'hash256', type:'HASH256', placeholder:'SHA256(witness script)'}] },
-  P2TR_LEGACY:       { category: 'legacy',   phase: 1, label: 'P2TR_LEGACY',       fields: [{name:'pubkey', type:'PUBKEY', placeholder:'02... x-only pubkey'}] },
-  P2TR_SCRIPT_LEGACY:{ category: 'legacy',   phase: 1, label: 'P2TR_SCRIPT_LEGACY',fields: [{name:'hash256', type:'HASH256', placeholder:'Merkle root hash'}, {name:'internal_key', type:'PUBKEY', placeholder:'02... internal pubkey'}] },
+  ACCUMULATOR:       { category: 'govern',   phase: 2, label: 'ACCUMULATOR',       fields: [{name:'root', type:'HASH256', placeholder:'Merkle root hash'}] },
 };
 
 const CATEGORIES = [
@@ -831,7 +822,6 @@ const CATEGORIES = [
   { id: 'plc',      name: 'PLC',       color: '#44DDFF' },
   { id: 'compound', name: 'COMPOUND',  color: '#FFD700' },
   { id: 'govern',   name: 'GOVERNANCE', color: '#22CC88' },
-  { id: 'legacy',   name: 'LEGACY',     color: '#e91e90' },
 ];
 
 const COIL_DEFS = {
@@ -840,6 +830,15 @@ const COIL_DEFS = {
   COVENANT:  { label: 'COVENANT',  desc: 'Constrains the spending transaction structure.', hasAddress: false, hasLogic: true },
 };
 const COIL_TYPES = Object.keys(COIL_DEFS);
+
+// Key-consuming block types cannot be inverted (anti-spam: prevents garbage-pubkey data embedding)
+const KEY_CONSUMING_TYPES = new Set([
+  'SIG', 'MULTISIG', 'TIMELOCKED_SIG', 'HTLC', 'HASH_SIG', 'CLTV_SIG', 'PTLC',
+  'TIMELOCKED_MULTISIG', 'KEY_REF_SIG', 'COSIGN', 'ADAPTOR_SIG', 'MUSIG_THRESHOLD',
+  'P2PK_LEGACY', 'P2PKH_LEGACY', 'P2WPKH_LEGACY', 'P2TR_LEGACY', 'P2TR_SCRIPT_LEGACY'
+]);
+
+function isInvertible(blockType) { return !KEY_CONSUMING_TYPES.has(blockType); }
 
 function categoryColor(cat) {
   const c = CATEGORIES.find(c => c.id === cat);
@@ -1193,12 +1192,16 @@ function openCoilBlockModal(oi, cri, cbi) {
   document.getElementById('modal-title').innerHTML = `<span style="color:${color}">${block.type}</span> — COIL LOGIC`;
 
   let html = '';
-  html += '<div class="form-group"><label class="form-label">Mode</label>';
-  html += '<div class="inv-toggle">';
-  html += `<button id="inv-normal" class="${!block.inverted ? 'active' : ''}" onclick="setCoilBlockInverted(false)">NORMAL</button>`;
-  html += `<button id="inv-inverted" class="${block.inverted ? 'active' : ''}" onclick="setCoilBlockInverted(true)">/INVERTED</button>`;
-  html += '</div>';
-  html += '<div class="inv-hint">Normal: condition must be satisfied. Inverted: condition must NOT be satisfied.</div></div>';
+  if (isInvertible(block.type)) {
+    html += '<div class="form-group"><label class="form-label">Mode</label>';
+    html += '<div class="inv-toggle">';
+    html += `<button id="inv-normal" class="${!block.inverted ? 'active' : ''}" onclick="setCoilBlockInverted(false)">NORMAL</button>`;
+    html += `<button id="inv-inverted" class="${block.inverted ? 'active' : ''}" onclick="setCoilBlockInverted(true)">/INVERTED</button>`;
+    html += '</div>';
+    html += '<div class="inv-hint">Normal: condition must be satisfied. Inverted: condition must NOT be satisfied.</div></div>';
+  } else {
+    block.inverted = false;
+  }
 
   for (const field of def.fields) {
     const val = block.params?.[field.name] || '';
@@ -1217,12 +1220,14 @@ function openCoilBlockModal(oi, cri, cbi) {
   document.getElementById('block-modal').classList.add('active');
 }
 function setCoilBlockInverted(val) {
-  document.getElementById('inv-normal').classList.toggle('active', !val);
-  document.getElementById('inv-inverted').classList.toggle('active', val);
   if (state.modalTarget && state.modalTarget.isCoilBlock) {
     const { oi, cri, cbi } = state.modalTarget;
-    P().outputs[oi].coil.rungs[cri].blocks[cbi].inverted = val;
+    const block = P().outputs[oi].coil.rungs[cri].blocks[cbi];
+    if (val && !isInvertible(block.type)) return;
+    block.inverted = val;
   }
+  document.getElementById('inv-normal').classList.toggle('active', !val);
+  document.getElementById('inv-inverted').classList.toggle('active', val);
 }
 function deleteCoilBlock() {
   if (!state.modalTarget || !state.modalTarget.isCoilBlock) return;
@@ -1485,14 +1490,19 @@ function openBlockModal(oi, ri, bi) {
 
   let html = '';
 
-  // Inversion toggle
-  html += '<div class="form-group"><label class="form-label">Mode</label>';
-  html += '<div class="inv-toggle">';
-  html += `<button id="inv-normal" class="${!block.inverted ? 'active' : ''}" onclick="setInverted(false)">NORMAL</button>`;
-  html += `<button id="inv-inverted" class="${block.inverted ? 'active' : ''}" onclick="setInverted(true)">/INVERTED</button>`;
-  html += '</div>';
-  html += `<div class="inv-hint">Normal: condition must be satisfied. Inverted: condition must NOT be satisfied (flips result).</div>`;
-  html += '</div>';
+  // Inversion toggle (only for non-key-consuming blocks)
+  if (isInvertible(block.type)) {
+    html += '<div class="form-group"><label class="form-label">Mode</label>';
+    html += '<div class="inv-toggle">';
+    html += `<button id="inv-normal" class="${!block.inverted ? 'active' : ''}" onclick="setInverted(false)">NORMAL</button>`;
+    html += `<button id="inv-inverted" class="${block.inverted ? 'active' : ''}" onclick="setInverted(true)">/INVERTED</button>`;
+    html += '</div>';
+    html += `<div class="inv-hint">Normal: condition must be satisfied. Inverted: condition must NOT be satisfied (flips result).</div>`;
+    html += '</div>';
+  } else {
+    // Force non-invertible for key-consuming blocks
+    block.inverted = false;
+  }
 
   // Parameter fields
   for (const field of def.fields) {
@@ -1515,12 +1525,14 @@ function openBlockModal(oi, ri, bi) {
 }
 
 function setInverted(val) {
-  document.getElementById('inv-normal').classList.toggle('active', !val);
-  document.getElementById('inv-inverted').classList.toggle('active', val);
   if (state.modalTarget) {
     const { oi, ri, bi } = state.modalTarget;
-    P().outputs[oi].rungs[ri].blocks[bi].inverted = val;
+    const block = P().outputs[oi].rungs[ri].blocks[bi];
+    if (val && !isInvertible(block.type)) return; // key-consuming blocks cannot be inverted
+    block.inverted = val;
   }
+  document.getElementById('inv-normal').classList.toggle('active', !val);
+  document.getElementById('inv-inverted').classList.toggle('active', val);
 }
 
 function applyModal() {
@@ -1569,7 +1581,7 @@ function buildPhaseJSON(phase) {
       const blocks = rung.blocks.map(block => {
         const def = BLOCK_DEFS[block.type];
         const b = { type: block.type };
-        if (block.inverted) b.inverted = true;
+        if (block.inverted && isInvertible(block.type)) b.inverted = true;
         if (def && def.fields.length > 0) {
           b.fields = [];
           for (const fd of def.fields) {
@@ -1599,7 +1611,7 @@ function buildPhaseJSON(phase) {
         const blocks = cr.blocks.map(cb => {
           const cdef = BLOCK_DEFS[cb.type];
           const b = { type: cb.type };
-          if (cb.inverted) b.inverted = true;
+          if (cb.inverted && isInvertible(cb.type)) b.inverted = true;
           if (cdef && cdef.fields.length > 0) {
             b.fields = [];
             for (const fd of cdef.fields) {
@@ -1868,11 +1880,11 @@ const TEMPLATES = [
   {
     name: 'HTLC',
     color: '#4488FF',
-    desc: 'Hash preimage OR timeout — classic atomic swap',
+    desc: 'Hash-locked transfer OR timeout — classic atomic swap',
     build: () => ({
       inputs: [{ txid: 'aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb', vout: 0, sequence: 0xfffffffe }],
       outputs: [{ amount: '0.999', rungs: [
-        { blocks: [{ type: 'HASH_PREIMAGE', inverted: false, params: { hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' } }] },
+        { blocks: [{ type: 'HTLC', inverted: false, params: { sender_key: '02a1633cafcc01ebfb6d78e39f687a1f0995c62fc95f51ead10a02ee0be551b5dc', receiver_key: '03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a', hash_lock: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', csv_delay: '144' } }] },
         { blocks: [
           { type: 'SIG', inverted: false, params: { pubkey: '02a1633cafcc01ebfb6d78e39f687a1f0995c62fc95f51ead10a02ee0be551b5dc' } },
           { type: 'CSV', inverted: false, params: { blocks: '144' } },
@@ -2074,13 +2086,13 @@ const TEMPLATES = [
   {
     name: 'Covenant Lock',
     color: '#FF6644',
-    desc: 'Anyone can spend → but spending tx must include a hash preimage and a specific SIG',
+    desc: 'Anyone can spend → but spending tx must include a tagged hash proof and a specific SIG',
     build: () => ({
       inputs: [{ txid: 'aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb', vout: 0, sequence: 0xfffffffe }],
       outputs: [{ amount: '0.999', rungs: [
         { blocks: [{ type: 'SIG', inverted: false, params: { pubkey: '02a1633cafcc01ebfb6d78e39f687a1f0995c62fc95f51ead10a02ee0be551b5dc' } }] },
       ], coil: { type: 'COVENANT', address: '', rungs: [
-        { blocks: [{ type: 'HASH_PREIMAGE', inverted: false, params: { hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' } }] },
+        { blocks: [{ type: 'TAGGED_HASH', inverted: false, params: { tag_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', expected: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' } }] },
         { blocks: [{ type: 'SIG', inverted: false, params: { pubkey: '03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a' } }] },
       ]}}],
     }),

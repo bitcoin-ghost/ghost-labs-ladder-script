@@ -46,7 +46,7 @@
   .output-amount { font-size: 8px; font-weight: 400; margin-top: 2px; opacity: 0.7; }
   .output-blocks { display: flex; gap: 4px; flex: 1; padding: 8px; background: #0a0a0a; border: 1px solid #242424; border-left: none; border-radius: 0 6px 6px 0; align-items: center; flex-wrap: wrap; }
 
-  .rung-block.sig { background: rgba(230, 168, 23, 0.08); color: #e6a817; border: 1px solid rgba(230, 168, 23, 0.2); }
+  .rung-block.sig { background: rgba(255, 23, 68, 0.08); color: #ff1744; border: 1px solid rgba(255, 23, 68, 0.2); }
 
   .json-block { background: #141414; border: 1px solid #1a1a1a; border-radius: 10px; padding: 18px 22px; margin: 16px 0; overflow-x: auto; font-size: 12px; line-height: 1.6; }
   .json-block pre { margin: 0; font-family: 'Geist Mono', 'IBM Plex Mono', monospace; color: #ccc; white-space: pre-wrap; word-break: break-all; }
@@ -69,7 +69,7 @@
   <h1 class="block-title">SINGLE SIG (COMPACT)</h1>
   <p class="block-subtitle">Simplest possible RUNG_TX: a single compact-encoded SIG rung. The wire format uses COMPACT_SIG encoding &amp;mdash; just the pubkey commit and scheme byte, no block array. Minimal transaction size demonstrates the most efficient Ladder Script encoding.</p>
   <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
-    <span class="scheme-badge" style="background: rgba(230, 168, 23, 0.08); color: #e6a817; border: 1px solid rgba(230, 168, 23, 0.2);">SIG &middot; TYPE 0x00</span>
+    <span class="scheme-badge" style="background: rgba(255, 23, 68, 0.08); color: #ff1744; border: 1px solid rgba(255, 23, 68, 0.2);">SIG</span>
     <span class="scheme-badge" style="background: rgba(0, 212, 255, 0.1); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.25);">SCHNORR &middot; SCHEME</span>
   </div>
 </div>
@@ -79,13 +79,14 @@
 <!-- Rung Diagram -->
 <div class="doc-section">
   <div class="section-label">Rung Structure</div>
-  <p class="section-text">Single rung using COMPACT_SIG wire encoding. Instead of a block array, the conditions contain just the pubkey commit and scheme &amp;mdash; the most compact possible encoding.</p>
+  <p class="section-text" style="margin-bottom: 8px;">Single rung using COMPACT_SIG wire encoding. Instead of a block array, the conditions contain just the pubkey commit and scheme &amp;mdash; the most compact possible encoding.</p>
+  <p class="section-text" style="font-size: 12px; color: #666; margin-bottom: 12px;">Each row is a <strong style="color: #aaa;">rung</strong> (spending path). Rungs are <strong style="color: #aaa;">OR</strong> &mdash; satisfy any one rung to spend. Blocks within a rung are joined by <span style="color: #444; font-weight: 600;">+</span> meaning <strong style="color: #aaa;">AND</strong> &mdash; all must pass.</p>
 
   <div class="rung-diagram">
     <div class="rung-row">
-      <div class="rung-label-box" style="background: rgba(230, 168, 23, 0.08); color: #e6a817; border: 1px solid rgba(230, 168, 23, 0.2);">SPEND</div>
+      <div class="rung-label-box" style="background: rgba(255, 23, 68, 0.08); color: #ff1744; border: 1px solid rgba(255, 23, 68, 0.2);">SPEND</div>
       <div class="rung-blocks">
-        <div class="rung-block" style="background: rgba(230, 168, 23, 0.08); color: #e6a817; border: 1px solid rgba(230, 168, 23, 0.2);">COMPACT_SIG</div>
+        <div class="rung-block" style="background: rgba(255, 23, 68, 0.08); color: #ff1744; border: 1px solid rgba(255, 23, 68, 0.2);">COMPACT_SIG</div>
         <div class="rung-arrow">&rarr;</div>
         <div class="rung-output">PAYMENT</div>
       </div>
@@ -98,15 +99,15 @@
   <p class="section-text">The funding transaction splits funds across outputs with different security policies.</p>
   <div class="output-diagram">
     <div class="output-row">
-      <div class="output-label-box" style="background: rgba(230, 168, 23, 0.08); color: #e6a817; border: 1px solid rgba(230, 168, 23, 0.2);">VOUT 0<div class="output-amount">10,000 sats</div></div>
+      <div class="output-label-box" style="background: rgba(255, 23, 68, 0.08); color: #ff1744; border: 1px solid rgba(255, 23, 68, 0.2);">VOUT 0<div class="output-amount">10,000 sats</div></div>
       <div class="output-blocks">
-        <div class="rung-block" style="background: rgba(230, 168, 23, 0.1); color: #e6a817; border: 1px solid rgba(230, 168, 23, 0.2);">COMPACT_SIG</div>
+        <div class="rung-block" style="background: rgba(255, 23, 68, 0.08); color: #ff1744; border: 1px solid rgba(255, 23, 68, 0.2);">COMPACT_SIG</div>
         <div class="rung-arrow">&rarr;</div>
         <div class="rung-output">PAYMENT</div>
       </div>
     </div>
     <div class="output-row">
-      <div class="output-label-box" style="background: rgba(100, 100, 100, 0.1); color: #888; border: 1px solid rgba(100, 100, 100, 0.2);">VOUT 1<div class="output-amount">1,249,989,000 sats</div></div>
+      <div class="output-label-box" style="background: rgba(100, 100, 100, 0.1); color: #888; border: 1px solid rgba(100, 100, 100, 0.2);">VOUT 1<div class="output-amount">624,989,000 sats</div></div>
       <div class="output-blocks">
         <div class="rung-block" style="background: rgba(100, 100, 100, 0.1); color: #888; border: 1px solid rgba(100, 100, 100, 0.2);">SIG (wallet)</div>
         <div class="rung-arrow">&rarr;</div>
@@ -126,7 +127,7 @@
       <div class="tx-box-label"><span class="arrow-right">&#9654;</span> Funding Transaction</div>
       <div class="tx-field">
         <div class="tx-field-name">TXID</div>
-        <div class="tx-field-value txid">612eec75b8f54e7d5c616fd3d4b656a979e48cfe747a6c92dacb5c763f54097f</div>
+        <div class="tx-field-value txid">89b14daabcf0f8c897e400fc5f3d72953388c650932fbb13a3791f937058f059</div>
       </div>
       <div class="tx-field">
         <div class="tx-field-name">Version</div>
@@ -138,7 +139,7 @@
       </div>
       <div class="tx-field">
         <div class="tx-field-name">Outputs</div>
-        <div class="tx-field-value">2 &mdash; vout 0: PAYMENT (10,000 sats), vout 1: change (1,249,989,000 sats)</div>
+        <div class="tx-field-value">2 &mdash; vout 0: PAYMENT (10,000 sats), vout 1: change (624,989,000 sats)</div>
       </div>
       <div class="tx-field">
         <div class="tx-field-name">Confirmations</div>
@@ -150,7 +151,7 @@
       <div class="tx-box-label"><span class="arrow-left">&#9664;</span> Spending Transaction (Compact Spend)</div>
       <div class="tx-field">
         <div class="tx-field-name">TXID</div>
-        <div class="tx-field-value txid">579f726e7d97e68dad631a5d583c5a5ae7ab71297e5024304fa7041d561a26b9</div>
+        <div class="tx-field-value txid">09ea6f95b6da1212fb9c96654e1ab6180989702163601b622ccb653f1fedca93</div>
       </div>
       <div class="tx-field">
         <div class="tx-field-name">Version</div>
@@ -182,7 +183,7 @@
 
 <div class="doc-section">
   <div class="section-label">Spending Witness Breakdown</div>
-  <p class="section-text">The ladder witness provides data for each block in the rung. Blocks that need no witness data (validation-only blocks) contribute zero bytes.</p>
+  <p class="section-text">The ladder witness carries data for each block in the rung. Total witness: <strong>107 bytes</strong>.</p>
   <div class="witness-bar">
     <div class="witness-seg" style="flex: 4; background: #4a4a4a;" title="HDR: 4 bytes">HDR</div>
     <div class="witness-seg" style="flex: 33; background: #f7931a;" title="33B: 33 bytes">33B</div>
@@ -249,8 +250,8 @@
   <div class="section-label">Funding Transaction JSON</div>
   <div class="json-block">
     <pre>{
-  <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;612eec75b8f54e7d5c616fd3d4b656a979e48cfe747a6c92dacb5c763f54097f&quot;</span>,
-  <span class="json-key">&quot;hash&quot;</span>: <span class="json-str">&quot;92d2057c77c3b4875e1f9336b20ee0cc79567c8b937601bac9ff857d1c5656b9&quot;</span>,
+  <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;89b14daabcf0f8c897e400fc5f3d72953388c650932fbb13a3791f937058f059&quot;</span>,
+  <span class="json-key">&quot;hash&quot;</span>: <span class="json-str">&quot;511c3abf49ae7dda9d2e508e707c01b9b0b3c1fc8fefbd948b90e575067e54c8&quot;</span>,
   <span class="json-key">&quot;version&quot;</span>: <span class="json-num">4</span>,
   <span class="json-key">&quot;size&quot;</span>: <span class="json-num">264</span>,
   <span class="json-key">&quot;vsize&quot;</span>: <span class="json-num">181</span>,
@@ -258,14 +259,14 @@
   <span class="json-key">&quot;locktime&quot;</span>: <span class="json-num">0</span>,
   <span class="json-key">&quot;vin&quot;</span>: [
     {
-      <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;990b350cc9891f1929af12e7c1abe4ef49d48a6b99274cf08faa752ab0cbf686&quot;</span>,
+      <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;9febf16f4eed8e72215f499db7edd256955d7354c11ba749e60bdc6362a64f78&quot;</span>,
       <span class="json-key">&quot;vout&quot;</span>: <span class="json-num">0</span>,
       <span class="json-key">&quot;scriptSig&quot;</span>: {
         <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;&quot;</span>,
         <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;&quot;</span>
       },
       <span class="json-key">&quot;txinwitness&quot;</span>: [
-        &quot;0101002103e45083e3adcb3e21004156476374cda467142260e550231111565b751bf0ec9240c54509786a3f75e315614a24652db01e64bc5c79f08afb40790b160e264e69c21fac10653cf9ac6651f89ceb3cee4caebf273c696011f3a27f086dd6b17d819f0101010000&quot;
+        &quot;0101002102eea4229b262105aa38a8a7119ca47624a6fb4b1deb6aa8d9f2f6b139e54439064007fa1a85548b598aa754e231943d703e7289177c6bae53f73ce4...(107 bytes total)&quot;
       ],
       <span class="json-key">&quot;sequence&quot;</span>: <span class="json-num">4294967294</span>
     }
@@ -275,21 +276,21 @@
       <span class="json-key">&quot;value&quot;</span>: <span class="json-num">0.0001</span>,
       <span class="json-key">&quot;n&quot;</span>: <span class="json-num">0</span>,
       <span class="json-key">&quot;scriptPubKey&quot;</span>: {
-        <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;OP_UNKNOWN 0 68 [error]&quot;</span>,
-        <span class="json-key">&quot;desc&quot;</span>: <span class="json-str">&quot;addr(rung1qyqqz3pksxqnauanx2qfr7ef0z7yqghfwcnsrql0wjurz47eamcacdcaqyqszqgqqqm6tdzt)#hepxqpcl&quot;</span>,
-        <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;c1010001443681813ef3b3328091fb2978bc4022e976270183ef74b83157d9eef1dc371d010101010000&quot;</span>,
-        <span class="json-key">&quot;address&quot;</span>: <span class="json-str">&quot;rung1qyqqz3pksxqnauanx2qfr7ef0z7yqghfwcnsrql0wjurz47eamcacdcaqyqszqgqqqm6tdzt&quot;</span>,
+        <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;OP_UNKNOWN 0 -110 OP_RIGHT ebeef13c72ed2130b22fc3b192e1ffea4aa7 OP_UNKNOWN OP_LESSTHANOREQUAL OP_UNK...&quot;</span>,
+        <span class="json-key">&quot;desc&quot;</span>: <span class="json-str">&quot;addr(rung1qyqqrm5pzt47aufuwtkjzv9j9lpmryhpll4y4fl95845qsw09atrhy75qyqszqgqqqcaljuv)#yq7u7j5d&quot;</span>,
+        <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;c1010001ee8112ebeef13c72ed2130b22fc3b192e1ffea4aa7e5a1eb4041cf2f563b93d4010101010000&quot;</span>,
+        <span class="json-key">&quot;address&quot;</span>: <span class="json-str">&quot;rung1qyqqrm5pzt47aufuwtkjzv9j9lpmryhpll4y4fl95845qsw09atrhy75qyqszqgqqqcaljuv&quot;</span>,
         <span class="json-key">&quot;type&quot;</span>: <span class="json-str">&quot;rung_conditions&quot;</span>
       }
     },
     {
-      <span class="json-key">&quot;value&quot;</span>: <span class="json-num">12.49989</span>,
+      <span class="json-key">&quot;value&quot;</span>: <span class="json-num">6.24989</span>,
       <span class="json-key">&quot;n&quot;</span>: <span class="json-num">1</span>,
       <span class="json-key">&quot;scriptPubKey&quot;</span>: {
-        <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;OP_UNKNOWN 0 68 [error]&quot;</span>,
-        <span class="json-key">&quot;desc&quot;</span>: <span class="json-str">&quot;addr(rung1qyqqz3pksxqnauanx2qfr7ef0z7yqghfwcnsrql0wjurz47eamcacdcaqyqszqgqqqm6tdzt)#hepxqpcl&quot;</span>,
-        <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;c1010001443681813ef3b3328091fb2978bc4022e976270183ef74b83157d9eef1dc371d010101010000&quot;</span>,
-        <span class="json-key">&quot;address&quot;</span>: <span class="json-str">&quot;rung1qyqqz3pksxqnauanx2qfr7ef0z7yqghfwcnsrql0wjurz47eamcacdcaqyqszqgqqqm6tdzt&quot;</span>,
+        <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;OP_UNKNOWN 0 -110 OP_RIGHT ebeef13c72ed2130b22fc3b192e1ffea4aa7 OP_UNKNOWN OP_LESSTHANOREQUAL OP_UNK...&quot;</span>,
+        <span class="json-key">&quot;desc&quot;</span>: <span class="json-str">&quot;addr(rung1qyqqrm5pzt47aufuwtkjzv9j9lpmryhpll4y4fl95845qsw09atrhy75qyqszqgqqqcaljuv)#yq7u7j5d&quot;</span>,
+        <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;c1010001ee8112ebeef13c72ed2130b22fc3b192e1ffea4aa7e5a1eb4041cf2f563b93d4010101010000&quot;</span>,
+        <span class="json-key">&quot;address&quot;</span>: <span class="json-str">&quot;rung1qyqqrm5pzt47aufuwtkjzv9j9lpmryhpll4y4fl95845qsw09atrhy75qyqszqgqqqcaljuv&quot;</span>,
         <span class="json-key">&quot;type&quot;</span>: <span class="json-str">&quot;rung_conditions&quot;</span>
       }
     }
@@ -303,8 +304,8 @@
   <div class="section-label">Spending Transaction JSON (Compact Spend)</div>
   <div class="json-block">
     <pre>{
-  <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;579f726e7d97e68dad631a5d583c5a5ae7ab71297e5024304fa7041d561a26b9&quot;</span>,
-  <span class="json-key">&quot;hash&quot;</span>: <span class="json-str">&quot;07f3dc76f41f683401aa67b2f455f9fae2b75de767e7042fe21b07668df43bce&quot;</span>,
+  <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;09ea6f95b6da1212fb9c96654e1ab6180989702163601b622ccb653f1fedca93&quot;</span>,
+  <span class="json-key">&quot;hash&quot;</span>: <span class="json-str">&quot;5b4d6f3adf4a735d32c5b80992e613b374d05d90f5727854da3afd869342bca5&quot;</span>,
   <span class="json-key">&quot;version&quot;</span>: <span class="json-num">4</span>,
   <span class="json-key">&quot;size&quot;</span>: <span class="json-num">217</span>,
   <span class="json-key">&quot;vsize&quot;</span>: <span class="json-num">134</span>,
@@ -312,14 +313,14 @@
   <span class="json-key">&quot;locktime&quot;</span>: <span class="json-num">0</span>,
   <span class="json-key">&quot;vin&quot;</span>: [
     {
-      <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;612eec75b8f54e7d5c616fd3d4b656a979e48cfe747a6c92dacb5c763f54097f&quot;</span>,
+      <span class="json-key">&quot;txid&quot;</span>: <span class="json-str">&quot;89b14daabcf0f8c897e400fc5f3d72953388c650932fbb13a3791f937058f059&quot;</span>,
       <span class="json-key">&quot;vout&quot;</span>: <span class="json-num">0</span>,
       <span class="json-key">&quot;scriptSig&quot;</span>: {
         <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;&quot;</span>,
         <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;&quot;</span>
       },
       <span class="json-key">&quot;txinwitness&quot;</span>: [
-        &quot;0101002103e45083e3adcb3e21004156476374cda467142260e550231111565b751bf0ec92409b97aa08a77595681f148779c52ee3a56db1c0ad53c60b873d87f1593942f85f2709f16d6d54f1faf3ca72b5059c78f2c6a56873c5b0eccec2dc1d63191526aa0101010000&quot;
+        &quot;0101002102eea4229b262105aa38a8a7119ca47624a6fb4b1deb6aa8d9f2f6b139e5443906408672df5f0f56eae0242a0ebbb56b4a08edc90090d9144a666cad...(107 bytes total)&quot;
       ],
       <span class="json-key">&quot;sequence&quot;</span>: <span class="json-num">4294967294</span>
     }
@@ -329,10 +330,10 @@
       <span class="json-key">&quot;value&quot;</span>: <span class="json-num">9</span>e-05,
       <span class="json-key">&quot;n&quot;</span>: <span class="json-num">0</span>,
       <span class="json-key">&quot;scriptPubKey&quot;</span>: {
-        <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;OP_UNKNOWN 1 OP_LEFT 0 2 443681813ef3b3328091fb2978bc4022e976270183ef74b83157d9eef1dc371d 1 0 0&quot;</span>,
-        <span class="json-key">&quot;desc&quot;</span>: <span class="json-str">&quot;addr(rung1qyqcqqgqqypzq3pksxqnauanx2qfr7ef0z7yqghfwcnsrql0wjurz47eamcacdcaqyqszqqqysg2ec)#ldd75fzv&quot;</span>,
-        <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;c10101800100010220443681813ef3b3328091fb2978bc4022e976270183ef74b83157d9eef1dc371d0101010000&quot;</span>,
-        <span class="json-key">&quot;address&quot;</span>: <span class="json-str">&quot;rung1qyqcqqgqqypzq3pksxqnauanx2qfr7ef0z7yqghfwcnsrql0wjurz47eamcacdcaqyqszqqqysg2ec&quot;</span>,
+        <span class="json-key">&quot;asm&quot;</span>: <span class="json-str">&quot;OP_UNKNOWN 1 OP_LEFT 0 2 ee8112ebeef13c72ed2130b22fc3b192e1ffea4aa7e5a1eb4041cf2f563b93d4 1 0 0&quot;</span>,
+        <span class="json-key">&quot;desc&quot;</span>: <span class="json-str">&quot;addr(rung1qyqcqqgqqypzpm5pzt47aufuwtkjzv9j9lpmryhpll4y4fl95845qsw09atrhy75qyqszqqqdlcrjw)#malg9nx4&quot;</span>,
+        <span class="json-key">&quot;hex&quot;</span>: <span class="json-str">&quot;c10101800100010220ee8112ebeef13c72ed2130b22fc3b192e1ffea4aa7e5a1eb4041cf2f563b93d40101010000&quot;</span>,
+        <span class="json-key">&quot;address&quot;</span>: <span class="json-str">&quot;rung1qyqcqqgqqypzpm5pzt47aufuwtkjzv9j9lpmryhpll4y4fl95845qsw09atrhy75qyqszqqqdlcrjw&quot;</span>,
         <span class="json-key">&quot;type&quot;</span>: <span class="json-str">&quot;rung_conditions&quot;</span>
       }
     }

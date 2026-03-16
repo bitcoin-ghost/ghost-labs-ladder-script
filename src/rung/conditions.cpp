@@ -24,6 +24,7 @@ bool IsConditionDataType(RungDataType type)
     case RungDataType::NUMERIC:
     case RungDataType::SCHEME:
     case RungDataType::SPEND_INDEX:
+    case RungDataType::DATA:
         return true;
     case RungDataType::PUBKEY:
     case RungDataType::SIGNATURE:

@@ -33,23 +33,23 @@
     <svg width="620" height="210" viewBox="0 0 620 210">
       <line x1="20" y1="10" x2="20" y2="200" stroke="#4a4a4a" stroke-width="3"/>
       <line x1="600" y1="10" x2="600" y2="200" stroke="#4a4a4a" stroke-width="3"/>
-      <line x1="20" y1="80" x2="140" y2="80" stroke="#e6a817" stroke-width="2"/>
-      <line x1="460" y1="80" x2="600" y2="80" stroke="#e6a817" stroke-width="2"/>
+      <line x1="20" y1="80" x2="140" y2="80" stroke="#ff1744" stroke-width="2"/>
+      <line x1="460" y1="80" x2="600" y2="80" stroke="#ff1744" stroke-width="2"/>
       <rect x="140" y="16" width="320" height="130" rx="2" fill="#2a2a2a" stroke="#e06c75" stroke-width="1.5"/>
       <text x="300" y="34" text-anchor="middle" fill="#e06c75" font-family="Share Tech Mono" font-size="13" letter-spacing="2">VAULT_LOCK</text>
       <!-- Recovery path -->
-      <rect x="165" y="46" width="130" height="40" rx="1" fill="#1a5c28" stroke="#2ea043" stroke-width="1"/>
+      <rect x="165" y="46" width="130" height="40" rx="1" fill="#1a5c28" stroke="#2979ff" stroke-width="1"/>
       <text x="230" y="62" text-anchor="middle" fill="#3fb950" font-family="IBM Plex Mono" font-size="9">RECOVERY KEY</text>
       <text x="230" y="78" text-anchor="middle" fill="#3fb950" font-family="IBM Plex Mono" font-size="8">immediate spend</text>
       <!-- Hot path -->
-      <rect x="310" y="46" width="130" height="40" rx="1" fill="#6e1a1a" stroke="#c43030" stroke-width="1"/>
+      <rect x="310" y="46" width="130" height="40" rx="1" fill="#6e1a1a" stroke="#ff4081" stroke-width="1"/>
       <text x="375" y="62" text-anchor="middle" fill="#f85149" font-family="IBM Plex Mono" font-size="9">HOT KEY</text>
       <text x="375" y="78" text-anchor="middle" fill="#f85149" font-family="IBM Plex Mono" font-size="8">CSV delay required</text>
       <!-- Divider -->
       <text x="300" y="68" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="10">|</text>
       <!-- Delay label -->
       <rect x="210" y="100" width="180" height="20" rx="1" fill="#1a2a2a" stroke="#3a5a5a" stroke-width="1"/>
-      <text x="300" y="114" text-anchor="middle" fill="#39a5b7" font-family="IBM Plex Mono" font-size="8">hot_delay (NUMERIC) blocks</text>
+      <text x="300" y="114" text-anchor="middle" fill="#ff6d00" font-family="IBM Plex Mono" font-size="8">hot_delay (NUMERIC) blocks</text>
       <!-- Label -->
       <text x="300" y="180" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">recovery_sig &rarr; instant | hot_sig + CSV(delay) &rarr; delayed</text>
     </svg>
@@ -65,9 +65,8 @@
       <tr><td class="field-name">recovery_commit</td><td class="field-type">PUBKEY_COMMIT</td><td class="field-size">32 B</td><td class="field-side-c">Conditions</td><td class="field-desc">Commitment to the recovery (cold) public key. Can authorize immediate spend.</td></tr>
       <tr><td class="field-name">hot_commit</td><td class="field-type">PUBKEY_COMMIT</td><td class="field-size">32 B</td><td class="field-side-c">Conditions</td><td class="field-desc">Commitment to the hot (day-to-day) public key. Requires CSV delay.</td></tr>
       <tr><td class="field-name">hot_delay</td><td class="field-type">NUMERIC</td><td class="field-size">1-4 B</td><td class="field-side-c">Conditions</td><td class="field-desc">Number of blocks the hot key path must wait (CSV relative timelock).</td></tr>
-      <tr><td class="field-name">pubkey_recovery</td><td class="field-type">PUBKEY</td><td class="field-size">32-33 B</td><td class="field-side-w">Witness</td><td class="field-desc">Recovery public key (must match recovery_commit).</td></tr>
-      <tr><td class="field-name">pubkey_hot</td><td class="field-type">PUBKEY</td><td class="field-size">32-33 B</td><td class="field-side-w">Witness</td><td class="field-desc">Hot public key (must match hot_commit).</td></tr>
-      <tr><td class="field-name">signature</td><td class="field-type">SIGNATURE</td><td class="field-size">64-65 B</td><td class="field-side-w">Witness</td><td class="field-desc">Signature from either the recovery key or the hot key.</td></tr>
+      <tr><td class="field-name">signer_key</td><td class="field-type">PUBKEY</td><td class="field-size">32-33 B</td><td class="field-side-w">Witness</td><td class="field-desc">Public key of the signer &mdash; either the recovery key or the hot key. Only the key being used is revealed; the evaluator checks which commitment it matches.</td></tr>
+      <tr><td class="field-name">signature</td><td class="field-type">SIGNATURE</td><td class="field-size">64-65 B</td><td class="field-side-w">Witness</td><td class="field-desc">Signature from the revealed key (recovery or hot).</td></tr>
     </tbody>
   </table>
 </div>
@@ -88,15 +87,14 @@
     <div class="wire-row">
       <span class="wire-segment wire-type">0x0302</span>
       <span class="wire-segment wire-inv">0</span>
-      <span class="wire-segment wire-count">3</span>
-      <span class="wire-segment wire-field-pubkey">PUBKEY &middot; 35B</span>
+      <span class="wire-segment wire-count">2</span>
       <span class="wire-segment wire-field-pubkey">PUBKEY &middot; 35B</span>
       <span class="wire-segment wire-field-sig">SIGNATURE &middot; 67B</span>
-      <span class="wire-bytes">Witness &asymp; 104 bytes</span>
+      <span class="wire-bytes">Witness &asymp; 110 bytes</span>
     </div>
     <div class="wire-total">
       <span class="wire-total-label">Total</span>
-      <span class="wire-total-bytes">&asymp; 184 bytes</span>
+      <span class="wire-total-bytes">&asymp; 188 bytes</span>
     </div>
   </div>
 </div>
@@ -105,10 +103,10 @@
 <div class="doc-section">
   <div class="section-label">Evaluation Logic</div>
   <div class="eval-box">
-    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Read <span class="eval-keyword">recovery_commit</span>, <span class="eval-keyword">hot_commit</span>, <span class="eval-keyword">hot_delay</span> from conditions. Read <span class="eval-keyword">pubkey_recovery</span>, <span class="eval-keyword">pubkey_hot</span>, <span class="eval-keyword">signature</span> from witness. Any missing &rarr; <span class="eval-result-err">ERROR</span></span></div>
-    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Verify pubkey_recovery matches recovery_commit and pubkey_hot matches hot_commit. Mismatch &rarr; <span class="eval-result-err">ERROR</span></span></div>
-    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">Try recovery path: verify <span class="eval-keyword">signature</span> against <span class="eval-keyword">pubkey_recovery</span>. If valid &rarr; <span class="eval-result-sat">SATISFIED</span> (no delay)</span></div>
-    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">Try hot path: verify <span class="eval-keyword">signature</span> against <span class="eval-keyword">pubkey_hot</span>. If valid AND <span class="eval-keyword">CheckSequence(hot_delay)</span> passes &rarr; <span class="eval-result-sat">SATISFIED</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Read <span class="eval-keyword">recovery_commit</span>, <span class="eval-keyword">hot_commit</span>, <span class="eval-keyword">hot_delay</span> from conditions. Read <span class="eval-keyword">signer_key</span>, <span class="eval-keyword">signature</span> from witness. Any missing &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Hash <span class="eval-keyword">signer_key</span> and check which commitment it matches (recovery_commit or hot_commit). If neither &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">If signer_key matches recovery_commit: verify <span class="eval-keyword">signature</span> against <span class="eval-keyword">signer_key</span>. If valid &rarr; <span class="eval-result-sat">SATISFIED</span> (no delay)</span></div>
+    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">If signer_key matches hot_commit: verify <span class="eval-keyword">signature</span> against <span class="eval-keyword">signer_key</span>. If valid AND <span class="eval-keyword">CheckSequence(hot_delay)</span> passes &rarr; <span class="eval-result-sat">SATISFIED</span></span></div>
     <div class="eval-step"><span class="eval-step-num">5.</span><span class="eval-step-text">Neither path satisfied &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span></div>
   </div>
 </div>
@@ -146,9 +144,8 @@
   <div class="json-block"><pre>{
   <span class="json-key">"type"</span>: <span class="json-str">"VAULT_LOCK"</span>,
   <span class="json-key">"fields"</span>: [
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"value"</span>: <span class="json-str">"02aabb...recovery_pubkey..."</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"value"</span>: <span class="json-str">"03ccdd...hot_pubkey..."</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"SIGNATURE"</span>, <span class="json-key">"value"</span>: <span class="json-str">"3045...hot_signature..."</span> }
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"value"</span>: <span class="json-str">"03ccdd...signer_pubkey..."</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"SIGNATURE"</span>, <span class="json-key">"value"</span>: <span class="json-str">"3045...signature..."</span> }
   ]
 }</pre></div>
   <p class="section-text" style="margin-top:12px">The 144-block delay (~1 day) gives the cold key holder time to detect unauthorized hot key usage and sweep funds using the recovery path before the hot spend confirms.</p>

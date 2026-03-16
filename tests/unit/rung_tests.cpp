@@ -267,15 +267,17 @@ BOOST_AUTO_TEST_CASE(known_type_checks)
     BOOST_CHECK(IsKnownBlockType(0x0671)); // RATE_LIMIT
     BOOST_CHECK(!IsKnownBlockType(0x0000));
     BOOST_CHECK(IsKnownBlockType(0x0004)); // MUSIG_THRESHOLD
-    BOOST_CHECK(!IsKnownBlockType(0x0507)); // gap in anchor range
+    BOOST_CHECK(IsKnownBlockType(0x0507)); // DATA_RETURN
+    BOOST_CHECK(!IsKnownBlockType(0x0508)); // gap in anchor range
     BOOST_CHECK(!IsKnownBlockType(0xFFFF));
 
     // Data types — uint8_t
     BOOST_CHECK(IsKnownDataType(0x01)); // PUBKEY
     BOOST_CHECK(IsKnownDataType(0x09)); // SCHEME
     BOOST_CHECK(IsKnownDataType(0x0A)); // SCRIPT_BODY
+    BOOST_CHECK(IsKnownDataType(0x0B)); // DATA
     BOOST_CHECK(!IsKnownDataType(0x00));
-    BOOST_CHECK(!IsKnownDataType(0x0B));
+    BOOST_CHECK(!IsKnownDataType(0x0C));
 
     // Scheme checks
     BOOST_CHECK(IsKnownScheme(0x01)); // SCHNORR
@@ -458,12 +460,12 @@ BOOST_AUTO_TEST_CASE(deserialize_rejects_invalid_header_byte)
 
 BOOST_AUTO_TEST_CASE(deserialize_rejects_unknown_data_type)
 {
-    // v3 wire: escape byte + SIG block type + explicit fields with unknown data type
+    // v3 wire: escape byte + ANCHOR block type (no implicit layout) + unknown data type
     std::vector<uint8_t> data{
         0x01,             // 1 rung
         0x01,             // 1 block
         0x80,             // escape (not inverted)
-        0x01, 0x00,       // SIG block type
+        0x01, 0x05,       // ANCHOR block type (0x0501, no implicit layout)
         0x01,             // 1 field
         0xFF,             // unknown data type
         0x01,             // 1 byte data (CompactSize)
@@ -478,10 +480,12 @@ BOOST_AUTO_TEST_CASE(deserialize_rejects_unknown_data_type)
 
 BOOST_AUTO_TEST_CASE(deserialize_rejects_oversized_pubkey)
 {
+    // Use ANCHOR block (no implicit layout) to test oversized PUBKEY rejection
+    // without triggering strict field enforcement
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::SIG;
+    block.type = RungBlockType::ANCHOR;
     block.fields.push_back({RungDataType::PUBKEY, std::vector<uint8_t>(2049, 0x02)}); // max is 2048
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
@@ -1634,7 +1638,7 @@ BOOST_AUTO_TEST_CASE(eval_adaptor_sig_unsatisfied)
 // Serialization roundtrip for all 39 types
 // ============================================================================
 
-BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_witness)
+BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_61_types_witness)
 {
     // Test that every known block type serializes and deserializes correctly
     // in WITNESS context with realistic field layouts matching implicit tables.
@@ -1708,30 +1712,29 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_witness)
         {RungBlockType::RECURSE_SPLIT, {{RungDataType::NUMERIC, num100}}},
         {RungBlockType::RECURSE_DECAY, {{RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num2}}},
 
-        // === Anchor family ===
-        {RungBlockType::ANCHOR, {{RungDataType::HASH256, h256}}},
-        {RungBlockType::ANCHOR_CHANNEL, {{RungDataType::HASH256, h256}}},
-        {RungBlockType::ANCHOR_POOL, {{RungDataType::HASH256, h256}}},
-        {RungBlockType::ANCHOR_RESERVE, {{RungDataType::HASH256, h256}}},
-        // ANCHOR_SEAL witness: explicit — HASH256
-        {RungBlockType::ANCHOR_SEAL, {{RungDataType::HASH256, h256}}},
-        {RungBlockType::ANCHOR_ORACLE, {{RungDataType::HASH256, h256}}},
+        // === Anchor family (conditions-only — no witness fields needed) ===
+        {RungBlockType::ANCHOR, {{RungDataType::NUMERIC, num1}}},
+        {RungBlockType::ANCHOR_CHANNEL, {{RungDataType::NUMERIC, num1}}},
+        {RungBlockType::ANCHOR_POOL, {{RungDataType::NUMERIC, num1}}},
+        {RungBlockType::ANCHOR_RESERVE, {{RungDataType::NUMERIC, num1}}},
+        {RungBlockType::ANCHOR_SEAL, {{RungDataType::NUMERIC, num1}}},
+        {RungBlockType::ANCHOR_ORACLE, {{RungDataType::NUMERIC, num1}}},
 
-        // === Automation family ===
+        // === Automation family (no witness fields use HASH256/PUBKEY_COMMIT) ===
         {RungBlockType::HYSTERESIS_FEE, {{RungDataType::NUMERIC, num10}, {RungDataType::NUMERIC, num100}}},
         {RungBlockType::HYSTERESIS_VALUE, {{RungDataType::NUMERIC, num10}, {RungDataType::NUMERIC, num100}}},
         {RungBlockType::TIMER_CONTINUOUS, {{RungDataType::NUMERIC, num10}, {RungDataType::NUMERIC, num100}}},
         {RungBlockType::TIMER_OFF_DELAY, {{RungDataType::NUMERIC, num10}}},
-        {RungBlockType::LATCH_SET, {{RungDataType::PUBKEY_COMMIT, commit}, {RungDataType::NUMERIC, num1}}},
-        {RungBlockType::LATCH_RESET, {{RungDataType::PUBKEY_COMMIT, commit}, {RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num10}}},
-        {RungBlockType::COUNTER_DOWN, {{RungDataType::PUBKEY_COMMIT, commit}, {RungDataType::NUMERIC, num10}}},
+        {RungBlockType::LATCH_SET, {{RungDataType::NUMERIC, num1}}},
+        {RungBlockType::LATCH_RESET, {{RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num10}}},
+        {RungBlockType::COUNTER_DOWN, {{RungDataType::NUMERIC, num10}}},
         {RungBlockType::COUNTER_PRESET, {{RungDataType::NUMERIC, num10}, {RungDataType::NUMERIC, num100}}},
-        {RungBlockType::COUNTER_UP, {{RungDataType::PUBKEY_COMMIT, commit}, {RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num10}}},
+        {RungBlockType::COUNTER_UP, {{RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num10}}},
         {RungBlockType::COMPARE, {{RungDataType::NUMERIC, num10}, {RungDataType::NUMERIC, num100}}},
         {RungBlockType::SEQUENCER, {{RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num3}}},
         {RungBlockType::ONE_SHOT, {{RungDataType::NUMERIC, num1}}},
         {RungBlockType::RATE_LIMIT, {{RungDataType::NUMERIC, num10}, {RungDataType::NUMERIC, num100}}},
-        // COSIGN witness: [HASH256]
+        // COSIGN witness: [HASH256] (implicit layout)
         {RungBlockType::COSIGN, {{RungDataType::HASH256, h256}}},
 
         // === Compound family ===
@@ -1759,8 +1762,8 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_witness)
         {RungBlockType::OUTPUT_COUNT, {{RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num10}}},
         // RELATIVE_VALUE: explicit — NUMERIC, NUMERIC
         {RungBlockType::RELATIVE_VALUE, {{RungDataType::NUMERIC, num1}, {RungDataType::NUMERIC, num2}}},
-        // ACCUMULATOR: explicit — HASH256
-        {RungBlockType::ACCUMULATOR, {{RungDataType::HASH256, h256}}},
+        // ACCUMULATOR: conditions-only, no witness fields
+        {RungBlockType::ACCUMULATOR, {{RungDataType::NUMERIC, num1}}},
 
         // === Legacy family ===
         // P2PK_LEGACY witness: [PUBKEY, SIGNATURE] (= SIG_WITNESS)
@@ -1777,9 +1780,11 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_witness)
         {RungBlockType::P2TR_LEGACY, {{RungDataType::PUBKEY, pk}, {RungDataType::SIGNATURE, sig}}},
         // P2TR_SCRIPT_LEGACY witness: explicit — PREIMAGE + PUBKEY + SIGNATURE
         {RungBlockType::P2TR_SCRIPT_LEGACY, {{RungDataType::PREIMAGE, preimage}, {RungDataType::PUBKEY, pk}, {RungDataType::SIGNATURE, sig}}},
+        // DATA_RETURN witness: explicit — NUMERIC (no implicit witness layout; unspendable)
+        {RungBlockType::DATA_RETURN, {{RungDataType::NUMERIC, num1}}},
     };
 
-    BOOST_CHECK_EQUAL(entries.size(), 60u);
+    BOOST_CHECK_EQUAL(entries.size(), 61u);
 
     for (const auto& entry : entries) {
         LadderWitness ladder;
@@ -1814,7 +1819,7 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_witness)
     }
 }
 
-BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_conditions)
+BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_61_types_conditions)
 {
     // Test CONDITIONS context round-trip for all 60 block types.
     // Types with implicit conditions layouts use matching fields.
@@ -1886,8 +1891,8 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_conditions)
         {RungBlockType::ANCHOR_CHANNEL, {{RungDataType::HASH256, h256}}},
         {RungBlockType::ANCHOR_POOL, {{RungDataType::HASH256, h256}}},
         {RungBlockType::ANCHOR_RESERVE, {{RungDataType::HASH256, h256}}},
-        // ANCHOR_SEAL conditions: [HASH256]
-        {RungBlockType::ANCHOR_SEAL, {{RungDataType::HASH256, h256}}},
+        // ANCHOR_SEAL conditions: [HASH256, HASH256] (implicit layout requires 2)
+        {RungBlockType::ANCHOR_SEAL, {{RungDataType::HASH256, h256}, {RungDataType::HASH256, h256}}},
         {RungBlockType::ANCHOR_ORACLE, {{RungDataType::HASH256, h256}}},
 
         // === Automation family ===
@@ -1945,9 +1950,11 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_60_types_conditions)
         {RungBlockType::P2TR_LEGACY, {{RungDataType::PUBKEY_COMMIT, commit}, {RungDataType::SCHEME, scheme_schnorr}}},
         // P2TR_SCRIPT_LEGACY conditions: [HASH256, PUBKEY_COMMIT]
         {RungBlockType::P2TR_SCRIPT_LEGACY, {{RungDataType::HASH256, h256}, {RungDataType::PUBKEY_COMMIT, commit}}},
+        // DATA_RETURN conditions: [DATA]
+        {RungBlockType::DATA_RETURN, {{RungDataType::DATA, std::vector<uint8_t>(42, 0xAB)}}},
     };
 
-    BOOST_CHECK_EQUAL(entries.size(), 60u);
+    BOOST_CHECK_EQUAL(entries.size(), 61u);
 
     for (const auto& entry : entries) {
         LadderWitness ladder;
@@ -2418,6 +2425,7 @@ BOOST_AUTO_TEST_CASE(conditions_serialize_roundtrip)
     RungBlock block;
     block.type = RungBlockType::SIG;
     block.fields.push_back({RungDataType::PUBKEY_COMMIT, commit});
+    block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     rung.blocks.push_back(block);
     conditions.rungs.push_back(rung);
 
@@ -2432,8 +2440,9 @@ BOOST_AUTO_TEST_CASE(conditions_serialize_roundtrip)
     BOOST_CHECK_EQUAL(decoded.rungs.size(), 1u);
     BOOST_CHECK_EQUAL(decoded.rungs[0].blocks.size(), 1u);
     BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::SIG);
-    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 1u);
+    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 2u);
     BOOST_CHECK(decoded.rungs[0].blocks[0].fields[0].type == RungDataType::PUBKEY_COMMIT);
+    BOOST_CHECK(decoded.rungs[0].blocks[0].fields[1].type == RungDataType::SCHEME);
 }
 
 BOOST_AUTO_TEST_CASE(conditions_roundtrip_with_inverted)
@@ -2457,12 +2466,12 @@ BOOST_AUTO_TEST_CASE(conditions_roundtrip_with_inverted)
 
 BOOST_AUTO_TEST_CASE(conditions_reject_signature_field)
 {
-    auto pk = MakePubkey();
+    // Use ANCHOR (no implicit layout) so strict field enforcement doesn't
+    // reject before the witness-only check fires.
     RungConditions conditions;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::SIG;
-    block.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+    block.type = RungBlockType::ANCHOR;
     block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     conditions.rungs.push_back(rung);
@@ -2482,26 +2491,22 @@ BOOST_AUTO_TEST_CASE(conditions_reject_signature_field)
 
 BOOST_AUTO_TEST_CASE(conditions_reject_preimage_field)
 {
-    // HASH_PREIMAGE block with PREIMAGE field must be rejected in conditions.
+    // PREIMAGE field in conditions must be rejected as witness-only.
+    // Use ANCHOR block (no implicit layout) so strict field enforcement
+    // doesn't reject before the witness-only check fires.
     // Build raw bytes with escape encoding to force explicit field types.
-    // Format: escape(0x80) + type(0x01,0x02=HASH_PREIMAGE) + field_count(2)
-    //         + HASH256 type(0x03) + len(32) + data(32 bytes)
+    // Format: escape(0x80) + type(0x01,0x05=ANCHOR) + field_count(1)
     //         + PREIMAGE type(0x05) + len(16) + data(16 bytes)
     //         + coil(3 bytes) + addr_len(0) + n_coil_conds(0)
-    std::vector<uint8_t> hash_data(32, 0xCC);
     std::vector<uint8_t> preimage_data(16, 0xEE);
 
     std::vector<uint8_t> raw;
     raw.push_back(0x01); // n_rungs = 1
     raw.push_back(0x01); // n_blocks = 1
     raw.push_back(0x80); // escape (not inverted)
-    raw.push_back(0x01); raw.push_back(0x02); // HASH_PREIMAGE = 0x0201 LE
-    raw.push_back(0x02); // 2 fields
-    // Field 1: HASH256
-    raw.push_back(0x03); // HASH256 type
-    raw.push_back(0x20); // 32 bytes
-    raw.insert(raw.end(), hash_data.begin(), hash_data.end());
-    // Field 2: PREIMAGE
+    raw.push_back(0x01); raw.push_back(0x05); // ANCHOR = 0x0501 LE
+    raw.push_back(0x01); // 1 field
+    // Field 1: PREIMAGE
     raw.push_back(0x05); // PREIMAGE type
     raw.push_back(0x10); // 16 bytes
     raw.insert(raw.end(), preimage_data.begin(), preimage_data.end());
@@ -2663,6 +2668,7 @@ BOOST_AUTO_TEST_CASE(policy_valid_rung_output)
     RungBlock block;
     block.type = RungBlockType::SIG;
     block.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+    block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     rung.blocks.push_back(block);
     conditions.rungs.push_back(rung);
 
@@ -3484,11 +3490,11 @@ BOOST_AUTO_TEST_CASE(deserialize_truncated_field_data)
 // Consensus-critical size limit boundary tests (M-7)
 // ============================================================================
 
-// --- MAX_RUNGS boundary (16) ---
+// --- MAX_RUNGS boundary (8) ---
 
 BOOST_AUTO_TEST_CASE(boundary_max_rungs_at_limit)
 {
-    // Exactly MAX_RUNGS (16) rungs — should serialize, deserialize, and pass policy
+    // Exactly MAX_RUNGS (8) rungs — should serialize, deserialize, and pass policy
     LadderWitness ladder;
     for (size_t i = 0; i < MAX_RUNGS; ++i) {
         Rung rung;
@@ -3499,7 +3505,7 @@ BOOST_AUTO_TEST_CASE(boundary_max_rungs_at_limit)
         rung.blocks.push_back(block);
         ladder.rungs.push_back(rung);
     }
-    BOOST_CHECK_EQUAL(ladder.rungs.size(), 16u);
+    BOOST_CHECK_EQUAL(ladder.rungs.size(), 8u);
 
     auto bytes = SerializeLadderWitness(ladder);
     BOOST_CHECK(!bytes.empty());
@@ -3619,7 +3625,7 @@ BOOST_AUTO_TEST_CASE(boundary_max_fields_at_limit)
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::SIG;
+    block.type = RungBlockType::ANCHOR; // ANCHOR has no implicit layout — any field count OK
     for (size_t i = 0; i < MAX_FIELDS_PER_BLOCK; ++i) {
         block.fields.push_back({RungDataType::NUMERIC, MakeNumeric(static_cast<uint32_t>(i))});
     }
@@ -4403,11 +4409,12 @@ BOOST_AUTO_TEST_CASE(eval_recurse_modified_cross_rung)
     RungConditions input_conds;
     auto pk = MakePubkey();
     {
-        // Rung 0: SIG block with PUBKEY_COMMIT (conditions use commits, not raw keys)
+        // Rung 0: SIG block with PUBKEY_COMMIT + SCHEME (strict field enforcement)
         Rung r0;
         RungBlock b0;
         b0.type = RungBlockType::SIG;
         b0.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+        b0.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
         r0.blocks.push_back(std::move(b0));
         input_conds.rungs.push_back(std::move(r0));
 
@@ -4427,6 +4434,7 @@ BOOST_AUTO_TEST_CASE(eval_recurse_modified_cross_rung)
         RungBlock b0;
         b0.type = RungBlockType::SIG;
         b0.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+        b0.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
         r0.blocks.push_back(std::move(b0));
         output_conds.rungs.push_back(std::move(r0));
 
@@ -5152,10 +5160,12 @@ BOOST_AUTO_TEST_CASE(eval_adaptor_sig_valid_adaptor_point)
 BOOST_AUTO_TEST_CASE(conditions_reject_pubkey_field)
 {
     // Raw PUBKEY must be rejected from conditions (witness-only data type)
+    // Use ANCHOR (no implicit layout) so we test the witness-only data type
+    // rejection without triggering strict field enforcement first
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::SIG;
+    block.type = RungBlockType::ANCHOR;
     block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
@@ -5182,6 +5192,7 @@ BOOST_AUTO_TEST_CASE(conditions_accept_pubkey_commit)
     RungBlock block;
     block.type = RungBlockType::SIG;
     block.fields.push_back({RungDataType::PUBKEY_COMMIT, commit});
+    block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     rung.blocks.push_back(block);
     conditions.rungs.push_back(rung);
 
@@ -5311,7 +5322,7 @@ BOOST_AUTO_TEST_CASE(policy_preimage_block_limit)
     CTransaction tx(mtx);
     std::string reason;
     BOOST_CHECK(!rung::IsStandardRungTx(tx, reason));
-    BOOST_CHECK(reason.find("preimage-blocks") != std::string::npos);
+    BOOST_CHECK(reason.find("PREIMAGE/SCRIPT_BODY fields") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(policy_preimage_block_limit_at_max)
@@ -5383,17 +5394,19 @@ BOOST_AUTO_TEST_CASE(policy_preimage_block_limit_mixed_types)
     CTransaction tx(mtx);
     std::string reason;
     BOOST_CHECK(!rung::IsStandardRungTx(tx, reason));
-    BOOST_CHECK(reason.find("preimage-blocks") != std::string::npos);
+    BOOST_CHECK(reason.find("PREIMAGE/SCRIPT_BODY fields") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(spam_embed_fake_pubkey_in_conditions_rejected)
 {
     // Attacker tries to embed spam data as a "PUBKEY" in conditions
-    // This must be rejected since PUBKEY is now witness-only
+    // This must be rejected since PUBKEY is now witness-only.
+    // Use ANCHOR (no implicit layout) so strict field enforcement doesn't
+    // reject before the witness-only check fires.
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::SIG;
+    block.type = RungBlockType::ANCHOR;
     // 2KB of spam disguised as a "PQ public key"
     std::vector<uint8_t> spam(2048, 0x41);  // 'AAAA...'
     block.fields.push_back({RungDataType::PUBKEY, spam});
@@ -5792,12 +5805,13 @@ BOOST_AUTO_TEST_CASE(relay_conditions_reject_witness_fields)
     RungBlock b;
     b.type = RungBlockType::SIG;
     b.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(MakePubkey())});
+    b.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     rung.blocks.push_back(b);
     conditions.rungs.push_back(rung);
 
     Relay relay;
     RungBlock rb;
-    rb.type = RungBlockType::SIG;
+    rb.type = RungBlockType::ANCHOR; // no implicit layout, so strict enforcement won't fire
     rb.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)}); // witness-only!
     relay.blocks.push_back(rb);
     conditions.relays.push_back(relay);
@@ -5821,6 +5835,7 @@ BOOST_AUTO_TEST_CASE(relay_merge_conditions_witness)
     cb.type = RungBlockType::SIG;
     auto pk = MakePubkey();
     cb.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+    cb.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     cond_rung.blocks.push_back(cb);
     cond_rung.relay_refs = {0};
     conditions.rungs.push_back(cond_rung);
@@ -5829,6 +5844,7 @@ BOOST_AUTO_TEST_CASE(relay_merge_conditions_witness)
     RungBlock crb;
     crb.type = RungBlockType::SIG;
     crb.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+    crb.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     cond_relay.blocks.push_back(crb);
     conditions.relays.push_back(cond_relay);
 
@@ -5858,9 +5874,10 @@ BOOST_AUTO_TEST_CASE(relay_merge_conditions_witness)
     BOOST_CHECK_EQUAL(decoded_cond.rungs[0].relay_refs.size(), 1u);
     BOOST_CHECK_EQUAL(decoded_cond.rungs[0].relay_refs[0], 0u);
 
-    // Verify relay has condition-only field
-    BOOST_CHECK_EQUAL(decoded_cond.relays[0].blocks[0].fields.size(), 1u);
+    // Verify relay has condition-only fields (PUBKEY_COMMIT + SCHEME)
+    BOOST_CHECK_EQUAL(decoded_cond.relays[0].blocks[0].fields.size(), 2u);
     BOOST_CHECK(decoded_cond.relays[0].blocks[0].fields[0].type == RungDataType::PUBKEY_COMMIT);
+    BOOST_CHECK(decoded_cond.relays[0].blocks[0].fields[1].type == RungDataType::SCHEME);
 }
 
 // ============================================================================
@@ -6813,11 +6830,11 @@ BOOST_AUTO_TEST_CASE(compound_serialize_roundtrip)
 
     RungBlock htlc_block;
     htlc_block.type = RungBlockType::HTLC;
-    htlc_block.fields.push_back({RungDataType::HASH256, MakeHash256()});
-    htlc_block.fields.push_back({RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0x42)});
-    htlc_block.fields.push_back({RungDataType::NUMERIC, MakeNumeric(144)});
+    // HTLC witness implicit layout: [PUBKEY, SIGNATURE, PREIMAGE, NUMERIC]
     htlc_block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
     htlc_block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
+    htlc_block.fields.push_back({RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0x42)});
+    htlc_block.fields.push_back({RungDataType::NUMERIC, MakeNumeric(144)});
     rung.blocks.push_back(std::move(htlc_block));
 
     ladder.rungs.push_back(std::move(rung));
@@ -6829,7 +6846,7 @@ BOOST_AUTO_TEST_CASE(compound_serialize_roundtrip)
     BOOST_CHECK_EQUAL(decoded.rungs.size(), 1u);
     BOOST_CHECK_EQUAL(decoded.rungs[0].blocks.size(), 1u);
     BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::HTLC);
-    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 5u);
+    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 4u);
 }
 
 BOOST_AUTO_TEST_CASE(new_compound_serialize_roundtrip)
@@ -7145,13 +7162,12 @@ BOOST_AUTO_TEST_CASE(micro_header_escape_inverted)
 
 BOOST_AUTO_TEST_CASE(micro_header_explicit_fallback_extra_fields)
 {
-    // Block with fields that don't match implicit layout falls back to explicit encoding
+    // Block type without implicit layout uses explicit encoding with arbitrary fields
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::SIG;
-    // Add a PUBKEY_COMMIT instead of expected PUBKEY — won't match witness implicit layout
-    block.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(MakePubkey())});
+    block.type = RungBlockType::ANCHOR; // No implicit witness layout — explicit encoding used
+    block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
     block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     rung.blocks.push_back(block);
@@ -7161,7 +7177,7 @@ BOOST_AUTO_TEST_CASE(micro_header_explicit_fallback_extra_fields)
     LadderWitness decoded;
     std::string error;
     BOOST_CHECK(DeserializeLadderWitness(bytes, decoded, error, SerializationContext::WITNESS));
-    BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::SIG);
+    BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::ANCHOR);
     BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 3u);
 }
 
@@ -8764,11 +8780,12 @@ BOOST_AUTO_TEST_CASE(compact_sig_mixed_with_normal_rungs)
     compact_rung.compact = std::move(compact);
     cond.rungs.push_back(compact_rung);
 
-    // Rung 1: normal SIG block
+    // Rung 1: normal SIG block with PUBKEY_COMMIT + SCHEME (strict field enforcement)
     Rung normal_rung;
     RungBlock block;
     block.type = RungBlockType::SIG;
     block.fields.push_back({RungDataType::PUBKEY_COMMIT, commit1});
+    block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
     normal_rung.blocks.push_back(block);
     cond.rungs.push_back(normal_rung);
 
@@ -9277,13 +9294,28 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2pk_legacy)
     RungBlock block;
     block.type = RungBlockType::P2PK_LEGACY;
     auto pk = MakePubkey();
-    block.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
-    block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
+
+    // Conditions side: PUBKEY_COMMIT + SCHEME (matches SIG_CONDITIONS)
+    RungBlock cond_block;
+    cond_block.type = RungBlockType::P2PK_LEGACY;
+    cond_block.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+    cond_block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
+    Rung cond_rung;
+    cond_rung.blocks.push_back(cond_block);
+    LadderWitness cond_ladder;
+    cond_ladder.rungs.push_back(cond_rung);
+    auto cond_bytes = SerializeLadderWitness(cond_ladder, SerializationContext::CONDITIONS);
+    BOOST_CHECK(!cond_bytes.empty());
+    LadderWitness cond_decoded;
+    std::string cond_error;
+    BOOST_CHECK(DeserializeLadderWitness(cond_bytes, cond_decoded, cond_error, SerializationContext::CONDITIONS));
+    BOOST_CHECK(cond_decoded.rungs[0].blocks[0].type == RungBlockType::P2PK_LEGACY);
+
+    // Witness side: PUBKEY + SIGNATURE (matches SIG_WITNESS)
     block.fields.push_back({RungDataType::PUBKEY, pk});
     block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
-
     auto bytes = SerializeLadderWitness(ladder);
     BOOST_CHECK(!bytes.empty());
     LadderWitness decoded;
@@ -9299,28 +9331,57 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2pkh_legacy)
     Rung rung;
     RungBlock block;
     block.type = RungBlockType::P2PKH_LEGACY;
-    block.fields.push_back({RungDataType::HASH160, MakeHash160()});
+
+    // Conditions side: HASH160 (matches P2PKH_LEGACY_CONDITIONS)
+    RungBlock cond_block;
+    cond_block.type = RungBlockType::P2PKH_LEGACY;
+    cond_block.fields.push_back({RungDataType::HASH160, MakeHash160()});
+    Rung cond_rung;
+    cond_rung.blocks.push_back(cond_block);
+    LadderWitness cond_ladder;
+    cond_ladder.rungs.push_back(cond_rung);
+    auto cond_bytes = SerializeLadderWitness(cond_ladder, SerializationContext::CONDITIONS);
+    BOOST_CHECK(!cond_bytes.empty());
+    LadderWitness cond_decoded;
+    std::string cond_error;
+    BOOST_CHECK(DeserializeLadderWitness(cond_bytes, cond_decoded, cond_error, SerializationContext::CONDITIONS));
+    BOOST_CHECK(cond_decoded.rungs[0].blocks[0].type == RungBlockType::P2PKH_LEGACY);
+    BOOST_CHECK_EQUAL(cond_decoded.rungs[0].blocks[0].fields.size(), 1u);
+
+    // Witness side: PUBKEY + SIGNATURE (matches SIG_WITNESS)
     block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
     block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
-
     auto bytes = SerializeLadderWitness(ladder);
     LadderWitness decoded;
     std::string error;
     BOOST_CHECK(DeserializeLadderWitness(bytes, decoded, error));
     BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::P2PKH_LEGACY);
-    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 3u);
+    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 2u);
 }
 
 BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2sh_legacy)
 {
+    // Conditions side: HASH160 (matches P2PKH_LEGACY_CONDITIONS)
+    LadderWitness cond_ladder;
+    Rung cond_rung;
+    RungBlock cond_block;
+    cond_block.type = RungBlockType::P2SH_LEGACY;
+    cond_block.fields.push_back({RungDataType::HASH160, MakeHash160()});
+    cond_rung.blocks.push_back(cond_block);
+    cond_ladder.rungs.push_back(cond_rung);
+    auto cond_bytes = SerializeLadderWitness(cond_ladder, SerializationContext::CONDITIONS);
+    BOOST_CHECK(!cond_bytes.empty());
+
+    // Witness side: PREIMAGE + PUBKEY + SIGNATURE (no implicit witness layout)
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
     block.type = RungBlockType::P2SH_LEGACY;
-    block.fields.push_back({RungDataType::HASH160, MakeHash160()});
     block.fields.push_back({RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0xEE)});
+    block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
+    block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
 
@@ -9333,12 +9394,25 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2sh_legacy)
 
 BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2wsh_legacy)
 {
+    // Conditions side: HASH256 (matches P2WSH_LEGACY_CONDITIONS)
+    LadderWitness cond_ladder;
+    Rung cond_rung;
+    RungBlock cond_block;
+    cond_block.type = RungBlockType::P2WSH_LEGACY;
+    cond_block.fields.push_back({RungDataType::HASH256, MakeHash256()});
+    cond_rung.blocks.push_back(cond_block);
+    cond_ladder.rungs.push_back(cond_rung);
+    auto cond_bytes = SerializeLadderWitness(cond_ladder, SerializationContext::CONDITIONS);
+    BOOST_CHECK(!cond_bytes.empty());
+
+    // Witness side: PREIMAGE + PUBKEY + SIGNATURE
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
     block.type = RungBlockType::P2WSH_LEGACY;
-    block.fields.push_back({RungDataType::HASH256, MakeHash256()});
     block.fields.push_back({RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0xEE)});
+    block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
+    block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
 
@@ -9351,13 +9425,26 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2wsh_legacy)
 
 BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2tr_script_legacy)
 {
+    // Conditions side: HASH256 + PUBKEY_COMMIT (matches P2TR_SCRIPT_LEGACY_CONDITIONS)
+    LadderWitness cond_ladder;
+    Rung cond_rung;
+    RungBlock cond_block;
+    cond_block.type = RungBlockType::P2TR_SCRIPT_LEGACY;
+    cond_block.fields.push_back({RungDataType::HASH256, MakeHash256()});
+    cond_block.fields.push_back({RungDataType::PUBKEY_COMMIT, std::vector<uint8_t>(32, 0xAA)});
+    cond_rung.blocks.push_back(cond_block);
+    cond_ladder.rungs.push_back(cond_rung);
+    auto cond_bytes = SerializeLadderWitness(cond_ladder, SerializationContext::CONDITIONS);
+    BOOST_CHECK(!cond_bytes.empty());
+
+    // Witness side: PREIMAGE + PUBKEY + SIGNATURE
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
     block.type = RungBlockType::P2TR_SCRIPT_LEGACY;
-    block.fields.push_back({RungDataType::HASH256, MakeHash256()});
-    block.fields.push_back({RungDataType::PUBKEY_COMMIT, std::vector<uint8_t>(32, 0xAA)});
     block.fields.push_back({RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0xEE)});
+    block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
+    block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
 
@@ -9766,18 +9853,29 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2wpkh_legacy)
     Rung rung;
     RungBlock block;
     block.type = RungBlockType::P2WPKH_LEGACY;
-    block.fields.push_back({RungDataType::HASH160, MakeHash160()});
+
+    // Conditions side: HASH160 (matches P2PKH_LEGACY_CONDITIONS)
+    RungBlock cond_block;
+    cond_block.type = RungBlockType::P2WPKH_LEGACY;
+    cond_block.fields.push_back({RungDataType::HASH160, MakeHash160()});
+    Rung cond_rung;
+    cond_rung.blocks.push_back(cond_block);
+    LadderWitness cond_ladder;
+    cond_ladder.rungs.push_back(cond_rung);
+    auto cond_bytes = SerializeLadderWitness(cond_ladder, SerializationContext::CONDITIONS);
+    BOOST_CHECK(!cond_bytes.empty());
+
+    // Witness side: PUBKEY + SIGNATURE (matches SIG_WITNESS)
     block.fields.push_back({RungDataType::PUBKEY, MakePubkey()});
     block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
-
     auto bytes = SerializeLadderWitness(ladder);
     LadderWitness decoded;
     std::string error;
     BOOST_CHECK(DeserializeLadderWitness(bytes, decoded, error));
     BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::P2WPKH_LEGACY);
-    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 3u);
+    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 2u);
 }
 
 BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2tr_legacy)
@@ -9787,19 +9885,30 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_p2tr_legacy)
     RungBlock block;
     block.type = RungBlockType::P2TR_LEGACY;
     auto pk = MakePubkey();
-    block.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
-    block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
+
+    // Conditions side: PUBKEY_COMMIT + SCHEME (matches SIG_CONDITIONS)
+    RungBlock cond_block;
+    cond_block.type = RungBlockType::P2TR_LEGACY;
+    cond_block.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(pk)});
+    cond_block.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
+    Rung cond_rung;
+    cond_rung.blocks.push_back(cond_block);
+    LadderWitness cond_ladder;
+    cond_ladder.rungs.push_back(cond_rung);
+    auto cond_bytes = SerializeLadderWitness(cond_ladder, SerializationContext::CONDITIONS);
+    BOOST_CHECK(!cond_bytes.empty());
+
+    // Witness side: PUBKEY + SIGNATURE (matches SIG_WITNESS)
     block.fields.push_back({RungDataType::PUBKEY, pk});
     block.fields.push_back({RungDataType::SIGNATURE, MakeSignature(64)});
     rung.blocks.push_back(block);
     ladder.rungs.push_back(rung);
-
     auto bytes = SerializeLadderWitness(ladder);
     LadderWitness decoded;
     std::string error;
     BOOST_CHECK(DeserializeLadderWitness(bytes, decoded, error));
     BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::P2TR_LEGACY);
-    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 4u);
+    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields.size(), 2u);
 }
 
 // -- P2SH_LEGACY: successful inner-conditions evaluation --
@@ -10323,7 +10432,7 @@ BOOST_AUTO_TEST_CASE(script_body_is_not_condition_data_type)
 BOOST_AUTO_TEST_CASE(script_body_size_bounds)
 {
     BOOST_CHECK_EQUAL(FieldMinSize(RungDataType::SCRIPT_BODY), 1u);
-    BOOST_CHECK_EQUAL(FieldMaxSize(RungDataType::SCRIPT_BODY), 10000u);
+    BOOST_CHECK_EQUAL(FieldMaxSize(RungDataType::SCRIPT_BODY), 520u);
 }
 
 BOOST_AUTO_TEST_CASE(script_body_data_type_name)
@@ -10338,16 +10447,16 @@ BOOST_AUTO_TEST_CASE(script_body_field_validation)
     std::string reason;
     BOOST_CHECK(f1.IsValid(reason));
 
-    // Valid: 10000 bytes (max)
-    RungField f2{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(10000, 0xBB)};
+    // Valid: 520 bytes (max — P2SH-compatible limit)
+    RungField f2{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(520, 0xBB)};
     BOOST_CHECK(f2.IsValid(reason));
 
     // Invalid: 0 bytes
     RungField f3{RungDataType::SCRIPT_BODY, std::vector<uint8_t>()};
     BOOST_CHECK(!f3.IsValid(reason));
 
-    // Invalid: 10001 bytes (over max)
-    RungField f4{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(10001, 0xCC)};
+    // Invalid: 521 bytes (over max)
+    RungField f4{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(521, 0xCC)};
     BOOST_CHECK(!f4.IsValid(reason));
 }
 
@@ -10361,6 +10470,7 @@ BOOST_AUTO_TEST_CASE(eval_p2sh_legacy_script_body)
     RungBlock inner_sig;
     inner_sig.type = RungBlockType::SIG;
     inner_sig.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(MakePubkey())});
+    inner_sig.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
 
     // Serialize the inner conditions
     LadderWitness inner_witness;
@@ -10403,6 +10513,7 @@ BOOST_AUTO_TEST_CASE(eval_p2wsh_legacy_script_body)
     RungBlock inner_sig;
     inner_sig.type = RungBlockType::SIG;
     inner_sig.fields.push_back({RungDataType::PUBKEY_COMMIT, MakePubkeyCommit(MakePubkey())});
+    inner_sig.fields.push_back({RungDataType::SCHEME, {static_cast<uint8_t>(RungScheme::SCHNORR)}});
 
     LadderWitness inner_witness;
     Rung inner_rung;
@@ -10442,9 +10553,100 @@ BOOST_AUTO_TEST_CASE(script_body_exceeds_preimage_limit)
     RungField script_field{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(253, 0xAA)};
     BOOST_CHECK(script_field.IsValid(reason)); // SCRIPT_BODY accepts 253 bytes
 
-    // And up to 10000
-    RungField big_script{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(5000, 0xBB)};
-    BOOST_CHECK(big_script.IsValid(reason));
+    // Up to 520 bytes (P2SH-compatible limit)
+    RungField max_script{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(520, 0xBB)};
+    BOOST_CHECK(max_script.IsValid(reason));
+
+    // 521 bytes exceeds SCRIPT_BODY limit
+    RungField over_script{RungDataType::SCRIPT_BODY, std::vector<uint8_t>(521, 0xCC)};
+    BOOST_CHECK(!over_script.IsValid(reason));
+}
+
+// ============================================================================
+// DATA_RETURN block tests
+// ============================================================================
+
+BOOST_AUTO_TEST_CASE(data_return_eval_always_error)
+{
+    MockSignatureChecker checker;
+    ScriptExecutionData execdata;
+
+    RungBlock block;
+    block.type = RungBlockType::DATA_RETURN;
+    block.fields.push_back({RungDataType::DATA, std::vector<uint8_t>(11, 0x42)});
+    BOOST_CHECK(EvalBlock(block, checker, SigVersion::LADDER, execdata) == EvalResult::ERROR);
+}
+
+BOOST_AUTO_TEST_CASE(data_return_eval_empty_error)
+{
+    MockSignatureChecker checker;
+    ScriptExecutionData execdata;
+
+    RungBlock block;
+    block.type = RungBlockType::DATA_RETURN;
+    // No fields at all
+    BOOST_CHECK(EvalBlock(block, checker, SigVersion::LADDER, execdata) == EvalResult::ERROR);
+}
+
+BOOST_AUTO_TEST_CASE(data_return_field_valid_range)
+{
+    std::string reason;
+
+    // Valid: 1 byte (minimum)
+    RungField field_1{RungDataType::DATA, std::vector<uint8_t>(1, 0xAA)};
+    BOOST_CHECK(field_1.IsValid(reason));
+
+    // Valid: 40 bytes (mid-range)
+    RungField field_40{RungDataType::DATA, std::vector<uint8_t>(40, 0xBB)};
+    BOOST_CHECK(field_40.IsValid(reason));
+
+    // Valid: 80 bytes (maximum)
+    RungField field_80{RungDataType::DATA, std::vector<uint8_t>(80, 0xCC)};
+    BOOST_CHECK(field_80.IsValid(reason));
+
+    // Invalid: 0 bytes (below minimum)
+    RungField field_0{RungDataType::DATA, std::vector<uint8_t>()};
+    BOOST_CHECK(!field_0.IsValid(reason));
+
+    // Invalid: 81 bytes (above maximum)
+    RungField field_81{RungDataType::DATA, std::vector<uint8_t>(81, 0xDD)};
+    BOOST_CHECK(!field_81.IsValid(reason));
+}
+
+BOOST_AUTO_TEST_CASE(data_return_is_base_block_type)
+{
+    BOOST_CHECK(IsBaseBlockType(static_cast<uint16_t>(RungBlockType::DATA_RETURN)));
+}
+
+BOOST_AUTO_TEST_CASE(data_return_is_condition_data_type)
+{
+    BOOST_CHECK(rung::IsConditionDataType(RungDataType::DATA));
+}
+
+BOOST_AUTO_TEST_CASE(data_return_serialize_roundtrip_conditions)
+{
+    LadderWitness ladder;
+    Rung rung;
+    RungBlock block;
+    block.type = RungBlockType::DATA_RETURN;
+    block.fields.push_back({RungDataType::DATA, std::vector<uint8_t>(80, 0xFF)});
+    rung.blocks.push_back(block);
+    ladder.rungs.push_back(rung);
+
+    auto bytes = SerializeLadderWitness(ladder, SerializationContext::CONDITIONS);
+    LadderWitness decoded;
+    std::string error;
+    BOOST_CHECK(DeserializeLadderWitness(bytes, decoded, error, SerializationContext::CONDITIONS));
+    BOOST_CHECK(decoded.rungs.size() == 1);
+    BOOST_CHECK(decoded.rungs[0].blocks[0].type == RungBlockType::DATA_RETURN);
+    BOOST_CHECK(decoded.rungs[0].blocks[0].fields[0].type == RungDataType::DATA);
+    BOOST_CHECK_EQUAL(decoded.rungs[0].blocks[0].fields[0].data.size(), 80u);
+}
+
+BOOST_AUTO_TEST_CASE(data_return_micro_header_lookup)
+{
+    BOOST_CHECK(MicroHeaderSlot(RungBlockType::DATA_RETURN) != 0xFF);
+    BOOST_CHECK(MicroHeaderSlot(RungBlockType::DATA_RETURN) == 0x3C);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

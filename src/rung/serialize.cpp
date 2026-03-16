@@ -12,6 +12,29 @@
 namespace rung {
 
 // ============================================================================
+// Helper: data type allowed in witness context
+// ============================================================================
+
+/** Consensus: data types that are NOT allowed in witness context for blocks
+ *  with no implicit witness layout. These are high-bandwidth conditions-only
+ *  types that could carry unvalidated data as ignored witness fields.
+ *  NUMERIC (4 bytes max) and SPEND_INDEX (4 bytes) are too small to be
+ *  meaningful data channels and are legitimately needed in compound block
+ *  witness fields. */
+static bool IsDataEmbeddingType(RungDataType type)
+{
+    switch (type) {
+    case RungDataType::PUBKEY_COMMIT:  // 32 bytes
+    case RungDataType::HASH256:        // 32 bytes
+    case RungDataType::HASH160:        // 20 bytes
+    case RungDataType::DATA:           // up to 80 bytes
+        return true;
+    default:
+        return false;
+    }
+}
+
+// ============================================================================
 // Helper: serialize a single field (varint NUMERIC optimization)
 // ============================================================================
 
@@ -248,6 +271,20 @@ static bool DeserializeBlock(DataStream& ss, RungBlock& block_out,
             error = "block has too many fields: " + std::to_string(n_fields);
             return false;
         }
+
+        // Strict field enforcement (consensus): if this block type has an
+        // implicit layout, the explicit field count and types must match exactly.
+        // This prevents extra unvalidated fields from riding through on-chain.
+        const auto& expected = GetImplicitLayout(block_out.type, ctx);
+        if (expected.count > 0) {
+            if (n_fields != expected.count) {
+                error = "block " + BlockTypeName(block_out.type) +
+                        " field count mismatch: got " + std::to_string(n_fields) +
+                        ", expected " + std::to_string(expected.count);
+                return false;
+            }
+        }
+
         block_out.fields.resize(n_fields);
         for (uint64_t f = 0; f < n_fields; ++f) {
             uint8_t data_type_byte;
@@ -257,6 +294,32 @@ static bool DeserializeBlock(DataStream& ss, RungBlock& block_out,
                 return false;
             }
             RungDataType dtype = static_cast<RungDataType>(data_type_byte);
+
+            // Consensus: for blocks with NO implicit witness layout, reject
+            // high-bandwidth conditions-only data types (HASH256, PUBKEY_COMMIT,
+            // HASH160, DATA). This prevents extra unvalidated data from riding as
+            // ignored witness fields in blocks like P2SH_LEGACY/P2WSH_LEGACY that
+            // use explicit encoding. Blocks WITH implicit layouts are already
+            // protected by strict field enforcement below.
+            if (ctx == static_cast<uint8_t>(SerializationContext::WITNESS) &&
+                expected.count == 0 &&
+                IsDataEmbeddingType(dtype)) {
+                error = "data-embedding type " + DataTypeName(dtype) +
+                        " not allowed in witness context";
+                return false;
+            }
+
+            // Strict field enforcement: validate field type matches expected layout
+            if (expected.count > 0 && f < expected.count) {
+                if (dtype != expected.fields[f].type) {
+                    error = "block " + BlockTypeName(block_out.type) +
+                            " field " + std::to_string(f) + " type mismatch: got " +
+                            DataTypeName(dtype) + ", expected " +
+                            DataTypeName(expected.fields[f].type);
+                    return false;
+                }
+            }
+
             if (!DeserializeField(ss, block_out.fields[f], dtype, 0, error)) {
                 return false;
             }
@@ -402,6 +465,9 @@ bool DeserializeLadderWitness(const std::vector<uint8_t>& witness_bytes,
             error = "too many rungs: " + std::to_string(n_rungs);
             return false;
         }
+
+        // Consensus: count PREIMAGE fields across all blocks (including compounds)
+        size_t preimage_field_count = 0;
 
         ladder_out.rungs.resize(n_rungs);
         for (uint64_t r = 0; r < n_rungs; ++r) {
@@ -563,6 +629,49 @@ bool DeserializeLadderWitness(const std::vector<uint8_t>& witness_bytes,
                         }
                         ladder_out.rungs[rq].relay_refs[ri] = static_cast<uint16_t>(req_idx);
                     }
+                }
+            }
+        }
+
+        // Consensus: count PREIMAGE and SCRIPT_BODY fields across all blocks in
+        // all rungs and relays. Both are user-chosen data channels and share a
+        // combined limit to bound total embeddable data per witness.
+        for (const auto& rung : ladder_out.rungs) {
+            for (const auto& block : rung.blocks) {
+                for (const auto& field : block.fields) {
+                    if (field.type == RungDataType::PREIMAGE ||
+                        field.type == RungDataType::SCRIPT_BODY) {
+                        preimage_field_count++;
+                    }
+                }
+            }
+        }
+        for (const auto& relay : ladder_out.relays) {
+            for (const auto& block : relay.blocks) {
+                for (const auto& field : block.fields) {
+                    if (field.type == RungDataType::PREIMAGE ||
+                        field.type == RungDataType::SCRIPT_BODY) {
+                        preimage_field_count++;
+                    }
+                }
+            }
+        }
+        if (preimage_field_count > MAX_PREIMAGE_FIELDS_PER_WITNESS) {
+            error = "too many PREIMAGE/SCRIPT_BODY fields: " + std::to_string(preimage_field_count) +
+                    " > " + std::to_string(MAX_PREIMAGE_FIELDS_PER_WITNESS);
+            return false;
+        }
+
+        // Consensus: validate relay chain depth
+        if (!ladder_out.relays.empty()) {
+            std::vector<size_t> depths(ladder_out.relays.size(), 0);
+            for (size_t rl = 0; rl < ladder_out.relays.size(); ++rl) {
+                for (uint16_t req : ladder_out.relays[rl].relay_refs) {
+                    depths[rl] = std::max(depths[rl], depths[req] + 1);
+                }
+                if (depths[rl] > MAX_RELAY_DEPTH) {
+                    error = "relay chain depth exceeded: " + std::to_string(depths[rl]);
+                    return false;
                 }
             }
         }

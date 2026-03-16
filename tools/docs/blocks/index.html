@@ -65,16 +65,17 @@
     border-bottom: 1px solid var(--border);
     margin-bottom: 20px;
   }
-  .family-signature { color: #e6a817; }
-  .family-timelock { color: #39a5b7; }
+  .family-signature { color: #ff1744; }
+  .family-timelock { color: #ff6d00; }
   .family-hash { color: #b070b0; }
   .family-covenant { color: #e06c75; }
   .family-anchor { color: #56b6c2; }
   .family-recursion { color: #e5c07b; }
   .family-plc { color: #98c379; }
-  .family-compound { color: #f59e0b; }
-  .family-governance { color: #8b5cf6; }
+  .family-compound { color: #ffffff; }
+  .family-governance { color: #9e9e9e; }
   .family-compact { color: #98c379; }
+  .family-legacy { color: #00e5ff; }
 
   .intro-text {
     color: var(--text-secondary);
@@ -338,6 +339,13 @@
       <div class="block-card-desc">Oracle attestation anchor. Commits to an oracle public key and event ID. Spending requires the oracle's signed attestation of the event outcome.</div>
       <div class="block-card-badge badge-anchor">Anchor</div>
     </a>
+
+    <a href="data-return.html" class="block-card">
+      <div class="block-card-code">0x0507</div>
+      <div class="block-card-name">DATA_RETURN</div>
+      <div class="block-card-desc">Typed OP_RETURN replacement. Up to 80 bytes of arbitrary data in an unspendable zero-value output. Max one per transaction. Closes OP_RETURN as a data-embedding vector.</div>
+      <div class="block-card-badge badge-anchor">Anchor</div>
+    </a>
   </div>
 </div>
 
@@ -543,6 +551,63 @@
       <div class="block-card-name">ACCUMULATOR</div>
       <div class="block-card-desc">Merkle set membership proof. Verifies that a value belongs to a committed set using sorted-pair Merkle proofs.</div>
       <div class="block-card-badge badge-governance">Governance</div>
+    </a>
+  </div>
+</div>
+
+<!-- Legacy Family -->
+<div class="family-section">
+  <h2 class="family-title family-legacy">Legacy Family — 0x0900</h2>
+  <p class="intro-text">Legacy blocks wrap Bitcoin's original transaction types (P2PK, P2PKH, P2SH, P2WPKH, P2WSH, P2TR) as typed Ladder Script blocks. Same spending semantics, but all fields are typed — closing the arbitrary data surfaces that enable inscription spam. Inner scripts (P2SH/P2WSH/P2TR_SCRIPT) must be valid Ladder Script conditions.</p>
+
+  <div class="index-grid">
+    <a href="p2pk-legacy.html" class="block-card">
+      <div class="block-card-code">0x0901</div>
+      <div class="block-card-name">P2PK_LEGACY</div>
+      <div class="block-card-desc">Pay-to-Public-Key. Signature verification against a committed public key. Equivalent to the original Bitcoin P2PK output type. Delegates to EvalSigBlock.</div>
+      <div class="block-card-badge" style="color:#00e5ff;border-color:#00e5ff40">Legacy</div>
+    </a>
+
+    <a href="p2pkh-legacy.html" class="block-card">
+      <div class="block-card-code">0x0902</div>
+      <div class="block-card-name">P2PKH_LEGACY</div>
+      <div class="block-card-desc">Pay-to-Public-Key-Hash. HASH160(pubkey) verification + signature check. The most common Bitcoin address type wrapped as a typed block.</div>
+      <div class="block-card-badge" style="color:#00e5ff;border-color:#00e5ff40">Legacy</div>
+    </a>
+
+    <a href="p2sh-legacy.html" class="block-card">
+      <div class="block-card-code">0x0903</div>
+      <div class="block-card-name">P2SH_LEGACY</div>
+      <div class="block-card-desc">Pay-to-Script-Hash. HASH160 of inner conditions. PREIMAGE carries serialized Ladder Script conditions — no arbitrary bytes allowed. Recursive inner evaluation.</div>
+      <div class="block-card-badge" style="color:#00e5ff;border-color:#00e5ff40">Legacy</div>
+    </a>
+
+    <a href="p2wpkh-legacy.html" class="block-card">
+      <div class="block-card-code">0x0904</div>
+      <div class="block-card-name">P2WPKH_LEGACY</div>
+      <div class="block-card-desc">Pay-to-Witness-Public-Key-Hash. SegWit v0 key-hash spending. Same evaluation as P2PKH_LEGACY — distinct type code for migration tracking.</div>
+      <div class="block-card-badge" style="color:#00e5ff;border-color:#00e5ff40">Legacy</div>
+    </a>
+
+    <a href="p2wsh-legacy.html" class="block-card">
+      <div class="block-card-code">0x0905</div>
+      <div class="block-card-name">P2WSH_LEGACY</div>
+      <div class="block-card-desc">Pay-to-Witness-Script-Hash. SHA256 of inner conditions. SegWit v0 script-hash spending with typed inner conditions. Recursive inner evaluation.</div>
+      <div class="block-card-badge" style="color:#00e5ff;border-color:#00e5ff40">Legacy</div>
+    </a>
+
+    <a href="p2tr-legacy.html" class="block-card">
+      <div class="block-card-code">0x0906</div>
+      <div class="block-card-name">P2TR_LEGACY</div>
+      <div class="block-card-desc">Pay-to-Taproot key-path spend. Signature against a committed internal key. Delegates to EvalSigBlock. Distinct from P2TR_SCRIPT for script-path.</div>
+      <div class="block-card-badge" style="color:#00e5ff;border-color:#00e5ff40">Legacy</div>
+    </a>
+
+    <a href="p2tr-script-legacy.html" class="block-card">
+      <div class="block-card-code">0x0907</div>
+      <div class="block-card-name">P2TR_SCRIPT_LEGACY</div>
+      <div class="block-card-desc">Pay-to-Taproot script-path spend. Closes the primary inscription vector. Revealed script leaf must be valid Ladder Script conditions. Merkle proof verification.</div>
+      <div class="block-card-badge" style="color:#00e5ff;border-color:#00e5ff40">Legacy</div>
     </a>
   </div>
 </div>

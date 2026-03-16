@@ -38,10 +38,10 @@
       <rect x="160" y="20" width="280" height="80" rx="2" fill="#2a2a2a" stroke="#98c379" stroke-width="1.5"/>
       <text x="300" y="38" text-anchor="middle" fill="#98c379" font-family="Share Tech Mono" font-size="13" letter-spacing="2">LATCH_RESET</text>
       <!-- Latch state visualization -->
-      <rect x="195" y="50" width="90" height="30" fill="#1a5c28" stroke="#2ea043" stroke-width="1" rx="2"/>
+      <rect x="195" y="50" width="90" height="30" fill="#1a5c28" stroke="#2979ff" stroke-width="1" rx="2"/>
       <text x="240" y="69" text-anchor="middle" fill="#3fb950" font-family="IBM Plex Mono" font-size="10">state &ge; 1</text>
       <text x="310" y="69" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="14">&rarr;</text>
-      <rect x="330" y="50" width="90" height="30" fill="#6e1a1a" stroke="#c43030" stroke-width="1" rx="2"/>
+      <rect x="330" y="50" width="90" height="30" fill="#6e1a1a" stroke="#ff4081" stroke-width="1" rx="2"/>
       <text x="375" y="69" text-anchor="middle" fill="#f85149" font-family="IBM Plex Mono" font-size="10">state = 0</text>
       <!-- Labels -->
       <text x="240" y="100" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="8">SATISFIED</text>
@@ -62,7 +62,7 @@
       <tr><td class="field-name">delay_blocks</td><td class="field-type">NUMERIC</td><td class="field-size">1-4 B</td><td class="field-side-c">Conditions</td><td class="field-desc">Optional delay parameter (block count) for reset timing</td></tr>
     </tbody>
   </table>
-  <p class="section-text" style="margin-top:12px">Requires a valid signature from the resetter key in the witness plus two NUMERIC fields (state and delay_blocks).</p>
+  <p class="section-text" style="margin-top:12px">The resetter key must be present as a PUBKEY or PUBKEY_COMMIT field. The evaluator checks key presence, not signature verification (signature checking is handled by a separate SIG block on the same rung). Two NUMERIC fields (state and delay_blocks) are required.</p>
 </div>
 
 <!-- Wire Format -->
@@ -97,10 +97,11 @@
 <div class="doc-section">
   <div class="section-label">Evaluation Logic</div>
   <div class="eval-box">
-    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Read <span class="eval-keyword">resetter_key</span> (PUBKEY or PUBKEY_COMMIT), <span class="eval-keyword">state</span>, and <span class="eval-keyword">delay_blocks</span> from conditions</span></div>
-    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Verify resetter key authorization from witness</span></div>
-    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">If state &ge; 1 &rarr; <span class="eval-result-sat">SATISFIED</span> (latch can be reset)</span></div>
-    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">If state == 0 &rarr; <span class="eval-result-unsat">UNSATISFIED</span> (already unset)</span></div>
+    <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Check for at least 1 <span class="eval-keyword">PUBKEY</span> or <span class="eval-keyword">PUBKEY_COMMIT</span> field. If missing &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Read <span class="eval-keyword">state</span> and <span class="eval-keyword">delay_blocks</span> from NUMERIC fields. If fewer than 2 NUMERIC fields &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">If delay_blocks &lt; 0 &rarr; <span class="eval-result-err">ERROR</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">If state &ge; 1 &rarr; <span class="eval-result-sat">SATISFIED</span> (latch can be reset)</span></div>
+    <div class="eval-step"><span class="eval-step-num">5.</span><span class="eval-step-text">If state == 0 &rarr; <span class="eval-result-unsat">UNSATISFIED</span> (already unset)</span></div>
   </div>
 </div>
 
@@ -110,8 +111,9 @@
   <table class="result-table">
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
-      <tr><td>Missing PUBKEY/PUBKEY_COMMIT or NUMERIC fields</td><td class="r-err">ERROR</td></tr>
-      <tr><td>Resetter key authorization fails</td><td class="r-unsat">UNSATISFIED</td></tr>
+      <tr><td>Missing PUBKEY/PUBKEY_COMMIT field</td><td class="r-err">ERROR</td></tr>
+      <tr><td>Fewer than 2 NUMERIC fields</td><td class="r-err">ERROR</td></tr>
+      <tr><td>delay_blocks &lt; 0</td><td class="r-err">ERROR</td></tr>
       <tr><td>state == 0 (already unset)</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>state &ge; 1 (set, can reset)</td><td class="r-sat">SATISFIED</td></tr>
     </tbody>

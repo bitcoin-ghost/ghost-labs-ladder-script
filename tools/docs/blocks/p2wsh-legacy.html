@@ -23,7 +23,7 @@
   <div class="block-type-code">TYPE 0x0905 &middot; LEGACY FAMILY</div>
   <h1 class="block-title">P2WSH_LEGACY</h1>
   <p class="block-subtitle">Legacy P2WSH (pay-to-witness-script-hash) wrapped as a typed Ladder Script block. SHA256 of inner conditions must match. Same pattern as P2SH but with SHA256.</p>
-  <span class="block-family-badge" style="color: #e91e90; border-color: #e91e9040;">Legacy</span>
+  <span class="block-family-badge" style="color: #00e5ff; border-color: #00e5ff40;">Legacy</span>
   <span class="invertible-badge inv-yes">Invertible</span>
 </div>
 
@@ -36,15 +36,15 @@
       <line x1="20" y1="10" x2="20" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <line x1="600" y1="10" x2="600" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <!-- Wire -->
-      <line x1="20" y1="60" x2="180" y2="60" stroke="#e91e90" stroke-width="2"/>
-      <line x1="440" y1="60" x2="600" y2="60" stroke="#e91e90" stroke-width="2"/>
+      <line x1="20" y1="60" x2="180" y2="60" stroke="#00e5ff" stroke-width="2"/>
+      <line x1="440" y1="60" x2="600" y2="60" stroke="#00e5ff" stroke-width="2"/>
       <!-- Block body -->
-      <rect x="180" y="20" width="260" height="80" rx="2" fill="#2a2a2a" stroke="#e91e90" stroke-width="1.5"/>
+      <rect x="180" y="20" width="260" height="80" rx="2" fill="#2a2a2a" stroke="#00e5ff" stroke-width="1.5"/>
       <!-- Block label -->
-      <text x="310" y="38" text-anchor="middle" fill="#e91e90" font-family="Share Tech Mono" font-size="13" letter-spacing="2">P2WSH_LEGACY</text>
+      <text x="310" y="38" text-anchor="middle" fill="#00e5ff" font-family="Share Tech Mono" font-size="13" letter-spacing="2">P2WSH_LEGACY</text>
       <!-- Internal component -->
       <rect x="210" y="48" width="200" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="310" y="66" text-anchor="middle" fill="#e91e90" font-family="IBM Plex Mono" font-size="10" font-weight="600">SHA256 + INNER EVAL</text>
+      <text x="310" y="66" text-anchor="middle" fill="#00e5ff" font-family="IBM Plex Mono" font-size="10" font-weight="600">SHA256 + INNER EVAL</text>
       <!-- Annotation -->
       <text x="310" y="125" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">Inner script must be valid Ladder Script conditions</text>
     </svg>
@@ -64,14 +64,14 @@
         <td class="field-type">HASH256</td>
         <td class="field-size">32 B</td>
         <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA256 commitment to the inner script</td>
+        <td class="field-desc">SHA256 commitment to the inner script. <strong>Node-computed</strong> &mdash; the user provides PREIMAGE (serialized Ladder Script conditions) and the node computes this field automatically. Raw hash input is rejected.</td>
       </tr>
       <tr>
         <td class="field-name">preimage</td>
         <td class="field-type">PREIMAGE</td>
         <td class="field-size">var</td>
         <td class="field-side-w">Witness</td>
-        <td class="field-desc">Serialized Ladder Script conditions (the inner script)</td>
+        <td class="field-desc">Serialized Ladder Script conditions (the inner script) &mdash; provided by the user. The node derives HASH256 from this data at creation time.</td>
       </tr>
       <tr>
         <td class="field-name">[inner witness]</td>
@@ -189,6 +189,7 @@
   <div class="section-label">Notes</div>
   <ul class="doc-notes">
     <li>Same anti-spam properties as P2SH_LEGACY &mdash; inner script must be valid Ladder Script.</li>
+    <li>The HASH256 field is <strong>node-computed</strong>: the user supplies PREIMAGE (the inner script) and the node derives the hash commitment automatically. Submitting a raw HASH256 value directly is rejected.</li>
     <li>Uses SHA256 instead of HASH160 for the script hash, matching Bitcoin's P2WSH design.</li>
     <li>Recursion depth limited to 2.</li>
   </ul>

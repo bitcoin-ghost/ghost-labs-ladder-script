@@ -2788,6 +2788,12 @@ EvalResult EvalBlock(const RungBlock& block,
     case RungBlockType::P2TR_SCRIPT_LEGACY:
         raw = EvalP2TRScriptLegacyBlock(block, checker, sigversion, execdata, ctx);
         break;
+    // Utility family
+    case RungBlockType::DATA_RETURN:
+        // DATA_RETURN is unspendable — if we reach evaluation, the output should
+        // never have been spent. Return ERROR to make the transaction invalid.
+        raw = EvalResult::ERROR;
+        break;
     default:
         raw = EvalResult::UNKNOWN_BLOCK_TYPE;
         break;
@@ -3159,10 +3165,77 @@ static bool ResolveWitnessReference(LadderWitness& witness,
     return true;
 }
 
+/** Check if a 0xC1 inline conditions script contains exactly one DATA_RETURN block
+ *  and nothing else (single rung, single block, no relays). */
+static bool IsDataReturnOutput(const RungConditions& conds)
+{
+    if (conds.IsTemplateRef()) return false;
+    if (conds.rungs.size() != 1) return false;
+    if (conds.rungs[0].IsCompact()) return false;
+    if (conds.rungs[0].blocks.size() != 1) return false;
+    if (conds.rungs[0].blocks[0].type != RungBlockType::DATA_RETURN) return false;
+    if (!conds.relays.empty()) return false;
+    return true;
+}
+
+bool ValidateRungOutputs(const CTransaction& tx, unsigned int flags, std::string& error)
+{
+    size_t data_return_count = 0;
+
+    for (size_t i = 0; i < tx.vout.size(); ++i) {
+        const auto& spk = tx.vout[i].scriptPubKey;
+
+        // MLSC output: 0xC2 + 32 bytes — always valid
+        if (IsMLSCScript(spk)) {
+            continue;
+        }
+
+        // Inline conditions: 0xC1
+        if (IsRungConditionsScript(spk)) {
+            RungConditions conds;
+            std::string cond_error;
+            if (!DeserializeRungConditions(spk, conds, cond_error)) {
+                error = "output " + std::to_string(i) + ": invalid conditions: " + cond_error;
+                return false;
+            }
+
+            // DATA_RETURN output: allowed even on mainnet (this is the OP_RETURN replacement)
+            if (IsDataReturnOutput(conds)) {
+                data_return_count++;
+                // Must be zero-value (unspendable)
+                if (tx.vout[i].nValue != 0) {
+                    error = "output " + std::to_string(i) + ": DATA_RETURN output must have zero value";
+                    return false;
+                }
+                continue;
+            }
+
+            // Non-DATA_RETURN 0xC1: rejected on mainnet
+            if (flags & RUNG_VERIFY_MLSC_ONLY) {
+                error = "output " + std::to_string(i) + ": inline conditions (0xC1) rejected on mainnet";
+                return false;
+            }
+            continue;
+        }
+
+        // Reject everything else: raw OP_RETURN, P2TR, P2WPKH, arbitrary data
+        error = "output " + std::to_string(i) + ": non-Ladder Script output rejected in v4 transaction";
+        return false;
+    }
+
+    // Only one DATA_RETURN output allowed per transaction
+    if (data_return_count > 1) {
+        error = "too many DATA_RETURN outputs: " + std::to_string(data_return_count) + " (max 1)";
+        return false;
+    }
+
+    return true;
+}
+
 bool VerifyRungTx(const CTransaction& tx,
                   unsigned int nIn,
                   const CTxOut& spent_output,
-                  unsigned int /*flags*/,
+                  unsigned int flags,
                   const BaseSignatureChecker& checker,
                   const PrecomputedTransactionData& txdata,
                   ScriptError* serror,
@@ -3172,6 +3245,10 @@ bool VerifyRungTx(const CTransaction& tx,
         if (serror) *serror = SCRIPT_ERR_UNKNOWN_ERROR;
         return false;
     }
+
+    // Note: output validation (ValidateRungOutputs) is called once per transaction
+    // in CheckInputScripts, not here, to avoid redundant/out-of-order execution
+    // when CScriptCheck runs in parallel.
 
     const auto& witness = tx.vin[nIn].scriptWitness;
     if (witness.stack.empty()) {
@@ -3198,8 +3275,15 @@ bool VerifyRungTx(const CTransaction& tx,
         }
     }
 
-    // Check if this is an MLSC (0xC2) or legacy (0xC1) output
+    // Check if this is an MLSC (0xC2) or inline (0xC1) output
     bool is_mlsc = IsMLSCScript(spent_output.scriptPubKey);
+    bool is_inline = IsRungConditionsScript(spent_output.scriptPubKey);
+
+    // Consensus: reject 0xC1 inline conditions on mainnet
+    if (is_inline && (flags & RUNG_VERIFY_MLSC_ONLY)) {
+        if (serror) *serror = SCRIPT_ERR_UNKNOWN_ERROR;
+        return false;
+    }
 
     RungConditions conditions;
     bool has_conditions = false;

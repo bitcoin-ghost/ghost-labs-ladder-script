@@ -23,7 +23,7 @@
   <div class="block-type-code">TYPE 0x0003 &middot; SIGNATURE FAMILY</div>
   <h1 class="block-title">ADAPTOR_SIG</h1>
   <p class="block-subtitle">Adaptor signature verification. Requires a signing key, an adaptor point, and an adapted signature. Enables scriptless scripts and atomic protocols without hash locks.</p>
-  <span class="block-family-badge" style="color: #2d7dd2; border-color: #2d7dd240;">Signature</span>
+  <span class="block-family-badge" style="color: #ff1744; border-color: #ff174440;">Signature</span>
   <span class="invertible-badge inv-yes">Invertible</span>
 </div>
 
@@ -36,18 +36,18 @@
       <line x1="20" y1="10" x2="20" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <line x1="600" y1="10" x2="600" y2="140" stroke="#4a4a4a" stroke-width="3"/>
       <!-- Wire -->
-      <line x1="20" y1="60" x2="140" y2="60" stroke="#2d7dd2" stroke-width="2"/>
-      <line x1="460" y1="60" x2="600" y2="60" stroke="#2d7dd2" stroke-width="2"/>
+      <line x1="20" y1="60" x2="140" y2="60" stroke="#ff1744" stroke-width="2"/>
+      <line x1="460" y1="60" x2="600" y2="60" stroke="#ff1744" stroke-width="2"/>
       <!-- Block body -->
-      <rect x="140" y="20" width="320" height="80" rx="2" fill="#2a2a2a" stroke="#2d7dd2" stroke-width="1.5"/>
+      <rect x="140" y="20" width="320" height="80" rx="2" fill="#2a2a2a" stroke="#ff1744" stroke-width="1.5"/>
       <!-- Block label -->
-      <text x="300" y="38" text-anchor="middle" fill="#2d7dd2" font-family="Share Tech Mono" font-size="13" letter-spacing="2">ADAPTOR_SIG</text>
+      <text x="300" y="38" text-anchor="middle" fill="#ff1744" font-family="Share Tech Mono" font-size="13" letter-spacing="2">ADAPTOR_SIG</text>
       <!-- Internal components -->
       <rect x="160" y="48" width="130" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="225" y="66" text-anchor="middle" fill="#2d7dd2" font-family="IBM Plex Mono" font-size="10" font-weight="600">ADAPTOR PT</text>
+      <text x="225" y="66" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="10" font-weight="600">ADAPTOR PT</text>
       <text x="300" y="66" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="12">+</text>
       <rect x="310" y="48" width="130" height="28" rx="2" fill="#1e1e1e" stroke="#3a3a3a"/>
-      <text x="375" y="66" text-anchor="middle" fill="#2d7dd2" font-family="IBM Plex Mono" font-size="10" font-weight="600">SIG VERIFY</text>
+      <text x="375" y="66" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="10" font-weight="600">SIG VERIFY</text>
       <!-- Annotation -->
       <text x="300" y="125" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">Adapted signature verified against signing key + adaptor point</text>
     </svg>
@@ -81,14 +81,7 @@
         <td class="field-type">PUBKEY</td>
         <td class="field-size">32-33 B</td>
         <td class="field-side-w">Witness</td>
-        <td class="field-desc">Signing public key (x-only 32B or compressed 33B)</td>
-      </tr>
-      <tr>
-        <td class="field-name">adaptor_point</td>
-        <td class="field-type">PUBKEY</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-w">Witness</td>
-        <td class="field-desc">Adaptor point (x-only 32B). Encodes the secret being revealed.</td>
+        <td class="field-desc">Signing public key (x-only 32B or compressed 33B). The adaptor point is NOT revealed in the witness &mdash; the adaptor secret is applied off-chain to produce the adapted signature.</td>
       </tr>
       <tr>
         <td class="field-name">signature</td>
@@ -122,16 +115,15 @@
     <div class="wire-row">
       <span class="wire-segment wire-type" style="min-width:60px">0x0003</span>
       <span class="wire-segment wire-inv">0</span>
-      <span class="wire-segment wire-count">3</span>
+      <span class="wire-segment wire-count">2</span>
       <span class="wire-segment wire-field-pubkey" style="min-width:100px">KEY &middot; 32B</span>
-      <span class="wire-segment wire-field-pubkey" style="min-width:120px">ADAPTOR &middot; 32B</span>
       <span class="wire-segment wire-field-sig" style="min-width:120px">SIGNATURE &middot; 64B</span>
-      <span class="wire-bytes">= 138 bytes</span>
+      <span class="wire-bytes">= 104 bytes</span>
     </div>
 
     <div class="wire-total">
       <span class="wire-total-label">Total (conditions + witness)</span>
-      <span class="wire-total-bytes">212 bytes</span>
+      <span class="wire-total-bytes">178 bytes</span>
     </div>
   </div>
 
@@ -198,7 +190,6 @@
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
     { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes (signing key)"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"7f3e9a...32 bytes (adaptor point)"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"SIGNATURE"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"e5f71b...64 bytes (adapted)"</span> }
   ]
 }</pre></div>
