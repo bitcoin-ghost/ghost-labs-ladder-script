@@ -25,3 +25,4 @@ docs/BUILD_PROMPT.md
 .pytest_cache/
 docs/IMPLEMENTATION_NOTES.md
 tests/test_documentation_accuracy.py
+proxy/
