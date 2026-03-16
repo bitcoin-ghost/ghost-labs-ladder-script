@@ -23,3 +23,4 @@ docs/BUILD_PROMPT.md
 # Local dev
 .claude/
 .pytest_cache/
+docs/IMPLEMENTATION_NOTES.md
