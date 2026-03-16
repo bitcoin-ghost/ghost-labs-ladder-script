@@ -7833,6 +7833,31 @@ function deleteRecord(txid) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SESSION TX LOG (for Review tab)
+// ═══════════════════════════════════════════════════════════════
+
+const SESSION_LOG_KEY = 'ghost_session_txlog';
+const SESSION_LOG_MAX = 50;
+
+function saveSessionTx({ txid, type, label, timestamp, fundJson, spendJson }) {
+  try {
+    const log = JSON.parse(localStorage.getItem(SESSION_LOG_KEY) || '[]');
+    log.unshift({ txid, type, label: label || '', timestamp: timestamp || Date.now(), fundJson: fundJson || null, spendJson: spendJson || null });
+    if (log.length > SESSION_LOG_MAX) log.length = SESSION_LOG_MAX;
+    localStorage.setItem(SESSION_LOG_KEY, JSON.stringify(log));
+  } catch (e) { console.warn('Failed to save session tx:', e); }
+}
+
+function loadSessionLog() {
+  try { return JSON.parse(localStorage.getItem(SESSION_LOG_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+
+function clearSessionLog() {
+  localStorage.removeItem(SESSION_LOG_KEY);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // REGTEST PANEL
 // ═══════════════════════════════════════════════════════════════
 
@@ -8804,6 +8829,9 @@ function SignetPanel() {
     if (data) {
       setTxid(data.txid);
       addToHistory('broadcast', data.txid, rungs.length + ' rungs');
+      // Save to session log for Review tab
+      const fundPayload = exportCreateRungtx(rungs, txOutputs, txInputs, locktime);
+      saveSessionTx({ txid: data.txid, type: 'fund', label: rungs.length + ' rungs', fundJson: fundPayload });
       setTimeout(refreshWallet, 2000);
       refreshMempool();
       // Save record via Record Module so SPEND tab can find this output
@@ -10155,6 +10183,8 @@ function SpendPanel() {
       }
 
       setSpendResult({ txid: bcResult.txid, amount: sendSats, scheme, destAddress: dest });
+      // Save to session log for Review tab
+      saveSessionTx({ txid: bcResult.txid, type: 'spend', label: 'Spend ' + txid.substring(0, 8) + '.. vout:' + vout, spendJson: createPayload });
 
     } catch (e) {
       addLog('ERROR: ' + e.message, 'err');
@@ -10480,6 +10510,137 @@ function SpendPanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REVIEW PANEL
+// ═══════════════════════════════════════════════════════════════
+
+function ReviewPanel() {
+  const [sessionLog, setSessionLog] = useState(() => loadSessionLog());
+  const [selectedIdx, setSelectedIdx] = useState(null);
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  const refresh = () => setSessionLog(loadSessionLog());
+
+  const copyWithFeedback = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 1500);
+    });
+  };
+
+  const selected = selectedIdx !== null ? sessionLog[selectedIdx] : null;
+  const fundStr = selected?.fundJson ? JSON.stringify(selected.fundJson, null, 2) : null;
+  const spendStr = selected?.spendJson ? JSON.stringify(selected.spendJson, null, 2) : null;
+
+  const timeAgo = (ts) => {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  };
+
+  return (
+    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
+      {/* TX List Sidebar */}
+      <div style={{ width: 260, minWidth: 260, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-secondary)' }}>
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.2, color: 'var(--amber)', textTransform: 'uppercase' }}>Session Transactions</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={refresh} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 9, padding: '2px 6px', letterSpacing: 0.5 }}>REFRESH</button>
+            <button onClick={() => { clearSessionLog(); setSessionLog([]); setSelectedIdx(null); }} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--red)', cursor: 'pointer', fontSize: 9, padding: '2px 6px', letterSpacing: 0.5 }}>CLEAR</button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {sessionLog.length === 0 ? (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
+              No transactions yet.<br/><br/>
+              <span style={{ fontSize: 10 }}>Use the SEND or SPEND tabs to create transactions. They will appear here for review.</span>
+            </div>
+          ) : sessionLog.map((tx, i) => (
+            <div key={i}
+              onClick={() => setSelectedIdx(i)}
+              style={{
+                padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                background: selectedIdx === i ? 'var(--bg-primary)' : 'transparent',
+                borderLeft: selectedIdx === i ? '2px solid var(--amber)' : '2px solid transparent',
+              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <span style={{
+                  fontSize: 8, padding: '1px 5px', letterSpacing: 1, fontWeight: 700, borderRadius: 2,
+                  background: tx.type === 'fund' ? 'var(--green-dim)' : 'rgba(57,165,183,0.1)',
+                  color: tx.type === 'fund' ? 'var(--green-bright)' : 'var(--cyan)',
+                  border: '1px solid ' + (tx.type === 'fund' ? 'var(--green)' : 'rgba(57,165,183,0.3)'),
+                }}>{tx.type.toUpperCase()}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{timeAgo(tx.timestamp)}</span>
+              </div>
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {tx.txid.substring(0, 24)}...
+              </div>
+              {tx.label && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{tx.label}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* JSON Panels */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {!selected ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
+            Select a transaction from the sidebar to review its JSON.
+          </div>
+        ) : (
+          <>
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, background: 'var(--bg-secondary)' }}>
+              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--amber)' }}>{selected.txid}</span>
+              <button style={{ background: 'none', border: '1px solid var(--border)', color: copiedKey === 'review-txid' ? 'var(--green-bright)' : 'var(--text-dim)', cursor: 'pointer', fontSize: 9, padding: '2px 6px' }}
+                onClick={() => copyWithFeedback(selected.txid, 'review-txid')}>
+                {copiedKey === 'review-txid' ? 'COPIED' : 'COPY TXID'}
+              </button>
+            </div>
+            <div style={{ flex: 1, display: 'flex', gap: 0, overflow: 'hidden' }}>
+              {/* Fund JSON */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)' }}>
+                <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-tertiary)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: 'var(--green-bright)' }}>FUND JSON</span>
+                  {fundStr && <button style={{ background: 'none', border: '1px solid var(--border)', color: copiedKey === 'review-fund' ? 'var(--green-bright)' : 'var(--text-dim)', cursor: 'pointer', fontSize: 9, padding: '2px 8px' }}
+                    onClick={() => copyWithFeedback(fundStr, 'review-fund')}>
+                    {copiedKey === 'review-fund' ? 'COPIED' : 'COPY'}
+                  </button>}
+                </div>
+                <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+                  {fundStr ? (
+                    <pre style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5, margin: 0 }}>{fundStr}</pre>
+                  ) : (
+                    <div style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center', marginTop: 40 }}>No fund JSON recorded for this transaction.</div>
+                  )}
+                </div>
+              </div>
+              {/* Spend JSON */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-tertiary)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: 'var(--cyan)' }}>SPEND JSON</span>
+                  {spendStr && <button style={{ background: 'none', border: '1px solid var(--border)', color: copiedKey === 'review-spend' ? 'var(--green-bright)' : 'var(--text-dim)', cursor: 'pointer', fontSize: 9, padding: '2px 8px' }}
+                    onClick={() => copyWithFeedback(spendStr, 'review-spend')}>
+                    {copiedKey === 'review-spend' ? 'COPIED' : 'COPY'}
+                  </button>}
+                </div>
+                <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+                  {spendStr ? (
+                    <pre style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5, margin: 0 }}>{spendStr}</pre>
+                  ) : (
+                    <div style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center', marginTop: 40 }}>No spend JSON recorded for this transaction.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -11705,6 +11866,7 @@ ${ladderRows.map(r => `
           <button className={`mode-tab ${mode === 'convert' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_MODE', value: 'convert' })} title={showTooltips ? 'Paste RPC JSON output to convert back to ladder diagram' : undefined}>CONVERT</button>
           <button className={`mode-tab ${mode === 'send' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_MODE', value: 'send' })} title={showTooltips ? 'Create and fund Ladder Script outputs on signet' : undefined} style={mode === 'send' ? { color: 'var(--green-bright)', borderBottomColor: 'var(--green-bright)' } : {}}>SEND</button>
           <button className={`mode-tab ${mode === 'spend' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_MODE', value: 'spend' })} title={showTooltips ? 'Spend existing RUNG outputs on signet' : undefined} style={mode === 'spend' ? { color: 'var(--cyan)', borderBottomColor: 'var(--cyan)' } : {}}>SPEND</button>
+          <button className={`mode-tab ${mode === 'review' ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_MODE', value: 'review' })} title={showTooltips ? 'Review fund and spend JSON for session transactions' : undefined} style={mode === 'review' ? { color: 'var(--amber)', borderBottomColor: 'var(--amber)' } : {}}>REVIEW</button>
         </div>
         <div className="header-actions">
           <button className="header-btn" onClick={() => window.open('../docs/index.html#ENGINE_GUIDE', '_blank')} title={showTooltips ? 'Open the Ladder Script engine guide in a new window' : undefined}>HELP</button>
@@ -11728,6 +11890,10 @@ ${ladderRows.map(r => `
         ) : mode === 'spend' ? (
           <div style={{ gridColumn: '1 / -1', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
             <SpendPanel />
+          </div>
+        ) : mode === 'review' ? (
+          <div style={{ gridColumn: '1 / -1', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <ReviewPanel />
           </div>
         ) : <>
         {isSimMode ? (
