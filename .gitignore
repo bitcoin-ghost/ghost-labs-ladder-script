@@ -24,3 +24,4 @@ docs/BUILD_PROMPT.md
 .claude/
 .pytest_cache/
 docs/IMPLEMENTATION_NOTES.md
+tests/test_documentation_accuracy.py
