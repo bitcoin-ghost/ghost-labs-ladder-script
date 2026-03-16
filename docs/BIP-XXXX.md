@@ -972,11 +972,11 @@ RECURSE_* blocks fall into two categories:
 
 | Block Type | Termination | Proof |
 |------------|-------------|-------|
-| RECURSE_MODIFIED | `max_depth == 0` → UNSATISFIED | Finite unsigned integer, decremented per spend |
-| RECURSE_UNTIL | `block_height >= target` → SATISFIED | Block height is monotonically increasing |
-| RECURSE_COUNT | `count == 0` → UNSATISFIED | Decremented per spend via RECURSE_MODIFIED |
-| RECURSE_SPLIT | `max_splits == 0` → UNSATISFIED | Decremented per split level |
-| RECURSE_DECAY | `max_depth == 0` → UNSATISFIED | Same as RECURSE_MODIFIED |
+| RECURSE_MODIFIED | `max_depth == 0` -> UNSATISFIED | Finite unsigned integer, decremented per spend |
+| RECURSE_UNTIL | `block_height >= target` -> SATISFIED | Block height is monotonically increasing |
+| RECURSE_COUNT | `count == 0` -> UNSATISFIED | Decremented per spend via RECURSE_MODIFIED |
+| RECURSE_SPLIT | `max_splits == 0` -> UNSATISFIED | Decremented per split level |
+| RECURSE_DECAY | `max_depth == 0` -> UNSATISFIED | Same as RECURSE_MODIFIED |
 
 **Perpetual covenants:**
 
