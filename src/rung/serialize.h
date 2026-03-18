@@ -26,8 +26,8 @@ static constexpr size_t MAX_LADDER_WITNESS_SIZE = 100000;
 /** Maximum number of PREIMAGE/SCRIPT_BODY fields per ladder witness (consensus).
  *  Counts all PREIMAGE and SCRIPT_BODY fields across all block types including
  *  compounds (HTLC, HASH_SIG, P2SH_LEGACY, P2WSH_LEGACY, P2TR_SCRIPT_LEGACY).
- *  Limits user-chosen data to 64 bytes (2 * 32 bytes PREIMAGE max). */
-static constexpr size_t MAX_PREIMAGE_FIELDS_PER_WITNESS = 2;
+ *  Limits user-chosen data to 32 bytes (1 * 32 bytes PREIMAGE). */
+static constexpr size_t MAX_PREIMAGE_FIELDS_PER_WITNESS = 1;
 /** Maximum coil address (raw scriptPubKey) size in bytes.
  *  Covers all standard formats: MLSC (33), P2TR (34), P2WSH (34),
  *  P2WPKH (22), P2SH (23), P2PKH (25). */

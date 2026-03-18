@@ -119,13 +119,13 @@ enum class RungDataType : uint8_t {
     PUBKEY_COMMIT = 0x02, //!< Public key commitment: exactly 32 bytes
     HASH256       = 0x03, //!< SHA-256 hash: exactly 32 bytes
     HASH160       = 0x04, //!< RIPEMD160(SHA256()) hash: exactly 20 bytes
-    PREIMAGE      = 0x05, //!< Hash preimage: 1-32 bytes (SHA256 payment hash preimage)
+    PREIMAGE      = 0x05, //!< Hash preimage: exactly 32 bytes (SHA256 payment hash preimage)
     SIGNATURE     = 0x06, //!< Signature: 1-50000 bytes (Schnorr 64-65, ECDSA 8-72, PQ up to 49216)
     SPEND_INDEX   = 0x07, //!< Spend index reference: 4 bytes
     NUMERIC       = 0x08, //!< Numeric value (threshold, locktime, etc.): 1-4 bytes
     SCHEME        = 0x09, //!< Signature scheme selector: 1 byte
     SCRIPT_BODY   = 0x0A, //!< Serialized inner conditions: 1-80 bytes (witness-only; node computes hash for conditions)
-    DATA          = 0x0B, //!< Opaque data: 1-80 bytes (DATA_RETURN block only)
+    DATA          = 0x0B, //!< Opaque data: 1-32 bytes (DATA_RETURN block only)
 };
 
 // Backward-compatible alias
@@ -230,7 +230,7 @@ inline size_t FieldMinSize(RungDataType type)
     case RungDataType::PUBKEY_COMMIT: return 32;
     case RungDataType::HASH256:       return 32;
     case RungDataType::HASH160:       return 20;
-    case RungDataType::PREIMAGE:      return 1;
+    case RungDataType::PREIMAGE:      return 32;
     case RungDataType::SCRIPT_BODY:   return 1;
     case RungDataType::SIGNATURE:     return 1;
     case RungDataType::SPEND_INDEX:   return 4;
@@ -255,7 +255,7 @@ inline size_t FieldMaxSize(RungDataType type)
     case RungDataType::SPEND_INDEX:   return 4;
     case RungDataType::NUMERIC:       return 4;
     case RungDataType::SCHEME:        return 1;
-    case RungDataType::DATA:          return 80;
+    case RungDataType::DATA:          return 32;
     }
     return 0;
 }
@@ -989,6 +989,31 @@ inline constexpr ImplicitFieldLayout ACCUMULATOR_CONDITIONS = {1, {
     {RungDataType::HASH256, 32},
 }};
 
+// -- Previously variable-length blocks, now capped --
+
+/** RECURSE_MODIFIED conditions: [NUMERIC(max_depth), NUMERIC x7 (mutation specs)] — max 8 NUMERICs */
+inline constexpr ImplicitFieldLayout RECURSE_MODIFIED_CONDITIONS = {8, {
+    {RungDataType::NUMERIC, 0}, {RungDataType::NUMERIC, 0},
+    {RungDataType::NUMERIC, 0}, {RungDataType::NUMERIC, 0},
+    {RungDataType::NUMERIC, 0}, {RungDataType::NUMERIC, 0},
+    {RungDataType::NUMERIC, 0}, {RungDataType::NUMERIC, 0},
+}};
+
+/** RECURSE_DECAY conditions: [NUMERIC x8 (depth + decay specs)] — same as RECURSE_MODIFIED */
+inline constexpr ImplicitFieldLayout RECURSE_DECAY_CONDITIONS = RECURSE_MODIFIED_CONDITIONS;
+
+/** ANCHOR conditions: [NUMERIC(anchor_id)] — marker block, single field */
+inline constexpr ImplicitFieldLayout ANCHOR_CONDITIONS = {1, {
+    {RungDataType::NUMERIC, 0},
+}};
+
+/** COMPARE conditions: [NUMERIC(operator), NUMERIC(value_b), NUMERIC(value_c)] — 3 NUMERICs */
+inline constexpr ImplicitFieldLayout COMPARE_CONDITIONS = {3, {
+    {RungDataType::NUMERIC, 0},
+    {RungDataType::NUMERIC, 0},
+    {RungDataType::NUMERIC, 0},
+}};
+
 // -- Witness context implicit field layouts --
 
 /** SIG witness: [PUBKEY(var), SIGNATURE(var)] */
@@ -1074,12 +1099,15 @@ inline const ImplicitFieldLayout& GetImplicitLayout(RungBlockType type, uint8_t 
         case RungBlockType::KEY_REF_SIG:      return KEY_REF_SIG_CONDITIONS;
         // Covenant family
         case RungBlockType::VAULT_LOCK:       return VAULT_LOCK_CONDITIONS;
-        // Recursion family (RECURSE_MODIFIED/RECURSE_DECAY: variable length, stay NO_IMPLICIT)
+        // Recursion family
         case RungBlockType::RECURSE_SAME:     return RECURSE_SAME_CONDITIONS;
+        case RungBlockType::RECURSE_MODIFIED: return RECURSE_MODIFIED_CONDITIONS;
+        case RungBlockType::RECURSE_DECAY:    return RECURSE_DECAY_CONDITIONS;
         case RungBlockType::RECURSE_UNTIL:    return RECURSE_UNTIL_CONDITIONS;
         case RungBlockType::RECURSE_COUNT:    return RECURSE_COUNT_CONDITIONS;
         case RungBlockType::RECURSE_SPLIT:    return RECURSE_SPLIT_CONDITIONS;
-        // Anchor family (ANCHOR: variable/generic, stays NO_IMPLICIT)
+        // Anchor family
+        case RungBlockType::ANCHOR:           return ANCHOR_CONDITIONS;
         case RungBlockType::ANCHOR_CHANNEL:   return ANCHOR_CHANNEL_CONDITIONS;
         case RungBlockType::ANCHOR_POOL:      return ANCHOR_POOL_CONDITIONS;
         case RungBlockType::ANCHOR_RESERVE:   return ANCHOR_RESERVE_CONDITIONS;
@@ -1106,6 +1134,7 @@ inline const ImplicitFieldLayout& GetImplicitLayout(RungBlockType type, uint8_t 
         case RungBlockType::OUTPUT_COUNT:     return OUTPUT_COUNT_CONDITIONS;
         case RungBlockType::RELATIVE_VALUE:   return RELATIVE_VALUE_CONDITIONS;
         case RungBlockType::ACCUMULATOR:      return ACCUMULATOR_CONDITIONS;
+        case RungBlockType::COMPARE:          return COMPARE_CONDITIONS;
         // Legacy family
         case RungBlockType::P2PK_LEGACY:      return SIG_CONDITIONS;
         case RungBlockType::P2PKH_LEGACY:     return P2PKH_LEGACY_CONDITIONS;
@@ -1189,6 +1218,8 @@ inline bool VerifyImplicitLayoutPairing()
         RungBlockType::WEIGHT_LIMIT, RungBlockType::INPUT_COUNT,
         RungBlockType::OUTPUT_COUNT, RungBlockType::RELATIVE_VALUE,
         RungBlockType::ACCUMULATOR,
+        RungBlockType::RECURSE_MODIFIED, RungBlockType::RECURSE_DECAY,
+        RungBlockType::ANCHOR, RungBlockType::COMPARE,
     };
 
     for (uint32_t code = 0; code <= 0x0FFF; ++code) {
