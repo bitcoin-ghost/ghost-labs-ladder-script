@@ -18,7 +18,7 @@ namespace rung {
 bool IsConditionDataType(RungDataType type)
 {
     switch (type) {
-    case RungDataType::PUBKEY_COMMIT:
+    // PUBKEY_COMMIT removed from conditions — pubkeys folded into Merkle leaf
     case RungDataType::HASH256:
     case RungDataType::HASH160:
     case RungDataType::NUMERIC:
@@ -26,6 +26,7 @@ bool IsConditionDataType(RungDataType type)
     case RungDataType::SPEND_INDEX:
     case RungDataType::DATA:
         return true;
+    case RungDataType::PUBKEY_COMMIT:
     case RungDataType::PUBKEY:
     case RungDataType::SIGNATURE:
     case RungDataType::PREIMAGE:
@@ -349,7 +350,10 @@ const uint256 MLSC_EMPTY_LEAF = ComputeEmptyLeaf();
 
 bool IsMLSCScript(const CScript& scriptPubKey)
 {
-    return scriptPubKey.size() == 33 && scriptPubKey[0] == RUNG_MLSC_PREFIX;
+    // 33 bytes = standard MLSC (0xC2 + 32-byte root)
+    // 34-113 bytes = MLSC with DATA_RETURN payload (max 80 bytes data)
+    return scriptPubKey.size() >= 33 && scriptPubKey.size() <= 113 &&
+           scriptPubKey[0] == RUNG_MLSC_PREFIX;
 }
 
 bool IsLadderScript(const CScript& scriptPubKey)
@@ -364,6 +368,19 @@ bool GetMLSCRoot(const CScript& scriptPubKey, uint256& root_out)
     return true;
 }
 
+std::vector<uint8_t> GetMLSCData(const CScript& scriptPubKey)
+{
+    if (!IsMLSCScript(scriptPubKey) || scriptPubKey.size() <= 33) {
+        return {};
+    }
+    return std::vector<uint8_t>(scriptPubKey.begin() + 33, scriptPubKey.end());
+}
+
+bool HasMLSCData(const CScript& scriptPubKey)
+{
+    return IsMLSCScript(scriptPubKey) && scriptPubKey.size() > 33;
+}
+
 CScript CreateMLSCScript(const uint256& conditions_root)
 {
     CScript result;
@@ -372,11 +389,25 @@ CScript CreateMLSCScript(const uint256& conditions_root)
     return result;
 }
 
-uint256 ComputeRungLeaf(const Rung& rung)
+CScript CreateMLSCScript(const uint256& conditions_root, const std::vector<uint8_t>& data)
+{
+    CScript result;
+    result.push_back(RUNG_MLSC_PREFIX);
+    result.insert(result.end(), conditions_root.begin(), conditions_root.end());
+    result.insert(result.end(), data.begin(), data.end());
+    return result;
+}
+
+uint256 ComputeRungLeaf(const Rung& rung,
+                         const std::vector<std::vector<uint8_t>>& pubkeys)
 {
     auto bytes = SerializeRungBlocks(rung, SerializationContext::CONDITIONS);
     CSHA256 hasher = LEAF_HASHER; // copy pre-computed prefix
     hasher.Write(bytes.data(), bytes.size());
+    // merkle_pub_key: append pubkeys in positional order
+    for (const auto& pk : pubkeys) {
+        hasher.Write(pk.data(), pk.size());
+    }
     uint256 result;
     hasher.Finalize(result.data());
     return result;
@@ -392,11 +423,16 @@ uint256 ComputeCoilLeaf(const RungCoil& coil)
     return result;
 }
 
-uint256 ComputeRelayLeaf(const Relay& relay)
+uint256 ComputeRelayLeaf(const Relay& relay,
+                          const std::vector<std::vector<uint8_t>>& pubkeys)
 {
     auto bytes = SerializeRelayBlocks(relay, SerializationContext::CONDITIONS);
     CSHA256 hasher = LEAF_HASHER;
     hasher.Write(bytes.data(), bytes.size());
+    // merkle_pub_key: append pubkeys in positional order
+    for (const auto& pk : pubkeys) {
+        hasher.Write(pk.data(), pk.size());
+    }
     uint256 result;
     hasher.Finalize(result.data());
     return result;
@@ -452,17 +488,21 @@ uint256 BuildMerkleTree(std::vector<uint256> leaves)
     return leaves[0];
 }
 
-uint256 ComputeConditionsRoot(const RungConditions& conditions)
+uint256 ComputeConditionsRoot(const RungConditions& conditions,
+                               const std::vector<std::vector<std::vector<uint8_t>>>& rung_pubkeys,
+                               const std::vector<std::vector<std::vector<uint8_t>>>& relay_pubkeys)
 {
     // Leaf order: [rung_leaf[0..N-1], relay_leaf[0..M-1], coil_leaf]
     std::vector<uint256> leaves;
     leaves.reserve(conditions.rungs.size() + conditions.relays.size() + 1);
 
-    for (const auto& rung : conditions.rungs) {
-        leaves.push_back(ComputeRungLeaf(rung));
+    for (size_t i = 0; i < conditions.rungs.size(); ++i) {
+        const auto& pks = (i < rung_pubkeys.size()) ? rung_pubkeys[i] : std::vector<std::vector<uint8_t>>{};
+        leaves.push_back(ComputeRungLeaf(conditions.rungs[i], pks));
     }
-    for (const auto& relay : conditions.relays) {
-        leaves.push_back(ComputeRelayLeaf(relay));
+    for (size_t i = 0; i < conditions.relays.size(); ++i) {
+        const auto& pks = (i < relay_pubkeys.size()) ? relay_pubkeys[i] : std::vector<std::vector<uint8_t>>{};
+        leaves.push_back(ComputeRelayLeaf(conditions.relays[i], pks));
     }
     leaves.push_back(ComputeCoilLeaf(conditions.coil));
 
@@ -511,28 +551,8 @@ bool DeserializeMLSCProof(const std::vector<uint8_t>& data, MLSCProof& proof, st
         uint8_t cond_ctx = static_cast<uint8_t>(SerializationContext::CONDITIONS);
 
         if (n_blocks == 0) {
-            // Compact rung: n_blocks == 0 signals compact encoding
-            uint8_t compact_type_byte;
-            ss >> compact_type_byte;
-            if (!IsKnownCompactRungType(compact_type_byte)) {
-                error = "MLSC proof unknown compact type: 0x" +
-                        HexStr(std::span<const uint8_t>{&compact_type_byte, 1});
-                return false;
-            }
-            CompactRungData compact;
-            compact.type = static_cast<CompactRungType>(compact_type_byte);
-            if (compact.type == CompactRungType::COMPACT_SIG) {
-                compact.pubkey_commit.resize(32);
-                ss.read(MakeWritableByteSpan(compact.pubkey_commit));
-                uint8_t scheme_byte;
-                ss >> scheme_byte;
-                if (!IsKnownScheme(scheme_byte)) {
-                    error = "MLSC proof compact SIG unknown scheme";
-                    return false;
-                }
-                compact.scheme = static_cast<RungScheme>(scheme_byte);
-            }
-            proof.revealed_rung.compact = std::move(compact);
+            error = "MLSC proof: compact rungs deprecated";
+            return false;
         } else {
             // Normal rung: deserialize blocks
             proof.revealed_rung.blocks.resize(n_blocks);
@@ -554,6 +574,13 @@ bool DeserializeMLSCProof(const std::vector<uint8_t>& data, MLSCProof& proof, st
                     }
                     block.type = static_cast<RungBlockType>(btype);
                     block.inverted = false;
+
+                    // Reject deprecated block types
+                    if (block.type == RungBlockType::HASH_PREIMAGE ||
+                        block.type == RungBlockType::HASH160_PREIMAGE) {
+                        error = "MLSC proof: deprecated block type: use HTLC or HASH_SIG";
+                        return false;
+                    }
 
                     // Check for implicit layout
                     const auto& layout = GetImplicitLayout(block.type, cond_ctx);
@@ -620,6 +647,18 @@ bool DeserializeMLSCProof(const std::vector<uint8_t>& data, MLSCProof& proof, st
                     if (!IsKnownBlockType(btype)) { error = "MLSC proof unknown block type"; return false; }
                     block.type = static_cast<RungBlockType>(btype);
                     block.inverted = (first_byte == MICRO_HEADER_ESCAPE_INV);
+
+                    // Reject deprecated block types
+                    if (block.type == RungBlockType::HASH_PREIMAGE ||
+                        block.type == RungBlockType::HASH160_PREIMAGE) {
+                        error = "MLSC proof: deprecated block type: use HTLC or HASH_SIG";
+                        return false;
+                    }
+                    // Reject inverted key-consuming blocks
+                    if (block.inverted && !IsInvertibleBlockType(block.type)) {
+                        error = "MLSC proof: block type cannot be inverted: " + BlockTypeName(block.type);
+                        return false;
+                    }
 
                     uint64_t nf = ReadCompactSize(ss);
                     if (nf > MAX_FIELDS_PER_BLOCK) { error = "MLSC proof too many fields"; return false; }
@@ -724,6 +763,17 @@ bool DeserializeMLSCProof(const std::vector<uint8_t>& data, MLSCProof& proof, st
                     rblock.inverted = (fb == MICRO_HEADER_ESCAPE_INV);
                 } else {
                     error = "MLSC proof relay: invalid header byte";
+                    return false;
+                }
+                // Reject deprecated block types
+                if (rblock.type == RungBlockType::HASH_PREIMAGE ||
+                    rblock.type == RungBlockType::HASH160_PREIMAGE) {
+                    error = "MLSC proof relay: deprecated block type: use HTLC or HASH_SIG";
+                    return false;
+                }
+                // Reject inverted key-consuming blocks
+                if (rblock.inverted && !IsInvertibleBlockType(rblock.type)) {
+                    error = "MLSC proof relay: block type cannot be inverted: " + BlockTypeName(rblock.type);
                     return false;
                 }
 
@@ -859,6 +909,8 @@ std::vector<uint8_t> SerializeMLSCProof(const MLSCProof& proof)
 bool VerifyMLSCProof(const MLSCProof& proof,
                      const RungCoil& coil,
                      const uint256& expected_root,
+                     const std::vector<std::vector<uint8_t>>& rung_pubkeys,
+                     const std::vector<std::vector<std::vector<uint8_t>>>& relay_pubkeys,
                      std::string& error)
 {
     // Total leaves: total_rungs + total_relays + 1 (coil)
@@ -870,18 +922,20 @@ bool VerifyMLSCProof(const MLSCProof& proof,
     // Track which leaves are revealed vs proof
     std::vector<bool> revealed(total_leaves, false);
 
-    // Rung leaf: the revealed rung goes at rung_index
-    leaves[proof.rung_index] = ComputeRungLeaf(proof.revealed_rung);
+    // Rung leaf: the revealed rung goes at rung_index (with merkle_pub_key pubkeys)
+    leaves[proof.rung_index] = ComputeRungLeaf(proof.revealed_rung, rung_pubkeys);
     revealed[proof.rung_index] = true;
 
     // Revealed relay leaves: relays start at index total_rungs
-    for (const auto& [relay_idx, relay] : proof.revealed_relays) {
+    for (size_t rl = 0; rl < proof.revealed_relays.size(); ++rl) {
+        const auto& [relay_idx, relay] = proof.revealed_relays[rl];
         size_t leaf_idx = proof.total_rungs + relay_idx;
         if (leaf_idx >= total_leaves - 1) { // -1 because last leaf is coil
             error = "revealed relay index out of range";
             return false;
         }
-        leaves[leaf_idx] = ComputeRelayLeaf(relay);
+        const auto& rpks = (rl < relay_pubkeys.size()) ? relay_pubkeys[rl] : std::vector<std::vector<uint8_t>>{};
+        leaves[leaf_idx] = ComputeRelayLeaf(relay, rpks);
         revealed[leaf_idx] = true;
     }
 

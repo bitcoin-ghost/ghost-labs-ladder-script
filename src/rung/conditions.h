@@ -44,11 +44,10 @@ struct TemplateReference {
 
 /** Rung conditions = the "locking" side of a v4 output.
  *  Stored in scriptPubKey with the same wire format as a LadderWitness
- *  but containing only condition data types (PUBKEY_COMMIT, HASH256,
- *  HASH160, NUMERIC, SCHEME, SPEND_INDEX) — never PUBKEY, SIGNATURE,
- *  or PREIMAGE. Raw public keys are witness-only; conditions use
- *  PUBKEY_COMMIT (SHA-256 of the key) to prevent arbitrary data
- *  embedding in the UTXO set.
+ *  but containing only condition data types (HASH256, HASH160, NUMERIC,
+ *  SCHEME, SPEND_INDEX) — never PUBKEY, PUBKEY_COMMIT, SIGNATURE,
+ *  or PREIMAGE. Public keys are folded into the Merkle leaf hash
+ *  (merkle_pub_key) to prevent arbitrary data embedding.
  *
  *  When template_ref is set, n_rungs was 0 on the wire — conditions
  *  are inherited from the referenced input with diffs applied.
@@ -98,7 +97,8 @@ inline bool IsConditionFieldType(RungDataType type) { return IsConditionDataType
 // MLSC (Merkelized Ladder Script Conditions)
 // ============================================================================
 
-/** Check if scriptPubKey starts with the MLSC prefix (0xC2 + 32-byte root). */
+/** Check if scriptPubKey is an MLSC output (0xC2 + 32-byte root + optional DATA_RETURN payload).
+ *  Valid sizes: 33 bytes (standard) or 34-113 bytes (with DATA_RETURN, max 80 bytes data). */
 bool IsMLSCScript(const CScript& scriptPubKey);
 
 /** Check if scriptPubKey is either inline rung conditions (0xC1) or MLSC (0xC2). */
@@ -107,17 +107,32 @@ bool IsLadderScript(const CScript& scriptPubKey);
 /** Extract the 32-byte conditions root from an MLSC scriptPubKey. */
 bool GetMLSCRoot(const CScript& scriptPubKey, uint256& root_out);
 
+/** Extract the DATA_RETURN payload from an MLSC scriptPubKey (bytes after the root).
+ *  Returns empty vector if no data is appended (standard 33-byte MLSC). */
+std::vector<uint8_t> GetMLSCData(const CScript& scriptPubKey);
+
+/** Check if an MLSC scriptPubKey has a DATA_RETURN payload appended. */
+bool HasMLSCData(const CScript& scriptPubKey);
+
 /** Create an MLSC scriptPubKey: 0xC2 + conditions_root. */
 CScript CreateMLSCScript(const uint256& conditions_root);
 
-/** Compute the SHA256 leaf hash for a single rung (blocks + relay_refs). */
-uint256 ComputeRungLeaf(const Rung& rung);
+/** Create an MLSC scriptPubKey with DATA_RETURN payload: 0xC2 + conditions_root + data.
+ *  Data must be 1-80 bytes. */
+CScript CreateMLSCScript(const uint256& conditions_root, const std::vector<uint8_t>& data);
+
+/** Compute the SHA256 leaf hash for a single rung (blocks + relay_refs + pubkeys).
+ *  merkle_pub_key: pubkeys are appended to the leaf in positional order,
+ *  walked left-to-right across key-consuming blocks using PubkeyCountForBlock(). */
+uint256 ComputeRungLeaf(const Rung& rung,
+                         const std::vector<std::vector<uint8_t>>& pubkeys = {});
 
 /** Compute the SHA256 leaf hash for coil metadata. */
 uint256 ComputeCoilLeaf(const RungCoil& coil);
 
-/** Compute the SHA256 leaf hash for a relay (blocks + relay_refs). */
-uint256 ComputeRelayLeaf(const Relay& relay);
+/** Compute the SHA256 leaf hash for a relay (blocks + relay_refs + pubkeys). */
+uint256 ComputeRelayLeaf(const Relay& relay,
+                          const std::vector<std::vector<uint8_t>>& pubkeys = {});
 
 /** Build a binary Merkle tree from an arbitrary set of leaves.
  *  Pads to next power of 2 with MLSC_EMPTY_LEAF.
@@ -126,8 +141,12 @@ uint256 ComputeRelayLeaf(const Relay& relay);
 uint256 BuildMerkleTree(std::vector<uint256> leaves);
 
 /** Compute the MLSC conditions root for a complete set of conditions.
- *  Leaf order: [rung_leaf[0], ..., rung_leaf[N-1], relay_leaf[0], ..., relay_leaf[M-1], coil_leaf]. */
-uint256 ComputeConditionsRoot(const RungConditions& conditions);
+ *  Leaf order: [rung_leaf[0], ..., rung_leaf[N-1], relay_leaf[0], ..., relay_leaf[M-1], coil_leaf].
+ *  @param rung_pubkeys   Per-rung pubkey lists (outer index = rung index)
+ *  @param relay_pubkeys  Per-relay pubkey lists (outer index = relay index) */
+uint256 ComputeConditionsRoot(const RungConditions& conditions,
+                               const std::vector<std::vector<std::vector<uint8_t>>>& rung_pubkeys = {},
+                               const std::vector<std::vector<std::vector<uint8_t>>>& relay_pubkeys = {});
 
 /** MLSC spending proof — revealed conditions + Merkle proof hashes.
  *  Carried in witness stack[1] when spending an MLSC (0xC2) output. */
@@ -152,11 +171,15 @@ std::vector<uint8_t> SerializeMLSCProof(const MLSCProof& proof);
  *  @param[in]  proof           The deserialized MLSC proof
  *  @param[in]  coil            The coil from the spending witness (always revealed)
  *  @param[in]  expected_root   The conditions_root from the UTXO
+ *  @param[in]  rung_pubkeys    Pubkeys for the revealed rung (from witness, bound by Merkle proof)
+ *  @param[in]  relay_pubkeys   Per-relay pubkey lists for revealed relays
  *  @param[out] error           Error message on failure
  *  @return true if the Merkle proof verifies correctly. */
 bool VerifyMLSCProof(const MLSCProof& proof,
                      const RungCoil& coil,
                      const uint256& expected_root,
+                     const std::vector<std::vector<uint8_t>>& rung_pubkeys,
+                     const std::vector<std::vector<std::vector<uint8_t>>>& relay_pubkeys,
                      std::string& error);
 
 } // namespace rung

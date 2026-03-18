@@ -107,52 +107,24 @@ static int64_t ReadNumeric(const RungField& field)
     return static_cast<int64_t>(val);
 }
 
-/** Helper: check if a pubkey field exists and has valid size.
- *  Accepts either raw PUBKEY (witness) or PUBKEY_COMMIT (conditions). */
+/** Helper: check if a block has at least `count` PUBKEY fields.
+ *  merkle_pub_key: pubkeys are in the witness, bound by Merkle proof. */
 static bool HasRequiredPubkeys(const RungBlock& block, size_t count)
 {
     auto pks = FindAllFields(block, RungDataType::PUBKEY);
-    auto commits = FindAllFields(block, RungDataType::PUBKEY_COMMIT);
-    return (pks.size() + commits.size()) >= count;
+    return pks.size() >= count;
 }
 
-/** Verify all PUBKEY_COMMIT fields in a block match corresponding PUBKEY fields.
- *  Returns the resolved PUBKEY fields (in commit order) on success, or empty on failure.
- *  Each PUBKEY_COMMIT must have exactly one matching PUBKEY where SHA256(PUBKEY) == PUBKEY_COMMIT. */
+/** Return PUBKEY fields from the block.
+ *  merkle_pub_key: PUBKEY_COMMIT removed from conditions. Pubkeys are in the
+ *  witness (PUBKEY fields), bound to the Merkle leaf at fund time. */
 static std::vector<const RungField*> ResolvePubkeyCommitments(const RungBlock& block)
 {
-    auto commits = FindAllFields(block, RungDataType::PUBKEY_COMMIT);
-    auto pubkeys = FindAllFields(block, RungDataType::PUBKEY);
-
-    if (commits.empty()) {
-        // No commits — return raw pubkeys (backward compat / bootstrap)
-        return pubkeys;
-    }
-
-    std::vector<const RungField*> resolved;
-    std::vector<bool> pk_used(pubkeys.size(), false);
-
-    for (const auto* commit : commits) {
-        if (commit->data.size() != 32) return {};
-
-        for (size_t i = 0; i < pubkeys.size(); ++i) {
-            if (pk_used[i]) continue;
-            unsigned char hash[CSHA256::OUTPUT_SIZE];
-            CSHA256().Write(pubkeys[i]->data.data(), pubkeys[i]->data.size()).Finalize(hash);
-            if (memcmp(hash, commit->data.data(), 32) == 0) {
-                resolved.push_back(pubkeys[i]);
-                pk_used[i] = true;
-                break;
-            }
-        }
-        // Unmatched commits are OK for threshold multisig (M-of-N: only M pubkeys revealed)
-    }
-
-    return resolved;
+    return FindAllFields(block, RungDataType::PUBKEY);
 }
 
 /** Helper: compare two RungBlocks for structural equality (same type, same condition fields).
- *  Only compares condition data types (PUBKEY_COMMIT, HASH256, HASH160, NUMERIC, SCHEME),
+ *  Only compares condition data types (HASH256, HASH160, NUMERIC, SCHEME),
  *  skips witness types (PUBKEY, SIGNATURE, PREIMAGE). */
 static bool BlockConditionsEqual(const RungBlock& a, const RungBlock& b)
 {
@@ -254,25 +226,11 @@ EvalResult EvalSigBlock(const RungBlock& block,
                         SigVersion sigversion,
                         ScriptExecutionData& execdata)
 {
-    const RungField* pubkey_commit = FindField(block, RungDataType::PUBKEY_COMMIT);
+    // merkle_pub_key: PUBKEY_COMMIT no longer in conditions. The pubkey is
+    // in the witness (PUBKEY field). Merkle proof verification guarantees
+    // this pubkey matches what was committed at fund time.
     const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
-
-    // PUBKEY_COMMIT: commitment without revealed pubkey is an error
-    if (pubkey_commit && !pubkey_field) {
-        return EvalResult::ERROR;
-    }
-
-    // If PUBKEY_COMMIT present, verify the revealed PUBKEY matches the commitment
-    if (pubkey_commit && pubkey_field) {
-        unsigned char hash[CSHA256::OUTPUT_SIZE];
-        CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(hash);
-        if (pubkey_commit->data.size() != 32 ||
-            memcmp(hash, pubkey_commit->data.data(), 32) != 0) {
-            return EvalResult::UNSATISFIED;
-        }
-        // Commitment verified — proceed with pubkey_field for signature check
-    }
 
     if (!pubkey_field || !sig_field) {
         return EvalResult::ERROR;
@@ -349,8 +307,9 @@ EvalResult EvalMultisigBlock(const RungBlock& block,
                              SigVersion sigversion,
                              ScriptExecutionData& execdata)
 {
-    // Expected field layout: NUMERIC (threshold M), N x PUBKEY_COMMIT (conditions),
-    //                        N x PUBKEY (witness), M x SIGNATURE (witness)
+    // merkle_pub_key: PUBKEY_COMMIT removed. Layout: NUMERIC (threshold M),
+    //   N x PUBKEY (witness), M x SIGNATURE (witness).
+    //   Pubkeys bound to leaf via Merkle proof.
     const RungField* threshold_field = FindField(block, RungDataType::NUMERIC);
     if (!threshold_field || threshold_field->data.size() < 1) {
         return EvalResult::ERROR;
@@ -362,18 +321,11 @@ EvalResult EvalMultisigBlock(const RungBlock& block,
     }
     uint32_t threshold = static_cast<uint32_t>(threshold_val);
 
-    // Resolve pubkey commitments: verify each PUBKEY_COMMIT matches a witness PUBKEY
-    auto commits = FindAllFields(block, RungDataType::PUBKEY_COMMIT);
-    auto pubkeys = ResolvePubkeyCommitments(block);
+    auto pubkeys = FindAllFields(block, RungDataType::PUBKEY);
     auto sigs = FindAllFields(block, RungDataType::SIGNATURE);
 
     if (pubkeys.empty() || threshold > pubkeys.size()) {
         return EvalResult::ERROR;
-    }
-    // Every revealed witness PUBKEY must match a PUBKEY_COMMIT (no unbound pubkeys)
-    auto witness_pubkeys = FindAllFields(block, RungDataType::PUBKEY);
-    if (!commits.empty() && pubkeys.size() != witness_pubkeys.size()) {
-        return EvalResult::UNSATISFIED; // Some witness pubkeys don't match any commit
     }
     if (sigs.size() < threshold) {
         return EvalResult::UNSATISFIED;
@@ -595,26 +547,15 @@ EvalResult EvalMusigThresholdBlock(const RungBlock& block,
                                     ScriptExecutionData& execdata)
 {
     // MuSig2/FROST aggregate threshold signature verification.
-    // Conditions: PUBKEY_COMMIT(aggregate_key), NUMERIC(M), NUMERIC(N)
-    // Witness: PUBKEY(aggregate_key), SIGNATURE(aggregate_sig)
+    // merkle_pub_key: PUBKEY in witness, bound by Merkle proof.
+    // Fields: PUBKEY(aggregate_key), SIGNATURE(aggregate_sig), NUMERIC(M), NUMERIC(N)
     // On-chain this looks identical to single-sig — one key, one signature.
     // The FROST/MuSig2 ceremony is entirely off-chain.
-    const RungField* pubkey_commit = FindField(block, RungDataType::PUBKEY_COMMIT);
     const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
 
     if (!pubkey_field || !sig_field) {
         return EvalResult::ERROR;
-    }
-
-    // Verify aggregate pubkey matches commitment (if present)
-    if (pubkey_commit) {
-        unsigned char hash[CSHA256::OUTPUT_SIZE];
-        CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(hash);
-        if (pubkey_commit->data.size() != 32 ||
-            memcmp(hash, pubkey_commit->data.data(), 32) != 0) {
-            return EvalResult::UNSATISFIED;
-        }
     }
 
     // Validate M and N policy fields (if present)
@@ -654,10 +595,9 @@ EvalResult EvalAdaptorSigBlock(const RungBlock& block,
                                 ScriptExecutionData& execdata)
 {
     // Adaptor signature verification:
-    // Conditions: PUBKEY_COMMIT(signing_key), PUBKEY_COMMIT(adaptor_point)
-    // Witness: PUBKEY(signing_key), SIGNATURE(adapted)
-    // The adaptor point is committed in conditions but not revealed in witness —
-    // the adaptor secret is applied off-chain to produce the full adapted signature.
+    // merkle_pub_key: PUBKEYs in witness, bound by Merkle proof.
+    // Fields: PUBKEY(signing_key), SIGNATURE(adapted)
+    // The adaptor secret is applied off-chain to produce the full adapted signature.
     auto pubkeys = ResolvePubkeyCommitments(block);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
 
@@ -838,14 +778,15 @@ EvalResult EvalVaultLockBlock(const RungBlock& block,
     // Two-path vault:
     // - recovery_key sig → SATISFIED immediately (cold sweep)
     // - hot_key sig → check CSV hot_delay elapsed
-    // Conditions: PUBKEY_COMMIT(recovery), PUBKEY_COMMIT(hot), NUMERIC(delay)
-    // Witness: PUBKEY(signer), SIGNATURE — only the key being used is revealed
-    auto commits = FindAllFields(block, RungDataType::PUBKEY_COMMIT);
+    // merkle_pub_key: PUBKEYs in witness, bound by Merkle proof.
+    // Fields: PUBKEY(recovery), PUBKEY(hot), NUMERIC(delay), SIGNATURE
+    // The first PUBKEY is recovery, second is hot. Only the signing key's
+    // signature is provided. We try both keys.
     auto witness_pks = FindAllFields(block, RungDataType::PUBKEY);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
     const RungField* delay_field = FindField(block, RungDataType::NUMERIC);
 
-    if (commits.size() < 2 || witness_pks.size() < 1 || !sig_field || !delay_field) {
+    if (witness_pks.size() < 2 || !sig_field || !delay_field) {
         return EvalResult::ERROR;
     }
 
@@ -858,43 +799,32 @@ EvalResult EvalVaultLockBlock(const RungBlock& block,
         return EvalResult::ERROR;
     }
 
-    // Determine which PUBKEY_COMMIT the witness pubkey matches
-    const RungField* provided_pk = witness_pks[0];
-    unsigned char pk_hash[CSHA256::OUTPUT_SIZE];
-    CSHA256().Write(provided_pk->data.data(), provided_pk->data.size()).Finalize(pk_hash);
-
-    bool is_recovery = (commits[0]->data.size() == 32 &&
-                        memcmp(pk_hash, commits[0]->data.data(), 32) == 0);
-    bool is_hot = (commits[1]->data.size() == 32 &&
-                   memcmp(pk_hash, commits[1]->data.data(), 32) == 0);
-
-    if (!is_recovery && !is_hot) {
-        return EvalResult::ERROR; // unknown key
-    }
-
-    // Verify signature against the provided pubkey
+    // Try recovery key (first PUBKEY) then hot key (second PUBKEY)
     std::span<const unsigned char> sig_span{sig_field->data.data(), sig_field->data.size()};
-    std::vector<unsigned char> xonly;
-    std::span<const unsigned char> pk_span{provided_pk->data.data(), provided_pk->data.size()};
-    if (provided_pk->data.size() == 33) {
-        xonly.assign(provided_pk->data.begin() + 1, provided_pk->data.end());
-        pk_span = std::span<const unsigned char>{xonly.data(), xonly.size()};
+
+    for (size_t ki = 0; ki < 2; ++ki) {
+        const RungField* pk = witness_pks[ki];
+        std::vector<unsigned char> xonly;
+        std::span<const unsigned char> pk_span{pk->data.data(), pk->data.size()};
+        if (pk->data.size() == 33) {
+            xonly.assign(pk->data.begin() + 1, pk->data.end());
+            pk_span = std::span<const unsigned char>{xonly.data(), xonly.size()};
+        }
+
+        if (checker.CheckSchnorrSignature(sig_span, pk_span, sigversion, execdata, nullptr)) {
+            if (ki == 0) {
+                return EvalResult::SATISFIED; // recovery key — cold sweep, no delay
+            }
+            // Hot key — check CSV delay
+            CScriptNum nSequence(hot_delay);
+            if (!checker.CheckSequence(nSequence)) {
+                return EvalResult::UNSATISFIED; // delay not met
+            }
+            return EvalResult::SATISFIED;
+        }
     }
 
-    if (!checker.CheckSchnorrSignature(sig_span, pk_span, sigversion, execdata, nullptr)) {
-        return EvalResult::UNSATISFIED;
-    }
-
-    if (is_recovery) {
-        return EvalResult::SATISFIED; // cold sweep — no delay
-    }
-
-    // Hot key — check CSV delay
-    CScriptNum nSequence(hot_delay);
-    if (!checker.CheckSequence(nSequence)) {
-        return EvalResult::UNSATISFIED; // delay not met
-    }
-    return EvalResult::SATISFIED;
+    return EvalResult::UNSATISFIED; // neither key verified
 }
 
 EvalResult EvalAmountLockBlock(const RungBlock& block, const RungEvalContext& ctx)
@@ -1608,23 +1538,15 @@ EvalResult EvalTimelockedSigBlock(const RungBlock& block,
                                    ScriptExecutionData& execdata)
 {
     // TIMELOCKED_SIG = SIG + CSV in one block
-    // Fields: PUBKEY_COMMIT (conditions), PUBKEY (witness), SIGNATURE (witness), NUMERIC (timelock blocks)
+    // merkle_pub_key: PUBKEY in witness, bound by Merkle proof.
+    // Fields: PUBKEY (witness), SIGNATURE (witness), NUMERIC (timelock blocks)
     // Optional: SCHEME field for PQ routing
 
     // 1. Verify signature (same logic as EvalSigBlock)
-    const RungField* pubkey_commit = FindField(block, RungDataType::PUBKEY_COMMIT);
     const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
     const RungField* numeric_field = FindField(block, RungDataType::NUMERIC);
 
-    if (pubkey_commit && !pubkey_field) return EvalResult::ERROR;
-    if (pubkey_commit && pubkey_field) {
-        unsigned char hash[CSHA256::OUTPUT_SIZE];
-        CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(hash);
-        if (pubkey_commit->data.size() != 32 || memcmp(hash, pubkey_commit->data.data(), 32) != 0) {
-            return EvalResult::UNSATISFIED;
-        }
-    }
     if (!pubkey_field || !sig_field || !numeric_field) return EvalResult::ERROR;
 
     // Check for PQ scheme
@@ -1680,8 +1602,9 @@ EvalResult EvalHTLCBlock(const RungBlock& block,
                           ScriptExecutionData& execdata)
 {
     // HTLC = HASH_PREIMAGE + CSV + SIG in one block
+    // merkle_pub_key: PUBKEY in witness, bound by Merkle proof.
     // Fields: HASH256 (conditions), PREIMAGE (witness), NUMERIC (timelock),
-    //         PUBKEY_COMMIT (conditions), PUBKEY (witness), SIGNATURE (witness)
+    //         PUBKEY (witness), SIGNATURE (witness)
 
     // 1. Verify hash preimage
     const RungField* hash_field = FindField(block, RungDataType::HASH256);
@@ -1706,18 +1629,9 @@ EvalResult EvalHTLCBlock(const RungBlock& block,
     }
 
     // 3. Verify signature
-    const RungField* pubkey_commit = FindField(block, RungDataType::PUBKEY_COMMIT);
     const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
 
-    if (pubkey_commit && !pubkey_field) return EvalResult::ERROR;
-    if (pubkey_commit && pubkey_field) {
-        unsigned char pk_hash[CSHA256::OUTPUT_SIZE];
-        CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(pk_hash);
-        if (pubkey_commit->data.size() != 32 || memcmp(pk_hash, pubkey_commit->data.data(), 32) != 0) {
-            return EvalResult::UNSATISFIED;
-        }
-    }
     if (!pubkey_field || !sig_field) return EvalResult::ERROR;
 
     std::span<const unsigned char> sig_span{sig_field->data.data(), sig_field->data.size()};
@@ -1752,8 +1666,9 @@ EvalResult EvalHashSigBlock(const RungBlock& block,
                              ScriptExecutionData& execdata)
 {
     // HASH_SIG = HASH_PREIMAGE + SIG in one block
+    // merkle_pub_key: PUBKEY in witness, bound by Merkle proof.
     // Fields: HASH256 (conditions), PREIMAGE (witness),
-    //         PUBKEY_COMMIT (conditions), PUBKEY (witness), SIGNATURE (witness)
+    //         PUBKEY (witness), SIGNATURE (witness)
 
     // 1. Verify hash preimage
     const RungField* hash_field = FindField(block, RungDataType::HASH256);
@@ -1768,18 +1683,9 @@ EvalResult EvalHashSigBlock(const RungBlock& block,
     }
 
     // 2. Verify signature
-    const RungField* pubkey_commit = FindField(block, RungDataType::PUBKEY_COMMIT);
     const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
 
-    if (pubkey_commit && !pubkey_field) return EvalResult::ERROR;
-    if (pubkey_commit && pubkey_field) {
-        unsigned char pk_hash[CSHA256::OUTPUT_SIZE];
-        CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(pk_hash);
-        if (pubkey_commit->data.size() != 32 || memcmp(pk_hash, pubkey_commit->data.data(), 32) != 0) {
-            return EvalResult::UNSATISFIED;
-        }
-    }
     if (!pubkey_field || !sig_field) return EvalResult::ERROR;
 
     std::span<const unsigned char> sig_span{sig_field->data.data(), sig_field->data.size()};
@@ -1814,9 +1720,9 @@ EvalResult EvalPTLCBlock(const RungBlock& block,
                           ScriptExecutionData& execdata)
 {
     // PTLC = ADAPTOR_SIG + CSV in one block
-    // Conditions: PUBKEY_COMMIT(signing_key), PUBKEY_COMMIT(adaptor_point), NUMERIC(CSV)
-    // Witness: PUBKEY(signing_key), SIGNATURE(adapted)
-    // Adaptor point committed but not revealed — adaptor secret applied off-chain.
+    // merkle_pub_key: PUBKEYs in witness, bound by Merkle proof.
+    // Fields: PUBKEY(signing_key), SIGNATURE(adapted), NUMERIC(CSV)
+    // Adaptor secret applied off-chain.
 
     // 1. Verify adaptor signature (same logic as EvalAdaptorSigBlock)
     auto pubkeys = ResolvePubkeyCommitments(block);
@@ -1862,23 +1768,15 @@ EvalResult EvalCLTVSigBlock(const RungBlock& block,
                               ScriptExecutionData& execdata)
 {
     // CLTV_SIG = SIG + CLTV in one block
-    // Fields: PUBKEY_COMMIT (conditions), PUBKEY (witness), SIGNATURE (witness), NUMERIC (CLTV height)
+    // merkle_pub_key: PUBKEY in witness, bound by Merkle proof.
+    // Fields: PUBKEY (witness), SIGNATURE (witness), NUMERIC (CLTV height)
     // Optional: SCHEME field for PQ routing
 
     // 1. Verify signature (same logic as EvalSigBlock / EvalTimelockedSigBlock)
-    const RungField* pubkey_commit = FindField(block, RungDataType::PUBKEY_COMMIT);
     const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
     const RungField* numeric_field = FindField(block, RungDataType::NUMERIC);
 
-    if (pubkey_commit && !pubkey_field) return EvalResult::ERROR;
-    if (pubkey_commit && pubkey_field) {
-        unsigned char hash[CSHA256::OUTPUT_SIZE];
-        CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(hash);
-        if (pubkey_commit->data.size() != 32 || memcmp(hash, pubkey_commit->data.data(), 32) != 0) {
-            return EvalResult::UNSATISFIED;
-        }
-    }
     if (!pubkey_field || !sig_field || !numeric_field) return EvalResult::ERROR;
 
     // Check for PQ scheme
@@ -1933,8 +1831,9 @@ EvalResult EvalTimelockedMultisigBlock(const RungBlock& block,
                                         ScriptExecutionData& execdata)
 {
     // TIMELOCKED_MULTISIG = MULTISIG + CSV in one block
-    // Fields: NUMERIC[0] (threshold M), N x PUBKEY_COMMIT (conditions),
-    //         N x PUBKEY (witness), M x SIGNATURE (witness), NUMERIC[1] (CSV timelock)
+    // merkle_pub_key: PUBKEYs in witness, bound by Merkle proof.
+    // Fields: NUMERIC[0] (threshold M), N x PUBKEY (witness),
+    //         M x SIGNATURE (witness), NUMERIC[1] (CSV timelock)
 
     // 1. Verify multisig (same logic as EvalMultisigBlock)
     auto numerics = FindAllFields(block, RungDataType::NUMERIC);
@@ -2202,15 +2101,15 @@ EvalResult EvalAccumulatorBlock(const RungBlock& block)
 // KEY_REF_SIG evaluator
 // ============================================================================
 
-/** Evaluate a KEY_REF_SIG block: verify a signature using PUBKEY_COMMIT + SCHEME
+/** Evaluate a KEY_REF_SIG block: verify a signature using PUBKEY + SCHEME
  *  resolved from a relay block.
  *
  *  Conditions fields: NUMERIC(relay_index) + NUMERIC(block_index)
- *  Witness fields:    PUBKEY + SIGNATURE
+ *  Witness fields:    SIGNATURE
  *
  *  The referenced relay must be in the rung's relay_refs. The target block
- *  must contain PUBKEY_COMMIT (and optionally SCHEME). The witness PUBKEY is
- *  verified against the commitment, then the signature is checked. */
+ *  must contain PUBKEY (bound by Merkle proof, and optionally SCHEME).
+ *  The signature is checked against the relay's PUBKEY. */
 EvalResult EvalKeyRefSigBlock(const RungBlock& block,
                                const BaseSignatureChecker& checker,
                                SigVersion sigversion,
@@ -2246,9 +2145,9 @@ EvalResult EvalKeyRefSigBlock(const RungBlock& block,
     if (block_idx >= target_relay.blocks.size()) return EvalResult::ERROR;
     const RungBlock& target_block = target_relay.blocks[block_idx];
 
-    // Extract PUBKEY_COMMIT from target block
-    const RungField* target_commit = FindField(target_block, RungDataType::PUBKEY_COMMIT);
-    if (!target_commit || target_commit->data.size() != 32) return EvalResult::ERROR;
+    // merkle_pub_key: resolve PUBKEY from target relay block (bound by Merkle proof)
+    const RungField* pubkey_field = FindField(target_block, RungDataType::PUBKEY);
+    if (!pubkey_field) return EvalResult::ERROR;
 
     // Extract SCHEME from target block (optional — defaults to Schnorr)
     RungScheme scheme = RungScheme::SCHNORR;
@@ -2257,17 +2156,9 @@ EvalResult EvalKeyRefSigBlock(const RungBlock& block,
         scheme = static_cast<RungScheme>(target_scheme->data[0]);
     }
 
-    // Extract witness PUBKEY + SIGNATURE from this block
-    const RungField* pubkey_field = FindField(block, RungDataType::PUBKEY);
+    // Extract witness SIGNATURE from this block
     const RungField* sig_field = FindField(block, RungDataType::SIGNATURE);
-    if (!pubkey_field || !sig_field) return EvalResult::ERROR;
-
-    // Verify PUBKEY matches the target's PUBKEY_COMMIT
-    unsigned char hash[CSHA256::OUTPUT_SIZE];
-    CSHA256().Write(pubkey_field->data.data(), pubkey_field->data.size()).Finalize(hash);
-    if (memcmp(hash, target_commit->data.data(), 32) != 0) {
-        return EvalResult::UNSATISFIED;
-    }
+    if (!sig_field) return EvalResult::ERROR;
 
     // Verify signature using the resolved scheme
     if (IsPQScheme(scheme)) {
@@ -2308,9 +2199,9 @@ EvalResult EvalKeyRefSigBlock(const RungBlock& block,
 // Shared signature verification helper
 // ============================================================================
 
-/** Verify a signature using PUBKEY_COMMIT check + SCHEME routing + sig dispatch.
- *  Shared by SIG-like evaluators (EvalSigBlock, P2PKH, TIMELOCKED_SIG, etc.).
- *  Assumes pubkey_field and sig_field are non-null and PUBKEY_COMMIT already verified. */
+/** Verify a signature using SCHEME routing + sig dispatch.
+ *  Shared by SIG-like evaluators (P2PKH, P2WPKH, etc.).
+ *  Assumes pubkey_field and sig_field are non-null. */
 static EvalResult VerifySigFromFields(const RungField& pubkey_field,
                                        const RungField& sig_field,
                                        const RungField* scheme_field,
@@ -2387,7 +2278,7 @@ static EvalResult EvalInnerConditions(const std::vector<uint8_t>& preimage_data,
         return EvalResult::ERROR;
     }
 
-    // Collect witness fields from outer block (everything except HASH160/HASH256/PUBKEY_COMMIT/PREIMAGE)
+    // Collect witness fields from outer block (everything except HASH160/HASH256/PREIMAGE)
     // These become the witness fields for the inner conditions' blocks
     std::vector<const RungField*> witness_fields;
     for (const auto& field : outer_block.fields) {
@@ -2425,7 +2316,7 @@ static EvalResult EvalInnerConditions(const std::vector<uint8_t>& preimage_data,
                 }
             }
 
-            EvalResult result = EvalBlock(combined, checker, sigversion, execdata, ctx);
+            EvalResult result = EvalBlock(combined, checker, sigversion, execdata, ctx, depth);
             if (result != EvalResult::SATISFIED) {
                 all_satisfied = false;
                 break;
@@ -2497,7 +2388,8 @@ EvalResult EvalP2SHLegacyBlock(const RungBlock& block,
                                 const BaseSignatureChecker& checker,
                                 SigVersion sigversion,
                                 ScriptExecutionData& execdata,
-                                const RungEvalContext& ctx)
+                                const RungEvalContext& ctx,
+                                int depth)
 {
     // P2SH_LEGACY: HASH160(inner_conditions) == committed hash, then eval inner
     const RungField* hash160_field = FindField(block, RungDataType::HASH160);
@@ -2519,14 +2411,15 @@ EvalResult EvalP2SHLegacyBlock(const RungBlock& block,
     }
 
     // Deserialize and evaluate inner conditions
-    return EvalInnerConditions(preimage_field->data, block, checker, sigversion, execdata, ctx, 1);
+    return EvalInnerConditions(preimage_field->data, block, checker, sigversion, execdata, ctx, depth + 1);
 }
 
 EvalResult EvalP2WSHLegacyBlock(const RungBlock& block,
                                  const BaseSignatureChecker& checker,
                                  SigVersion sigversion,
                                  ScriptExecutionData& execdata,
-                                 const RungEvalContext& ctx)
+                                 const RungEvalContext& ctx,
+                                 int depth)
 {
     // P2WSH_LEGACY: SHA256(inner_conditions) == committed hash, then eval inner
     const RungField* hash256_field = FindField(block, RungDataType::HASH256);
@@ -2548,29 +2441,29 @@ EvalResult EvalP2WSHLegacyBlock(const RungBlock& block,
     }
 
     // Deserialize and evaluate inner conditions
-    return EvalInnerConditions(preimage_field->data, block, checker, sigversion, execdata, ctx, 1);
+    return EvalInnerConditions(preimage_field->data, block, checker, sigversion, execdata, ctx, depth + 1);
 }
 
 EvalResult EvalP2TRScriptLegacyBlock(const RungBlock& block,
                                       const BaseSignatureChecker& checker,
                                       SigVersion sigversion,
                                       ScriptExecutionData& execdata,
-                                      const RungEvalContext& ctx)
+                                      const RungEvalContext& ctx,
+                                      int depth)
 {
     // P2TR_SCRIPT_LEGACY: script-path spend
-    // Conditions: HASH256 (Merkle root of script tree) + PUBKEY_COMMIT (internal key)
-    // Witness: PREIMAGE (revealed leaf = serialized Ladder Script conditions) + inner witness fields
+    // merkle_pub_key: internal key bound by Merkle proof (no longer in conditions).
+    // Fields: HASH256 (Merkle root of script tree), PREIMAGE (revealed leaf)
     // Verification: hash the revealed leaf, check it matches the Merkle root,
     //               then deserialize and evaluate inner conditions.
     const RungField* hash256_field = FindField(block, RungDataType::HASH256);
-    const RungField* pubkey_commit = FindField(block, RungDataType::PUBKEY_COMMIT);
     const RungField* preimage_field = FindField(block, RungDataType::PREIMAGE);
     if (!preimage_field) preimage_field = FindField(block, RungDataType::SCRIPT_BODY);
 
-    if (!hash256_field || !pubkey_commit || !preimage_field) {
+    if (!hash256_field || !preimage_field) {
         return EvalResult::ERROR;
     }
-    if (hash256_field->data.size() != 32 || pubkey_commit->data.size() != 32) {
+    if (hash256_field->data.size() != 32) {
         return EvalResult::ERROR;
     }
 
@@ -2583,7 +2476,7 @@ EvalResult EvalP2TRScriptLegacyBlock(const RungBlock& block,
     }
 
     // Deserialize and evaluate inner conditions
-    return EvalInnerConditions(preimage_field->data, block, checker, sigversion, execdata, ctx, 1);
+    return EvalInnerConditions(preimage_field->data, block, checker, sigversion, execdata, ctx, depth + 1);
 }
 
 // ============================================================================
@@ -2594,8 +2487,14 @@ EvalResult EvalBlock(const RungBlock& block,
                      const BaseSignatureChecker& checker,
                      SigVersion sigversion,
                      ScriptExecutionData& execdata,
-                     const RungEvalContext& ctx)
+                     const RungEvalContext& ctx,
+                     int depth)
 {
+    // Defense in depth: reject inverted key-consuming blocks
+    if (block.inverted && !IsInvertibleBlockType(block.type)) {
+        return EvalResult::ERROR;
+    }
+
     EvalResult raw;
     switch (block.type) {
     // Signature
@@ -2627,12 +2526,10 @@ EvalResult EvalBlock(const RungBlock& block,
     case RungBlockType::CLTV_TIME:
         raw = EvalCLTVTimeBlock(block, checker);
         break;
-    // Hash
+    // Hash (HASH_PREIMAGE/HASH160_PREIMAGE deprecated — use HTLC or HASH_SIG)
     case RungBlockType::HASH_PREIMAGE:
-        raw = EvalHashPreimageBlock(block);
-        break;
     case RungBlockType::HASH160_PREIMAGE:
-        raw = EvalHash160PreimageBlock(block);
+        raw = EvalResult::ERROR;
         break;
     case RungBlockType::TAGGED_HASH:
         raw = EvalTaggedHashBlock(block);
@@ -2774,19 +2671,19 @@ EvalResult EvalBlock(const RungBlock& block,
         raw = EvalP2PKHLegacyBlock(block, checker, sigversion, execdata);
         break;
     case RungBlockType::P2SH_LEGACY:
-        raw = EvalP2SHLegacyBlock(block, checker, sigversion, execdata, ctx);
+        raw = EvalP2SHLegacyBlock(block, checker, sigversion, execdata, ctx, depth);
         break;
     case RungBlockType::P2WPKH_LEGACY:
         raw = EvalP2WPKHLegacyBlock(block, checker, sigversion, execdata);
         break;
     case RungBlockType::P2WSH_LEGACY:
-        raw = EvalP2WSHLegacyBlock(block, checker, sigversion, execdata, ctx);
+        raw = EvalP2WSHLegacyBlock(block, checker, sigversion, execdata, ctx, depth);
         break;
     case RungBlockType::P2TR_LEGACY:
         raw = EvalP2TRLegacyBlock(block, checker, sigversion, execdata);
         break;
     case RungBlockType::P2TR_SCRIPT_LEGACY:
-        raw = EvalP2TRScriptLegacyBlock(block, checker, sigversion, execdata, ctx);
+        raw = EvalP2TRScriptLegacyBlock(block, checker, sigversion, execdata, ctx, depth);
         break;
     // Utility family
     case RungBlockType::DATA_RETURN:
@@ -2862,21 +2759,6 @@ EvalResult EvalRung(const Rung& rung,
                     const RungEvalContext& ctx,
                     const std::vector<EvalResult>* relay_results)
 {
-    // Compact rung: resolve to equivalent SIG block and evaluate
-    if (rung.IsCompact()) {
-        if (rung.compact->type == CompactRungType::COMPACT_SIG) {
-            // Build a SIG block from compact data
-            RungBlock resolved;
-            resolved.type = RungBlockType::SIG;
-            resolved.inverted = false;
-            resolved.fields.push_back({RungDataType::PUBKEY_COMMIT, rung.compact->pubkey_commit});
-            resolved.fields.push_back({RungDataType::SCHEME,
-                {static_cast<uint8_t>(rung.compact->scheme)}});
-            return EvalBlock(resolved, checker, sigversion, execdata, ctx);
-        }
-        return EvalResult::ERROR; // unknown compact type
-    }
-
     if (rung.blocks.empty()) {
         return EvalResult::ERROR;
     }
@@ -2957,46 +2839,7 @@ static bool MergeConditionsAndWitness(const RungConditions& conditions,
         const auto& cond_rung = conditions.rungs[r];
         const auto& wit_rung = witness.rungs[r];
 
-        // Compact conditions rung: resolve to SIG block with merged fields
-        if (cond_rung.IsCompact()) {
-            if (cond_rung.compact->type == CompactRungType::COMPACT_SIG) {
-                // Witness must provide exactly 1 SIG block with PUBKEY + SIGNATURE
-                if (wit_rung.blocks.size() != 1) {
-                    error = "compact SIG rung " + std::to_string(r) +
-                            " witness must have exactly 1 block, got " +
-                            std::to_string(wit_rung.blocks.size());
-                    return false;
-                }
-                if (wit_rung.blocks[0].type != RungBlockType::SIG) {
-                    error = "compact SIG rung " + std::to_string(r) +
-                            " witness block must be SIG type";
-                    return false;
-                }
-
-                // Build merged SIG block: conditions fields (from compact) + witness fields
-                RungBlock merged_block;
-                merged_block.type = RungBlockType::SIG;
-                merged_block.inverted = false;
-                // Conditions fields: PUBKEY_COMMIT + SCHEME
-                merged_block.fields.push_back({RungDataType::PUBKEY_COMMIT,
-                    cond_rung.compact->pubkey_commit});
-                merged_block.fields.push_back({RungDataType::SCHEME,
-                    {static_cast<uint8_t>(cond_rung.compact->scheme)}});
-                // Witness fields: PUBKEY + SIGNATURE
-                merged_block.fields.insert(merged_block.fields.end(),
-                    wit_rung.blocks[0].fields.begin(),
-                    wit_rung.blocks[0].fields.end());
-
-                merged.rungs[r].blocks.push_back(std::move(merged_block));
-                merged.rungs[r].rung_id = cond_rung.rung_id;
-                // Compact rungs have no relay_refs
-            } else {
-                error = "unknown compact type in rung " + std::to_string(r);
-                return false;
-            }
-            continue;
-        }
-
+        // Compact rungs (COMPACT_SIG) removed — merkle_pub_key eliminates this path.
         if (cond_rung.blocks.size() != wit_rung.blocks.size()) {
             error = "block count mismatch in rung " + std::to_string(r);
             return false;
@@ -3165,18 +3008,6 @@ static bool ResolveWitnessReference(LadderWitness& witness,
     return true;
 }
 
-/** Check if a 0xC1 inline conditions script contains exactly one DATA_RETURN block
- *  and nothing else (single rung, single block, no relays). */
-static bool IsDataReturnOutput(const RungConditions& conds)
-{
-    if (conds.IsTemplateRef()) return false;
-    if (conds.rungs.size() != 1) return false;
-    if (conds.rungs[0].IsCompact()) return false;
-    if (conds.rungs[0].blocks.size() != 1) return false;
-    if (conds.rungs[0].blocks[0].type != RungBlockType::DATA_RETURN) return false;
-    if (!conds.relays.empty()) return false;
-    return true;
-}
 
 bool ValidateRungOutputs(const CTransaction& tx, unsigned int flags, std::string& error)
 {
@@ -3185,32 +3016,23 @@ bool ValidateRungOutputs(const CTransaction& tx, unsigned int flags, std::string
     for (size_t i = 0; i < tx.vout.size(); ++i) {
         const auto& spk = tx.vout[i].scriptPubKey;
 
-        // MLSC output: 0xC2 + 32 bytes — always valid
+        // MLSC output: 0xC2 + 32 bytes (+ optional DATA_RETURN payload)
         if (IsMLSCScript(spk)) {
-            continue;
-        }
-
-        // Inline conditions: 0xC1
-        if (IsRungConditionsScript(spk)) {
-            RungConditions conds;
-            std::string cond_error;
-            if (!DeserializeRungConditions(spk, conds, cond_error)) {
-                error = "output " + std::to_string(i) + ": invalid conditions: " + cond_error;
-                return false;
-            }
-
-            // DATA_RETURN output: allowed even on mainnet (this is the OP_RETURN replacement)
-            if (IsDataReturnOutput(conds)) {
+            // MLSC with DATA_RETURN payload (> 33 bytes)
+            if (HasMLSCData(spk)) {
                 data_return_count++;
                 // Must be zero-value (unspendable)
                 if (tx.vout[i].nValue != 0) {
                     error = "output " + std::to_string(i) + ": DATA_RETURN output must have zero value";
                     return false;
                 }
-                continue;
             }
+            continue;
+        }
 
-            // Non-DATA_RETURN 0xC1: rejected on mainnet
+        // Inline conditions: 0xC1
+        if (IsRungConditionsScript(spk)) {
+            // 0xC1 rejected on mainnet (no exceptions)
             if (flags & RUNG_VERIFY_MLSC_ONLY) {
                 error = "output " + std::to_string(i) + ": inline conditions (0xC1) rejected on mainnet";
                 return false;
@@ -3230,6 +3052,23 @@ bool ValidateRungOutputs(const CTransaction& tx, unsigned int flags, std::string
     }
 
     return true;
+}
+
+/** Extract pubkeys from witness blocks positionally (merkle_pub_key).
+ *  Walks blocks left-to-right, collecting PUBKEY fields based on
+ *  PubkeyCountForBlock() for each block type. */
+static std::vector<std::vector<uint8_t>> ExtractBlockPubkeys(const std::vector<RungBlock>& blocks)
+{
+    std::vector<std::vector<uint8_t>> pubkeys;
+    for (const auto& block : blocks) {
+        size_t count = PubkeyCountForBlock(block.type, block);
+        if (count == 0) continue;
+        auto pks = FindAllFields(block, RungDataType::PUBKEY);
+        for (size_t i = 0; i < count && i < pks.size(); ++i) {
+            pubkeys.push_back(pks[i]->data);
+        }
+    }
+    return pubkeys;
 }
 
 bool VerifyRungTx(const CTransaction& tx,
@@ -3320,9 +3159,24 @@ bool VerifyRungTx(const CTransaction& tx,
             return false;
         }
 
-        // Verify Merkle proof using revealed conditions + coil from witness
+        // Extract pubkeys from witness for merkle_pub_key leaf computation
+        std::vector<std::vector<uint8_t>> rung_pks;
+        if (!witness_ladder.rungs.empty()) {
+            rung_pks = ExtractBlockPubkeys(witness_ladder.rungs[0].blocks);
+        }
+        std::vector<std::vector<std::vector<uint8_t>>> relay_pks;
+        for (const auto& [relay_idx, relay] : mlsc_proof.revealed_relays) {
+            // Find the corresponding witness relay to extract pubkeys
+            if (relay_idx < witness_ladder.relays.size()) {
+                relay_pks.push_back(ExtractBlockPubkeys(witness_ladder.relays[relay_idx].blocks));
+            } else {
+                relay_pks.push_back({});
+            }
+        }
+
+        // Verify Merkle proof using revealed conditions + coil + pubkeys from witness
         std::string verify_error;
-        if (!VerifyMLSCProof(mlsc_proof, witness_ladder.coil, conditions_root, verify_error)) {
+        if (!VerifyMLSCProof(mlsc_proof, witness_ladder.coil, conditions_root, rung_pks, relay_pks, verify_error)) {
             if (serror) *serror = SCRIPT_ERR_UNKNOWN_ERROR;
             return false;
         }

@@ -23,8 +23,7 @@ bool IsBaseBlockType(uint16_t block_type)
     case RungBlockType::CSV_TIME:
     case RungBlockType::CLTV:
     case RungBlockType::CLTV_TIME:
-    case RungBlockType::HASH_PREIMAGE:
-    case RungBlockType::HASH160_PREIMAGE:
+    // HASH_PREIMAGE/HASH160_PREIMAGE: deprecated (removed from IsBaseBlockType)
     case RungBlockType::TAGGED_HASH:
     // Compound family (collapsed multi-block patterns)
     case RungBlockType::TIMELOCKED_SIG:
@@ -117,7 +116,7 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
                 return false;
             }
         }
-        // MLSC outputs (0xC2 + 32-byte root) are always standard
+        // MLSC outputs (0xC2 + 32-byte root + optional DATA_RETURN payload) are always standard
         if (IsMLSCScript(scriptPubKey)) {
             continue;
         }
@@ -152,29 +151,6 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
         }
 
         for (const auto& rung : ladder.rungs) {
-            // Compact rungs: validate compact data, skip block iteration
-            if (rung.IsCompact()) {
-                if (!IsKnownCompactRungType(static_cast<uint8_t>(rung.compact->type))) {
-                    reason = "rung-unknown-compact-type";
-                    return false;
-                }
-                if (rung.compact->type == CompactRungType::COMPACT_SIG) {
-                    if (rung.compact->pubkey_commit.size() != 32) {
-                        reason = "rung-compact-sig-bad-commit-size";
-                        return false;
-                    }
-                    if (!IsKnownScheme(static_cast<uint8_t>(rung.compact->scheme))) {
-                        reason = "rung-compact-sig-unknown-scheme";
-                        return false;
-                    }
-                }
-                if (!rung.relay_refs.empty()) {
-                    reason = "rung-compact-has-relay-refs";
-                    return false;
-                }
-                continue;
-            }
-
             if (rung.blocks.size() > MAX_BLOCKS_PER_RUNG) {
                 reason = "rung-too-many-blocks";
                 return false;
@@ -184,6 +160,19 @@ bool IsStandardRungTx(const CTransaction& tx, std::string& reason)
                 uint16_t btype = static_cast<uint16_t>(block.type);
                 if (!IsKnownBlockType(btype)) {
                     reason = "rung-unknown-block-type: " + BlockTypeName(block.type);
+                    return false;
+                }
+
+                // Reject deprecated block types
+                if (block.type == RungBlockType::HASH_PREIMAGE ||
+                    block.type == RungBlockType::HASH160_PREIMAGE) {
+                    reason = "rung-deprecated-block-type: " + BlockTypeName(block.type);
+                    return false;
+                }
+
+                // Reject inverted key-consuming blocks
+                if (block.inverted && !IsInvertibleBlockType(block.type)) {
+                    reason = "rung-non-invertible-block: " + BlockTypeName(block.type);
                     return false;
                 }
 
@@ -275,29 +264,6 @@ bool IsStandardRungOutput(const CScript& scriptPubKey, std::string& reason)
     }
 
     for (const auto& rung : conditions.rungs) {
-        // Compact rungs: validate and skip
-        if (rung.IsCompact()) {
-            if (!IsKnownCompactRungType(static_cast<uint8_t>(rung.compact->type))) {
-                reason = "rung-output-unknown-compact-type";
-                return false;
-            }
-            if (rung.compact->type == CompactRungType::COMPACT_SIG) {
-                if (rung.compact->pubkey_commit.size() != 32) {
-                    reason = "rung-output-compact-sig-bad-commit-size";
-                    return false;
-                }
-                if (!IsKnownScheme(static_cast<uint8_t>(rung.compact->scheme))) {
-                    reason = "rung-output-compact-sig-unknown-scheme";
-                    return false;
-                }
-            }
-            if (!rung.relay_refs.empty()) {
-                reason = "rung-output-compact-has-relay-refs";
-                return false;
-            }
-            continue;
-        }
-
         if (rung.blocks.size() > MAX_BLOCKS_PER_RUNG) {
             reason = "rung-output-too-many-blocks";
             return false;

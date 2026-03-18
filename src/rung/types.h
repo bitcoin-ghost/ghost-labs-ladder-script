@@ -16,10 +16,10 @@ namespace rung {
  *  Each block evaluates a single spending condition within a rung.
  *  Encoded as uint16_t in the wire format (little-endian 2 bytes).
  *
- *  Ranges (10 families, 61 block types):
+ *  Ranges (10 families, 59 block types):
  *    0x0001-0x00FF  Signature family (SIG, MULTISIG, ADAPTOR_SIG, MUSIG_THRESHOLD, KEY_REF_SIG)
  *    0x0100-0x01FF  Timelock family (CSV, CSV_TIME, CLTV, CLTV_TIME)
- *    0x0200-0x02FF  Hash family (HASH_PREIMAGE, HASH160_PREIMAGE, TAGGED_HASH)
+ *    0x0200-0x02FF  Hash family (TAGGED_HASH) — HASH_PREIMAGE, HASH160_PREIMAGE deprecated
  *    0x0300-0x03FF  Covenant family (CTV, VAULT_LOCK, AMOUNT_LOCK)
  *    0x0400-0x04FF  Recursion family (RECURSE_SAME, _MODIFIED, _UNTIL, _COUNT, _SPLIT, _DECAY)
  *    0x0500-0x05FF  Anchor family (ANCHOR, _CHANNEL, _POOL, _RESERVE, _SEAL, _ORACLE, DATA_RETURN)
@@ -146,9 +146,7 @@ inline bool IsKnownBlockType(uint16_t b)
     case RungBlockType::CSV_TIME:
     case RungBlockType::CLTV:
     case RungBlockType::CLTV_TIME:
-    // Hash
-    case RungBlockType::HASH_PREIMAGE:
-    case RungBlockType::HASH160_PREIMAGE:
+    // Hash (HASH_PREIMAGE/HASH160_PREIMAGE deprecated — use HTLC or HASH_SIG)
     case RungBlockType::TAGGED_HASH:
     // Covenant
     case RungBlockType::CTV:
@@ -207,6 +205,10 @@ inline bool IsKnownBlockType(uint16_t b)
     case RungBlockType::P2TR_LEGACY:
     case RungBlockType::P2TR_SCRIPT_LEGACY:
         return true;
+    // Deprecated block types — explicitly false
+    case RungBlockType::HASH_PREIMAGE:
+    case RungBlockType::HASH160_PREIMAGE:
+        return false;
     }
     return false;
 }
@@ -349,6 +351,97 @@ inline std::string DataTypeName(RungDataType type)
 // Backward-compatible alias
 inline std::string FieldTypeName(RungDataType type) { return DataTypeName(type); }
 
+/** Returns true for block types that consume pubkeys (key-consuming blocks).
+ *  These blocks cannot be inverted (garbage pubkey → fail → invert → SATISFIED
+ *  would embed arbitrary data in the block witness). With merkle_pub_key, the
+ *  pubkeys for these blocks are folded into the Merkle leaf. */
+inline bool IsKeyConsumingBlockType(RungBlockType type)
+{
+    switch (type) {
+    case RungBlockType::SIG:
+    case RungBlockType::MULTISIG:
+    case RungBlockType::TIMELOCKED_SIG:
+    case RungBlockType::HTLC:
+    case RungBlockType::HASH_SIG:
+    case RungBlockType::CLTV_SIG:
+    case RungBlockType::PTLC:
+    case RungBlockType::TIMELOCKED_MULTISIG:
+    case RungBlockType::KEY_REF_SIG:
+    case RungBlockType::COSIGN:
+    case RungBlockType::ADAPTOR_SIG:
+    case RungBlockType::MUSIG_THRESHOLD:
+    case RungBlockType::P2PK_LEGACY:
+    case RungBlockType::P2PKH_LEGACY:
+    case RungBlockType::P2WPKH_LEGACY:
+    case RungBlockType::P2TR_LEGACY:
+    case RungBlockType::P2TR_SCRIPT_LEGACY:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/** Returns true for block types that are allowed to be inverted.
+ *  Fail-closed allowlist: new block types default to non-invertible.
+ *  Key-consuming blocks are never invertible (prevents garbage-pubkey data embedding). */
+inline bool IsInvertibleBlockType(RungBlockType type)
+{
+    switch (type) {
+    // Timelock
+    case RungBlockType::CSV:
+    case RungBlockType::CSV_TIME:
+    case RungBlockType::CLTV:
+    case RungBlockType::CLTV_TIME:
+    // Hash (TAGGED_HASH only — HASH_PREIMAGE/HASH160_PREIMAGE deprecated)
+    case RungBlockType::TAGGED_HASH:
+    // Covenant
+    case RungBlockType::CTV:
+    case RungBlockType::VAULT_LOCK:
+    case RungBlockType::AMOUNT_LOCK:
+    // Policy / Governance
+    case RungBlockType::WEIGHT_LIMIT:
+    case RungBlockType::INPUT_COUNT:
+    case RungBlockType::OUTPUT_COUNT:
+    // Anchor
+    case RungBlockType::ANCHOR:
+    case RungBlockType::ANCHOR_CHANNEL:
+    case RungBlockType::ANCHOR_POOL:
+    case RungBlockType::ANCHOR_RESERVE:
+    case RungBlockType::ANCHOR_SEAL:
+    case RungBlockType::ANCHOR_ORACLE:
+    case RungBlockType::DATA_RETURN:
+    // Recursion
+    case RungBlockType::RECURSE_SAME:
+    case RungBlockType::RECURSE_MODIFIED:
+    case RungBlockType::RECURSE_UNTIL:
+    case RungBlockType::RECURSE_COUNT:
+    case RungBlockType::RECURSE_SPLIT:
+    case RungBlockType::RECURSE_DECAY:
+    // PLC
+    case RungBlockType::HYSTERESIS_FEE:
+    case RungBlockType::HYSTERESIS_VALUE:
+    case RungBlockType::TIMER_CONTINUOUS:
+    case RungBlockType::TIMER_OFF_DELAY:
+    case RungBlockType::LATCH_SET:
+    case RungBlockType::LATCH_RESET:
+    case RungBlockType::COUNTER_UP:
+    case RungBlockType::COUNTER_DOWN:
+    case RungBlockType::COUNTER_PRESET:
+    case RungBlockType::COMPARE:
+    case RungBlockType::SEQUENCER:
+    case RungBlockType::ONE_SHOT:
+    case RungBlockType::RATE_LIMIT:
+    // Legacy non-key
+    case RungBlockType::P2SH_LEGACY:
+    case RungBlockType::P2WSH_LEGACY:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// PubkeyCountForBlock declared after RungBlock (needs full struct definition)
+
 /** Coil type — determines what this rung unlocks. */
 enum class RungCoilType : uint8_t {
     UNLOCK    = 0x01, //!< Standard unlock — spend the output
@@ -423,38 +516,14 @@ struct RungBlock {
     bool inverted{false}; //!< If true, evaluation result is inverted (SATISFIED↔UNSATISFIED)
 };
 
-/** Compact rung types — efficient encodings for common single-block patterns.
- *  Triggered by n_blocks == 0 sentinel within a rung.
- *  See COMPACT_RUNG_PLAN.md for design rationale. */
-enum class CompactRungType : uint8_t {
-    COMPACT_SIG = 0x01,  //!< Single SIG with explicit PUBKEY_COMMIT + SCHEME
-};
+// CompactRungType, CompactRungData removed — COMPACT_SIG stored PUBKEY_COMMIT
+// on the rung, which defeats merkle_pub_key.
 
-/** Returns true if the byte is a known CompactRungType. */
-inline bool IsKnownCompactRungType(uint8_t b)
-{
-    return b == 0x01;
-}
-
-/** Compact rung data — stored in Rung when compact is set.
- *  COMPACT_SIG: pubkey_commit (32 bytes) + scheme.
- *  Resolves to an equivalent SIG block at evaluation time. */
-struct CompactRungData {
-    CompactRungType type;
-    std::vector<uint8_t> pubkey_commit;  //!< 32-byte SHA-256(pubkey)
-    RungScheme scheme{RungScheme::SCHNORR};
-};
-
-/** A single rung in a ladder. All blocks must be satisfied (AND logic).
- *  When compact is set, the rung has no blocks — it encodes a single
- *  condition compactly (e.g., COMPACT_SIG = SIG with inline PUBKEY_COMMIT). */
+/** A single rung in a ladder. All blocks must be satisfied (AND logic). */
 struct Rung {
     std::vector<RungBlock> blocks;
     uint8_t rung_id{0};                //!< Rung identifier within the ladder
     std::vector<uint16_t> relay_refs;    //!< Indices into relay array that must be satisfied
-    std::optional<CompactRungData> compact; //!< Compact rung encoding (n_blocks == 0 on wire)
-
-    bool IsCompact() const { return compact.has_value(); }
 };
 
 /** A relay definition: blocks evaluated for cross-referencing, not tied to an output.
@@ -464,6 +533,55 @@ struct Relay {
     std::vector<RungBlock> blocks;
     std::vector<uint16_t> relay_refs;    //!< Indices of other relays (must be < own index)
 };
+
+/** Returns the number of pubkeys consumed by a block type.
+ *  Used by merkle_pub_key to determine how many pubkeys to fold into
+ *  each block's contribution to the Merkle leaf. */
+inline size_t PubkeyCountForBlock(RungBlockType type, const RungBlock& block)
+{
+    switch (type) {
+    // Single pubkey blocks
+    case RungBlockType::SIG:
+    case RungBlockType::TIMELOCKED_SIG:
+    case RungBlockType::HASH_SIG:
+    case RungBlockType::CLTV_SIG:
+    case RungBlockType::PTLC:
+    case RungBlockType::ADAPTOR_SIG:
+    case RungBlockType::KEY_REF_SIG:
+    case RungBlockType::COSIGN:
+    case RungBlockType::MUSIG_THRESHOLD:
+    case RungBlockType::P2PK_LEGACY:
+    case RungBlockType::P2PKH_LEGACY:
+    case RungBlockType::P2WPKH_LEGACY:
+    case RungBlockType::P2TR_LEGACY:
+    case RungBlockType::P2TR_SCRIPT_LEGACY:
+        return 1;
+    // Two pubkey blocks
+    case RungBlockType::HTLC:
+        return 2;
+    // N pubkey blocks: read from NUMERIC field
+    case RungBlockType::MULTISIG:
+    case RungBlockType::TIMELOCKED_MULTISIG: {
+        // Second NUMERIC field is N (total signers)
+        size_t numeric_count = 0;
+        for (const auto& field : block.fields) {
+            if (field.type == RungDataType::NUMERIC) {
+                ++numeric_count;
+                if (numeric_count == 2 && field.data.size() >= 1) {
+                    uint32_t val = 0;
+                    for (size_t i = 0; i < field.data.size(); ++i) {
+                        val |= static_cast<uint32_t>(field.data[i]) << (8 * i);
+                    }
+                    return val;
+                }
+            }
+        }
+        return 0;
+    }
+    default:
+        return 0;
+    }
+}
 
 /** A single field-level diff in a witness reference. */
 struct WitnessDiff {
@@ -522,9 +640,9 @@ inline constexpr uint16_t MICRO_HEADER_TABLE[MICRO_HEADER_SLOTS] = {
     0x0102, // 0x04: CSV_TIME
     0x0103, // 0x05: CLTV
     0x0104, // 0x06: CLTV_TIME
-    // Slot 7-9: Hash family
-    0x0201, // 0x07: HASH_PREIMAGE
-    0x0202, // 0x08: HASH160_PREIMAGE
+    // Slot 7-9: Hash family (HASH_PREIMAGE/HASH160_PREIMAGE deprecated)
+    0xFFFF, // 0x07: (was HASH_PREIMAGE — deprecated)
+    0xFFFF, // 0x08: (was HASH160_PREIMAGE — deprecated)
     0x0203, // 0x09: TAGGED_HASH
     // Slot 10-12: Covenant family
     0x0301, // 0x0A: CTV
@@ -633,9 +751,8 @@ inline constexpr ImplicitFieldLayout NO_IMPLICIT = {0, {}};
 
 // -- Conditions context implicit field layouts --
 
-/** SIG conditions: [PUBKEY_COMMIT(32), SCHEME(1)] */
-inline constexpr ImplicitFieldLayout SIG_CONDITIONS = {2, {
-    {RungDataType::PUBKEY_COMMIT, 32},
+/** SIG conditions: [SCHEME(1)] — pubkey folded into Merkle leaf (merkle_pub_key) */
+inline constexpr ImplicitFieldLayout SIG_CONDITIONS = {1, {
     {RungDataType::SCHEME, 1},
 }};
 
@@ -653,15 +770,7 @@ inline constexpr ImplicitFieldLayout CLTV_CONDITIONS = CSV_CONDITIONS;
 /** CLTV_TIME conditions: [NUMERIC(varint)] */
 inline constexpr ImplicitFieldLayout CLTV_TIME_CONDITIONS = CSV_CONDITIONS;
 
-/** HASH_PREIMAGE conditions: [HASH256(32)] */
-inline constexpr ImplicitFieldLayout HASH_PREIMAGE_CONDITIONS = {1, {
-    {RungDataType::HASH256, 32},
-}};
-
-/** HASH160_PREIMAGE conditions: [HASH160(20)] */
-inline constexpr ImplicitFieldLayout HASH160_PREIMAGE_CONDITIONS = {1, {
-    {RungDataType::HASH160, 20},
-}};
+// HASH_PREIMAGE_CONDITIONS and HASH160_PREIMAGE_CONDITIONS removed (deprecated block types)
 
 /** TAGGED_HASH conditions: [HASH256(32), HASH256(32)] */
 inline constexpr ImplicitFieldLayout TAGGED_HASH_CONDITIONS = {2, {
@@ -685,37 +794,32 @@ inline constexpr ImplicitFieldLayout COSIGN_CONDITIONS = {1, {
     {RungDataType::HASH256, 32},
 }};
 
-/** TIMELOCKED_SIG conditions: [PUBKEY_COMMIT(32), SCHEME(1), NUMERIC(varint)] */
-inline constexpr ImplicitFieldLayout TIMELOCKED_SIG_CONDITIONS = {3, {
-    {RungDataType::PUBKEY_COMMIT, 32},
+/** TIMELOCKED_SIG conditions: [SCHEME(1), NUMERIC(varint)] — pubkey folded into Merkle leaf */
+inline constexpr ImplicitFieldLayout TIMELOCKED_SIG_CONDITIONS = {2, {
     {RungDataType::SCHEME, 1},
     {RungDataType::NUMERIC, 0},
 }};
 
-/** HTLC conditions: [PUBKEY_COMMIT(32), PUBKEY_COMMIT(32), HASH256(32), NUMERIC(varint)] */
-inline constexpr ImplicitFieldLayout HTLC_CONDITIONS = {4, {
-    {RungDataType::PUBKEY_COMMIT, 32},
-    {RungDataType::PUBKEY_COMMIT, 32},
+/** HTLC conditions: [HASH256(32), NUMERIC(varint)] — pubkeys folded into Merkle leaf */
+inline constexpr ImplicitFieldLayout HTLC_CONDITIONS = {2, {
     {RungDataType::HASH256, 32},
     {RungDataType::NUMERIC, 0},
 }};
 
-/** HASH_SIG conditions: [PUBKEY_COMMIT(32), HASH256(32), SCHEME(1)] */
-inline constexpr ImplicitFieldLayout HASH_SIG_CONDITIONS = {3, {
-    {RungDataType::PUBKEY_COMMIT, 32},
+/** HASH_SIG conditions: [HASH256(32), SCHEME(1)] — pubkey folded into Merkle leaf */
+inline constexpr ImplicitFieldLayout HASH_SIG_CONDITIONS = {2, {
     {RungDataType::HASH256, 32},
     {RungDataType::SCHEME, 1},
 }};
 
-/** CLTV_SIG conditions: [PUBKEY_COMMIT(32), SCHEME(1), NUMERIC(varint)] */
+/** CLTV_SIG conditions: [SCHEME(1), NUMERIC(varint)] — pubkey folded into Merkle leaf */
 inline constexpr ImplicitFieldLayout CLTV_SIG_CONDITIONS = TIMELOCKED_SIG_CONDITIONS;
 
 /** EPOCH_GATE conditions: [NUMERIC(varint), NUMERIC(varint)] */
 inline constexpr ImplicitFieldLayout EPOCH_GATE_CONDITIONS = AMOUNT_LOCK_CONDITIONS;
 
-/** MUSIG_THRESHOLD conditions: [PUBKEY_COMMIT(32), NUMERIC(varint M), NUMERIC(varint N)] */
-inline constexpr ImplicitFieldLayout MUSIG_THRESHOLD_CONDITIONS = {3, {
-    {RungDataType::PUBKEY_COMMIT, 32},
+/** MUSIG_THRESHOLD conditions: [NUMERIC(varint M), NUMERIC(varint N)] — pubkey folded into Merkle leaf */
+inline constexpr ImplicitFieldLayout MUSIG_THRESHOLD_CONDITIONS = {2, {
     {RungDataType::NUMERIC, 0},  // threshold M
     {RungDataType::NUMERIC, 0},  // group size N
 }};
@@ -736,10 +840,9 @@ inline constexpr ImplicitFieldLayout P2WSH_LEGACY_CONDITIONS = {1, {
     {RungDataType::HASH256, 32},
 }};
 
-/** P2TR_SCRIPT_LEGACY conditions: [HASH256(32), PUBKEY_COMMIT(32)] */
-inline constexpr ImplicitFieldLayout P2TR_SCRIPT_LEGACY_CONDITIONS = {2, {
+/** P2TR_SCRIPT_LEGACY conditions: [HASH256(32)] — internal key folded into Merkle leaf */
+inline constexpr ImplicitFieldLayout P2TR_SCRIPT_LEGACY_CONDITIONS = {1, {
     {RungDataType::HASH256, 32},
-    {RungDataType::PUBKEY_COMMIT, 32},
 }};
 
 /** DATA_RETURN conditions: [DATA(var, max 80)] — unspendable data commitment */
@@ -758,17 +861,7 @@ inline constexpr ImplicitFieldLayout SIG_WITNESS = {2, {
 /** CSV witness: [NUMERIC(varint)] */
 inline constexpr ImplicitFieldLayout CSV_WITNESS = CSV_CONDITIONS;
 
-/** HASH_PREIMAGE witness: [HASH256(32), PREIMAGE(var)] */
-inline constexpr ImplicitFieldLayout HASH_PREIMAGE_WITNESS = {2, {
-    {RungDataType::HASH256, 32},
-    {RungDataType::PREIMAGE, 0},
-}};
-
-/** HASH160_PREIMAGE witness: [HASH160(20), PREIMAGE(var)] */
-inline constexpr ImplicitFieldLayout HASH160_PREIMAGE_WITNESS = {2, {
-    {RungDataType::HASH160, 20},
-    {RungDataType::PREIMAGE, 0},
-}};
+// HASH_PREIMAGE_WITNESS and HASH160_PREIMAGE_WITNESS removed (deprecated block types)
 
 /** TAGGED_HASH witness: [HASH256(32), HASH256(32), PREIMAGE(var)] */
 inline constexpr ImplicitFieldLayout TAGGED_HASH_WITNESS = {3, {
@@ -825,8 +918,7 @@ inline const ImplicitFieldLayout& GetImplicitLayout(RungBlockType type, uint8_t 
         case RungBlockType::CSV_TIME:         return CSV_TIME_CONDITIONS;
         case RungBlockType::CLTV:             return CLTV_CONDITIONS;
         case RungBlockType::CLTV_TIME:        return CLTV_TIME_CONDITIONS;
-        case RungBlockType::HASH_PREIMAGE:    return HASH_PREIMAGE_CONDITIONS;
-        case RungBlockType::HASH160_PREIMAGE: return HASH160_PREIMAGE_CONDITIONS;
+        // HASH_PREIMAGE/HASH160_PREIMAGE: deprecated (removed from GetImplicitLayout)
         case RungBlockType::TAGGED_HASH:      return TAGGED_HASH_CONDITIONS;
         case RungBlockType::CTV:              return CTV_CONDITIONS;
         case RungBlockType::AMOUNT_LOCK:      return AMOUNT_LOCK_CONDITIONS;
@@ -857,8 +949,7 @@ inline const ImplicitFieldLayout& GetImplicitLayout(RungBlockType type, uint8_t 
         case RungBlockType::CSV_TIME:         return CSV_WITNESS;
         case RungBlockType::CLTV:             return CSV_WITNESS;
         case RungBlockType::CLTV_TIME:        return CSV_WITNESS;
-        case RungBlockType::HASH_PREIMAGE:    return HASH_PREIMAGE_WITNESS;
-        case RungBlockType::HASH160_PREIMAGE: return HASH160_PREIMAGE_WITNESS;
+        // HASH_PREIMAGE/HASH160_PREIMAGE: deprecated (removed from GetImplicitLayout)
         case RungBlockType::TAGGED_HASH:      return TAGGED_HASH_WITNESS;
         case RungBlockType::CTV:              return CTV_WITNESS;
         case RungBlockType::COSIGN:           return COSIGN_WITNESS;

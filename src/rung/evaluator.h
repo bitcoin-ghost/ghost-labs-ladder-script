@@ -143,11 +143,11 @@ EvalResult EvalTimelockedMultisigBlock(const RungBlock& block, const BaseSignatu
 // Legacy evaluators (wrapped Bitcoin transaction types)
 EvalResult EvalP2PKLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata);
 EvalResult EvalP2PKHLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata);
-EvalResult EvalP2SHLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, const RungEvalContext& ctx);
+EvalResult EvalP2SHLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, const RungEvalContext& ctx, int depth = 0);
 EvalResult EvalP2WPKHLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata);
-EvalResult EvalP2WSHLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, const RungEvalContext& ctx);
+EvalResult EvalP2WSHLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, const RungEvalContext& ctx, int depth = 0);
 EvalResult EvalP2TRLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata);
-EvalResult EvalP2TRScriptLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, const RungEvalContext& ctx);
+EvalResult EvalP2TRScriptLegacyBlock(const RungBlock& block, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, const RungEvalContext& ctx, int depth = 0);
 
 // Governance evaluators (transaction-level constraints)
 EvalResult EvalEpochGateBlock(const RungBlock& block, const RungEvalContext& ctx);
@@ -162,7 +162,8 @@ EvalResult EvalBlock(const RungBlock& block,
                      const BaseSignatureChecker& checker,
                      SigVersion sigversion,
                      ScriptExecutionData& execdata,
-                     const RungEvalContext& ctx = {});
+                     const RungEvalContext& ctx = {},
+                     int depth = 0);
 
 /** Evaluate all relays in order, caching results.
  *  Relays are evaluated index 0 first; each relay checks its relay_refs
