@@ -501,11 +501,11 @@ Nine types are defined:
 | 0x01 | PUBKEY | 1-2048 B | Witness | Public key |
 | 0x03 | HASH256 | 32 B | Both | SHA-256 hash |
 | 0x04 | HASH160 | 20 B | Both | HASH160 digest |
-| 0x05 | PREIMAGE | 1-252 B | Witness | Hash preimage |
+| 0x05 | PREIMAGE | 1-32 B | Witness | Hash preimage |
 | 0x06 | SIGNATURE | 1-50000 B | Witness | Signature |
 | 0x08 | NUMERIC | 1-4 B | Both | Numeric value (little-endian) |
 | 0x09 | SCHEME | 1 B | Both | Signature scheme selector |
-| 0x0A | SCRIPT_BODY | 1-520 B | Witness | Serialised inner conditions |
+| 0x0A | SCRIPT_BODY | 1-80 B | Witness | Serialised inner conditions |
 | 0x0B | DATA | 1-80 B | Both | Opaque data (DATA_RETURN payloads) |
 
 Code 0x02 (formerly PUBKEY_COMMIT) is reserved. Public keys are bound to conditions
@@ -532,7 +532,7 @@ than the script interpreter.
 ### SCRIPT_BODY
 
 A data type (0x0A) for serialised inner Ladder Script conditions carried in the witness.
-Size range: 1-520 bytes. Witness-only -- cannot appear in conditions. Used by the
+Size range: 1-80 bytes. Witness-only -- cannot appear in conditions. Used by the
 Legacy family blocks P2SH_LEGACY, P2WSH_LEGACY, and P2TR_SCRIPT_LEGACY to carry the
 inner conditions that must deserialise as valid Ladder Script. Rejecting arbitrary bytes
 in this field closes the data-embedding surface that raw P2SH/P2WSH/taproot script-path

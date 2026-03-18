@@ -2560,7 +2560,7 @@ const BLOCK_FAMILIES = [
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
       { type: 'P2SH_LEGACY', label: 'P2SH', desc: 'P2SH wrapped --provide inner conditions, node computes HASH160', fields: [
-        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 520 bytes) --node computes HASH160' },
+        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 80 bytes) --node computes HASH160' },
         { name: 'hash160', dataType: 'HASH160', label: 'Script Hash (read-only)', placeholder: 'Auto-computed by node from inner conditions', computed: true }
       ]},
       { type: 'P2WPKH_LEGACY', label: 'P2WPKH', desc: 'P2WPKH wrapped --provide pubkey, node computes HASH160 (segwit version)', fields: [
@@ -2569,7 +2569,7 @@ const BLOCK_FAMILIES = [
         { name: 'signature', dataType: 'SIGNATURE', label: 'Signature', placeholder: 'Schnorr or ECDSA sig hex', witnessOnly: true }
       ]},
       { type: 'P2WSH_LEGACY', label: 'P2WSH', desc: 'P2WSH wrapped --provide inner conditions, node computes SHA256', fields: [
-        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 520 bytes) --node computes SHA256' },
+        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Inner Conditions (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 80 bytes) --node computes SHA256' },
         { name: 'hash256', dataType: 'HASH256', label: 'Script Hash (read-only)', placeholder: 'Auto-computed by node from inner conditions', computed: true }
       ]},
       { type: 'P2TR_LEGACY', label: 'P2TR', desc: 'P2TR key-path wrapped --public key + signature (same as SIG)', fields: [
@@ -2578,7 +2578,7 @@ const BLOCK_FAMILIES = [
         { name: 'scheme', dataType: 'SCHEME', label: 'Scheme', placeholder: '01=Schnorr', optional: true }
       ]},
       { type: 'P2TR_SCRIPT_LEGACY', label: 'P2TR_S', desc: 'P2TR script-path wrapped --provide inner conditions + internal key, node computes hashes', fields: [
-        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Script Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 520 bytes) --node computes Merkle root' },
+        { name: 'script_body', dataType: 'SCRIPT_BODY', label: 'Script Leaf (serialized)', placeholder: 'Serialized Ladder Script conditions (up to 80 bytes) --node computes Merkle root' },
         { name: 'hash256', dataType: 'HASH256', label: 'Script Tree Root (read-only)', placeholder: 'Auto-computed by node from script leaf', computed: true },
         { name: 'internal_key', dataType: 'PUBKEY', label: 'Internal Public Key', placeholder: '33-byte compressed pubkey (folded into Merkle leaf)' }
       ]},
@@ -2604,8 +2604,8 @@ const DATA_TYPE_SIZES = {
   PUBKEY_COMMIT: { min: 32, max: 32, note: 'Reserved. No longer used in conditions or witness (merkle_pub_key).' },
   HASH256: { min: 32, max: 32, note: 'SHA-256 digest' },
   HASH160: { min: 20, max: 20, note: 'RIPEMD160(SHA256()) digest' },
-  PREIMAGE: { min: 1, max: 252, note: 'Hash preimage (witness only)' },
-  SCRIPT_BODY: { min: 1, max: 520, note: 'Serialized inner conditions for P2SH/P2WSH/P2TR_SCRIPT (witness only)' },
+  PREIMAGE: { min: 1, max: 32, note: 'Hash preimage (witness only)' },
+  SCRIPT_BODY: { min: 1, max: 80, note: 'Serialized inner conditions for P2SH/P2WSH/P2TR_SCRIPT (witness only)' },
   SIGNATURE: { min: 1, max: 50000, note: 'Schnorr 64-65B, ECDSA 8-72B, PQ up to ~49216B' },
   DATA: { min: 1, max: 80, note: 'Raw data for DATA_RETURN. Appended to MLSC scriptPubKey (0x0B)' },
   SPEND_INDEX: { min: 4, max: 4, note: 'uint32 LE index reference' },
@@ -2663,11 +2663,11 @@ const BLOCK_RULES = {
   OUTPUT_REF: 'References a named output coil from another rung.',
   P2PK_LEGACY: 'Legacy P2PK wrapped as a Ladder Script block. Same evaluation as SIG. Pubkey folded into Merkle leaf, then Schnorr/ECDSA/PQ signature check. Closes arbitrary data surfaces by requiring typed fields.',
   P2PKH_LEGACY: 'Legacy P2PKH wrapped. Computes HASH160(pubkey) and compares to the committed hash. If match, verifies signature. Bridges legacy pay-to-pubkey-hash semantics into typed fields.',
-  P2SH_LEGACY: 'Legacy P2SH wrapped. HASH160 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 520 bytes) that are deserialized and evaluated. Prevents arbitrary script embedding.',
+  P2SH_LEGACY: 'Legacy P2SH wrapped. HASH160 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 80 bytes) that are deserialized and evaluated. Prevents arbitrary script embedding.',
   P2WPKH_LEGACY: 'Legacy P2WPKH wrapped. Identical evaluation to P2PKH --HASH160(pubkey) check + signature verify. Represents the segwit migration path.',
-  P2WSH_LEGACY: 'Legacy P2WSH wrapped. SHA256 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 520 bytes). Same pattern as P2SH but with SHA256 hash.',
+  P2WSH_LEGACY: 'Legacy P2WSH wrapped. SHA256 of inner conditions must match. SCRIPT_BODY carries serialized Ladder Script conditions (up to 80 bytes). Same pattern as P2SH but with SHA256 hash.',
   P2TR_LEGACY: 'Legacy P2TR key-path wrapped. Same evaluation as SIG --key-path Taproot spend with typed fields. Closes key-path data surfaces.',
-  P2TR_SCRIPT_LEGACY: 'Legacy P2TR script-path wrapped. HASH256 is Merkle root of script tree, internal key folded into Merkle leaf. Revealed leaf (SCRIPT_BODY) must be valid Ladder Script conditions (up to 520 bytes). Closes the primary inscription/data-embedding vector.',
+  P2TR_SCRIPT_LEGACY: 'Legacy P2TR script-path wrapped. HASH256 is Merkle root of script tree, internal key folded into Merkle leaf. Revealed leaf (SCRIPT_BODY) must be valid Ladder Script conditions (up to 80 bytes). Closes the primary inscription/data-embedding vector.',
 };
 
 // Realistic test data for every block type --deterministic fake keys/hashes
@@ -5513,8 +5513,8 @@ const FIELD_TOOLTIP = {
   SIGNATURE: 'Digital signature --produced at spend time by signing with the private key',
   HASH256: 'SHA-256 hash --32 bytes (64 hex chars)',
   HASH160: 'HASH160 = RIPEMD160(SHA256(data)) --20 bytes (40 hex chars)',
-  PREIMAGE: 'Preimage data that hashes to the commitment --revealed at spend time (max 252 bytes)',
-  SCRIPT_BODY: 'Serialized inner conditions --up to 520 bytes, used for P2SH/P2WSH/P2TR_SCRIPT inner scripts',
+  PREIMAGE: 'Preimage data that hashes to the commitment --revealed at spend time (max 32 bytes)',
+  SCRIPT_BODY: 'Serialized inner conditions --up to 80 bytes, used for P2SH/P2WSH/P2TR_SCRIPT inner scripts',
   SCHEME: 'Signature scheme --SCHNORR (default), ECDSA, or post-quantum (FALCON, DILITHIUM, SPHINCS+)',
   PUBKEY_COMMIT: 'Reserved. No longer used (pubkeys folded into Merkle leaf).',
   BLOCK_HEIGHT: 'Bitcoin block height --e.g. 860000',
@@ -5531,7 +5531,7 @@ const FIELD_TOOLTIP = {
   group_size: 'Total number of signers in the MuSig group',
   hash: 'Hash value --the preimage must hash to this to satisfy the condition',
   hash160: 'HASH160 of the public key --RIPEMD160(SHA256(pubkey)), 20 bytes (40 hex chars)',
-  script_body: 'Serialized Ladder Script conditions --the inner script for P2SH/P2WSH/P2TR_SCRIPT (up to 520 bytes)',
+  script_body: 'Serialized Ladder Script conditions --the inner script for P2SH/P2WSH/P2TR_SCRIPT (up to 80 bytes)',
   hash256: 'SHA-256 hash commitment --32 bytes (64 hex chars)',
   blocks: 'Number of blocks to wait before this condition can be satisfied',
   height: 'Block height at which this condition becomes valid',

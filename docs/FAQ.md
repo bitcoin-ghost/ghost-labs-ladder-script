@@ -31,9 +31,9 @@ Three:
   data type with enforced size constraints. On the conditions side, the node
   computes all key and hash commitments -- no arbitrary data enters the UTXO set.
   On the witness side, PUBKEY and SIGNATURE are cryptographically constrained,
-  PREIMAGE and SCRIPT_BODY are capped (252 and 520 bytes) with a combined limit
+  PREIMAGE and SCRIPT_BODY are capped (32 and 80 bytes) with a combined limit
   of 2 per witness, and data-embedding types are rejected in witness context for
-  blocks without implicit witness layouts. Maximum embeddable data: ~504 bytes.
+  blocks without implicit witness layouts. Maximum embeddable data: ~64 bytes.
 
 ### 3. What is the PLC analogy?
 
@@ -151,8 +151,8 @@ witness version, or Taproot annex byte.
 | Max ladder witness size | 100,000 bytes | Deserialisation |
 | Max PUBKEY size | 2,048 bytes | Field validation |
 | Max SIGNATURE size | 50,000 bytes | Field validation |
-| Max PREIMAGE size | 252 bytes | Field validation |
-| Max SCRIPT_BODY size | 520 bytes | Field validation |
+| Max PREIMAGE size | 32 bytes | Field validation |
+| Max SCRIPT_BODY size | 80 bytes | Field validation |
 | HASH256 size | Exactly 32 bytes | Field validation |
 | HASH160 size | Exactly 20 bytes | Field validation |
 | NUMERIC size | 1-4 bytes | Field validation |
@@ -451,11 +451,11 @@ layers:
    witness layouts.
 4. **Selective inversion.** Key-consuming blocks cannot be inverted, preventing
    an attacker from using a garbage pubkey with an inverted SIG to embed data.
-5. **Witness data limits.** PREIMAGE (max 252 bytes) and SCRIPT_BODY (max 520
+5. **Witness data limits.** PREIMAGE (max 32 bytes) and SCRIPT_BODY (max 80
    bytes) share a combined limit of 2 fields per witness
    (`MAX_PREIMAGE_FIELDS_PER_WITNESS`). PUBKEY and SIGNATURE are cryptographically
    constrained -- they must correspond to valid keys and signatures. Maximum
-   embeddable data per witness: ~504 bytes.
+   embeddable data per witness: ~64 bytes.
 6. **Build-time validation.** Public keys are checked for compressed key prefix
    (0x02/0x03 for 33-byte keys), SCHEME values are validated against the enum.
 7. **Economic deterrent.** Even if structurally valid data gets into a UTXO
@@ -506,11 +506,11 @@ Merkle proof exists -- so the fake data is never published on-chain. The
 attacker burns their funds for nothing.
 
 On the witness side, cryptographically constrained fields (PUBKEY, SIGNATURE)
-leave no room for arbitrary data. PREIMAGE is capped at 252 bytes, SCRIPT_BODY
+leave no room for arbitrary data. PREIMAGE is capped at 32 bytes, SCRIPT_BODY
 at 520 bytes, and `MAX_PREIMAGE_FIELDS_PER_WITNESS` limits each witness to 2
 such fields total. Data-embedding types (HASH256, HASH160, DATA) are rejected
 in witness context for blocks without implicit witness layouts. The maximum
-embeddable data per witness is ~504 bytes -- and only as valid hash preimages
+embeddable data per witness is ~64 bytes -- and only as valid hash preimages
 or serialised Ladder Script conditions.
 
 The Legacy family (0x0900) extends this to traditional transaction types. P2SH,

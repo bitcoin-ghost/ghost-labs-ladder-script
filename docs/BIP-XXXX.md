@@ -297,15 +297,15 @@ Every field in a Ladder Script witness or conditions structure has one of the fo
 | `0x02` | *(reserved)* | | | | Formerly PUBKEY_COMMIT. Removed by merkle_pub_key. Rejected in both conditions and witness. |
 | `0x03` | HASH256 | 32 | 32 | Both | SHA-256 hash digest. |
 | `0x04` | HASH160 | 20 | 20 | Conditions only | RIPEMD160(SHA256()) hash digest. |
-| `0x05` | PREIMAGE | 1 | 252 | Witness only | Hash preimage (forbidden in conditions). |
+| `0x05` | PREIMAGE | 1 | 32 | Witness only | Hash preimage (forbidden in conditions). |
 | `0x06` | SIGNATURE | 1 | 50,000 | Witness only | Signature (Schnorr 64-65B, ECDSA 8-72B, PQ up to ~49,216B for SPHINCS_SHA). |
 | `0x07` | SPEND_INDEX | 4 | 4 | Both | Index reference (uint32 LE) for aggregate attestation. |
 | `0x08` | NUMERIC | 1 | 4 | Both | Unsigned 32-bit integer. Encoded on wire as CompactSize(value); stored internally as 4-byte LE. |
 | `0x09` | SCHEME | 1 | 1 | Both | Signature scheme selector byte. |
-| `0x0A` | SCRIPT_BODY | 1 | 520 | Witness only | Serialized inner conditions (P2SH/P2WSH/P2TR_SCRIPT inner scripts). 520-byte cap matches P2SH's original limit. |
+| `0x0A` | SCRIPT_BODY | 1 | 80 | Witness only | Serialized inner conditions (P2SH/P2WSH/P2TR_SCRIPT inner scripts). 80-byte cap limits data embedding (legacy blocks on deprecation path). |
 | `0x0B` | DATA | 1 | 80 | Both | Opaque data payload (DATA_RETURN block only). Maximum 80 bytes. |
 
-The SIGNATURE maximum of 50,000 bytes accommodates all post-quantum signature schemes including SPHINCS_SHA (~7,856 bytes) and Dilithium3 (3,293 bytes) with headroom. The PUBKEY maximum of 2,048 bytes accommodates FALCON-1024 public keys (1,793 bytes). The SCRIPT_BODY type supports inner conditions in legacy wrapping blocks, capped at 520 bytes to prevent data embedding.
+The SIGNATURE maximum of 50,000 bytes accommodates all post-quantum signature schemes including SPHINCS_SHA (~7,856 bytes) and Dilithium3 (3,293 bytes) with headroom. The PUBKEY maximum of 2,048 bytes accommodates FALCON-1024 public keys (1,793 bytes). The SCRIPT_BODY type supports inner conditions in legacy wrapping blocks, capped at 80 bytes. Legacy blocks are on the deprecation path.
 
 Data type validity is checked by `IsKnownDataType()`. Unknown data type codes cause deserialization failure.
 
@@ -486,7 +486,7 @@ Three coordinated defenses close all practical data embedding surfaces in Ladder
 
 **2. Selective inversion.** Key-consuming blocks cannot be inverted. Without this restriction, an attacker could invert a SIG block with a garbage pubkey: the signature check fails, returning UNSATISFIED, which inversion flips to SATISFIED. The garbage pubkey data lands in the block witness permanently. The function `IsInvertibleBlockType()` is a fail-closed allowlist. New block types default to non-invertible. The 17 key-consuming block types (SIG, MULTISIG, ADAPTOR_SIG, MUSIG_THRESHOLD, KEY_REF_SIG, TIMELOCKED_SIG, HTLC, HASH_SIG, PTLC, CLTV_SIG, TIMELOCKED_MULTISIG, COSIGN, P2PK_LEGACY, P2PKH_LEGACY, P2WPKH_LEGACY, P2TR_LEGACY, P2TR_SCRIPT_LEGACY) are all non-invertible. Non-key blocks (timelocks, covenants, anchors, recursion, PLC, governance, P2SH_LEGACY, P2WSH_LEGACY) remain invertible.
 
-**3. Hash lock deprecation.** HASH_PREIMAGE and HASH160_PREIMAGE are removed. These were invertible non-key blocks with writable hash fields. An inverted HASH_PREIMAGE with a garbage hash and arbitrary preimage data could land up to 252 bytes in the block. Removing standalone hash locks and requiring the compound blocks HTLC and HASH_SIG (which always require a signature) closes this vector entirely.
+**3. Hash lock deprecation.** HASH_PREIMAGE and HASH160_PREIMAGE are removed. These were invertible non-key blocks with writable hash fields. An inverted HASH_PREIMAGE with a garbage hash and arbitrary preimage data could land up to 32 bytes in the block. Removing standalone hash locks and requiring the compound blocks HTLC and HASH_SIG (which always require a signature) closes this vector entirely.
 
 The combined effect is that every byte in a Ladder Script transaction must conform to its declared type. There is no field in any active block type where an attacker can write arbitrary data without also providing a valid cryptographic proof.
 
@@ -591,7 +591,7 @@ The following limits are enforced at the policy (mempool) layer. Consensus enfor
 | MAX_BLOCKS_PER_RUNG | 8 | Maximum blocks per rung. Limits AND-condition depth. |
 | MAX_FIELDS_PER_BLOCK | 16 | Maximum typed fields per block. |
 | MAX_LADDER_WITNESS_SIZE | 100,000 bytes | Maximum total serialised witness size. Accommodates post-quantum signatures with headroom for multi-block rungs. |
-| MAX_PREIMAGE_FIELDS_PER_WITNESS | 2 | Maximum PREIMAGE/SCRIPT_BODY fields per witness. Limits user-chosen data to ~504 bytes (2 x 252 bytes). |
+| MAX_PREIMAGE_FIELDS_PER_WITNESS | 2 | Maximum PREIMAGE/SCRIPT_BODY fields per witness. Limits user-chosen data to ~64 bytes (2 x 32 bytes). |
 | MAX_RELAYS | 8 | Maximum relay definitions per ladder witness. |
 | MAX_REQUIRES | 8 | Maximum relay requirements (co-spend input indices) per rung or relay. |
 | MAX_RELAY_DEPTH | 4 | Maximum transitive relay chain depth. Prevents unbounded recursive relay evaluation. |
