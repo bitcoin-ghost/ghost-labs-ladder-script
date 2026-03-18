@@ -435,7 +435,7 @@ bool DeserializeLadderWitness(const std::vector<uint8_t>& witness_bytes,
 
             // Read coil address
             uint64_t addr_len = ReadCompactSize(ss);
-            if (addr_len > 520) {
+            if (addr_len > MAX_COIL_ADDRESS_SIZE) {
                 error = "coil address too large: " + std::to_string(addr_len);
                 return false;
             }
@@ -511,7 +511,7 @@ bool DeserializeLadderWitness(const std::vector<uint8_t>& witness_bytes,
 
         // Read coil address (variable-length scriptPubKey)
         uint64_t addr_len = ReadCompactSize(ss);
-        if (addr_len > 520) { // Max scriptPubKey size
+        if (addr_len > MAX_COIL_ADDRESS_SIZE) {
             error = "coil address too large: " + std::to_string(addr_len);
             return false;
         }

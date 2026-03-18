@@ -115,16 +115,16 @@ enum class RungBlockType : uint16_t {
  *  No arbitrary data pushes are possible.
  *  (Renamed from RungFieldType in v1.) */
 enum class RungDataType : uint8_t {
-    PUBKEY        = 0x01, //!< Public key: 1-2048 bytes (witness-only; conditions use PUBKEY_COMMIT)
+    PUBKEY        = 0x01, //!< Public key: 1-2048 bytes (witness-only; folded into Merkle leaf via merkle_pub_key)
     PUBKEY_COMMIT = 0x02, //!< Public key commitment: exactly 32 bytes
     HASH256       = 0x03, //!< SHA-256 hash: exactly 32 bytes
     HASH160       = 0x04, //!< RIPEMD160(SHA256()) hash: exactly 20 bytes
-    PREIMAGE      = 0x05, //!< Hash preimage: 1-252 bytes
+    PREIMAGE      = 0x05, //!< Hash preimage: 1-32 bytes (SHA256 payment hash preimage)
     SIGNATURE     = 0x06, //!< Signature: 1-50000 bytes (Schnorr 64-65, ECDSA 8-72, PQ up to 49216)
     SPEND_INDEX   = 0x07, //!< Spend index reference: 4 bytes
     NUMERIC       = 0x08, //!< Numeric value (threshold, locktime, etc.): 1-4 bytes
     SCHEME        = 0x09, //!< Signature scheme selector: 1 byte
-    SCRIPT_BODY   = 0x0A, //!< Serialized inner conditions: 1-520 bytes (witness-only; node computes hash for conditions)
+    SCRIPT_BODY   = 0x0A, //!< Serialized inner conditions: 1-80 bytes (witness-only; node computes hash for conditions)
     DATA          = 0x0B, //!< Opaque data: 1-80 bytes (DATA_RETURN block only)
 };
 
@@ -249,8 +249,8 @@ inline size_t FieldMaxSize(RungDataType type)
     case RungDataType::PUBKEY_COMMIT: return 32;
     case RungDataType::HASH256:       return 32;
     case RungDataType::HASH160:       return 20;
-    case RungDataType::PREIMAGE:      return 252;
-    case RungDataType::SCRIPT_BODY:   return 520;
+    case RungDataType::PREIMAGE:      return 32;
+    case RungDataType::SCRIPT_BODY:   return 80;
     case RungDataType::SIGNATURE:     return 50000;
     case RungDataType::SPEND_INDEX:   return 4;
     case RungDataType::NUMERIC:       return 4;

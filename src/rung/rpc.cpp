@@ -347,7 +347,8 @@ static RungBlock ParseBlockSpec(const UniValue& block_obj, bool conditions_only,
             }
             if (field.type == RungDataType::HASH256 &&
                 (block.type == RungBlockType::HASH_SIG ||
-                 block.type == RungBlockType::HTLC)) {
+                 block.type == RungBlockType::HTLC ||
+                 block.type == RungBlockType::ANCHOR_SEAL)) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER,
                     "Use PREIMAGE instead of HASH256; the node computes the hash commitment automatically");
             }
@@ -386,8 +387,8 @@ static RungBlock ParseBlockSpec(const UniValue& block_obj, bool conditions_only,
             block.fields.push_back(std::move(hash_field));
             continue;
         }
-        // Auto-convert SCRIPT_BODY to hash commitment in conditions (same as PREIMAGE but allows up to 10000 bytes).
-        // Used for P2SH/P2WSH/P2TR_SCRIPT inner conditions that exceed PREIMAGE's 252-byte limit.
+        // Auto-convert SCRIPT_BODY to hash commitment in conditions (same as PREIMAGE, max 80 bytes).
+        // Used for P2SH/P2WSH/P2TR_SCRIPT legacy inner conditions.
         if (conditions_only && field.type == RungDataType::SCRIPT_BODY) {
             RungField hash_field;
             if (block.type == RungBlockType::P2SH_LEGACY) {

@@ -23,11 +23,15 @@ static constexpr size_t MAX_BLOCKS_PER_RUNG = 8;
 static constexpr size_t MAX_FIELDS_PER_BLOCK = 16;
 /** Maximum total ladder witness size in bytes (must accommodate PQ signatures). */
 static constexpr size_t MAX_LADDER_WITNESS_SIZE = 100000;
-/** Maximum number of PREIMAGE fields per ladder witness (consensus).
- *  Counts all PREIMAGE-type fields across all block types including compounds
- *  (HTLC, HASH_SIG, P2SH_LEGACY, P2WSH_LEGACY, P2TR_SCRIPT_LEGACY).
- *  Limits user-chosen data to ~504 bytes (2 * 252 bytes PREIMAGE max). */
+/** Maximum number of PREIMAGE/SCRIPT_BODY fields per ladder witness (consensus).
+ *  Counts all PREIMAGE and SCRIPT_BODY fields across all block types including
+ *  compounds (HTLC, HASH_SIG, P2SH_LEGACY, P2WSH_LEGACY, P2TR_SCRIPT_LEGACY).
+ *  Limits user-chosen data to 64 bytes (2 * 32 bytes PREIMAGE max). */
 static constexpr size_t MAX_PREIMAGE_FIELDS_PER_WITNESS = 2;
+/** Maximum coil address (raw scriptPubKey) size in bytes.
+ *  Covers all standard formats: MLSC (33), P2TR (34), P2WSH (34),
+ *  P2WPKH (22), P2SH (23), P2PKH (25). */
+static constexpr size_t MAX_COIL_ADDRESS_SIZE = 42;
 /** Maximum number of relays per ladder witness. */
 static constexpr size_t MAX_RELAYS = 8;
 /** Maximum number of relay requirements per rung or relay. */
