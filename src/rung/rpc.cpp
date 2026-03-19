@@ -1825,11 +1825,11 @@ static RPCHelpMan signrungtx()
             conditions.conditions_root = root;
             has_conditions = true;
         } else {
-            has_conditions = rung::DeserializeRungConditions(
-                spent_outputs[input_idx].scriptPubKey, conditions, cond_error);
-            if (!has_conditions) {
-                conditions = RungConditions{};
-            }
+            // Non-MLSC input (standard Bitcoin output — bootstrap path).
+            // signrungtx only signs Ladder Script inputs. Standard inputs
+            // must be signed separately (e.g., by the wallet or MiniWallet).
+            // Skip this input — it should already have a witness.
+            continue;
         }
 
         LadderWitness ladder;

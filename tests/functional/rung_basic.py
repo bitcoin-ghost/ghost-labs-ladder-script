@@ -484,12 +484,13 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         assert tx_info["confirmations"] >= 1, "Bootstrap tx should be confirmed"
         self.log.info("  Bootstrap spend (standard -> v4) confirmed!")
 
-        # Rung-to-rung spend
+        # Rung-to-rung spend — MLSC output is the last vout (appended by bootstrap)
+        mlsc_vout = len(tx_info["vout"]) - 1
         output_amount2 = output_amount - Decimal("0.001")
-        spent_conditions_spk = tx_info["vout"][0]["scriptPubKey"]["hex"]
+        spent_conditions_spk = tx_info["vout"][mlsc_vout]["scriptPubKey"]["hex"]
 
         result2 = node.createrungtx(
-            [{"txid": txid1, "vout": 0}],
+            [{"txid": txid1, "vout": mlsc_vout}],
             [{"amount": output_amount2, "conditions": [{
                 "blocks": [{
                     "type": "SIG",
