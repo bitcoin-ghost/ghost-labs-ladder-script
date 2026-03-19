@@ -407,13 +407,15 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         # Unknown block type via escape: 01 rung, 01 block, 80 escape, ff00 type LE, 00 fields, coil, relay
         assert_raises_rpc_error(-22, "unknown block type", node.decoderung, "010180ff0000010101" + "0000")
 
-        # Unknown data type (0xff) via escape: 01 rung, 01 block, 80 escape, 0100 SIG type LE, 01 field, ff type, 01 len, aa data, coil, relay
-        assert_raises_rpc_error(-22, "unknown data type", node.decoderung, "0101800100" + "01ff01aa" + "010101" + "0000")
+        # Malformed SIG block via escape: 01 rung, 01 block, 80 escape, 0100 SIG type LE, 01 field, ff type, 01 len, aa data, coil, relay
+        # Strict field enforcement catches field count mismatch before unknown type check
+        assert_raises_rpc_error(-22, "field count mismatch", node.decoderung, "0101800100" + "01ff01aa" + "010101" + "0000")
 
         # Oversized PUBKEY field (2049 bytes, max is 2048) via escape:
+        # SIG expects 2 fields — strict field enforcement catches count mismatch first
         # 01 rung, 01 block, 80 escape, 0100 SIG type LE, 01 field, 01 PUBKEY, varint len=2049, 2049 bytes, coil, relay
         oversized = "0101800100" + "01" + "01" + "fd0108" + "02" * 2049 + "010101" + "0000"
-        assert_raises_rpc_error(-22, "too large", node.decoderung, oversized)
+        assert_raises_rpc_error(-22, "field count mismatch", node.decoderung, oversized)
 
         self.log.info("  All malformed inputs correctly rejected")
 
