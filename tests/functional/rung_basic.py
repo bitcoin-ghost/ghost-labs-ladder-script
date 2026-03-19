@@ -3719,7 +3719,7 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         ]}]}]
 
         # Try to spend with a DIFFERENT preimage (the "spam payload")
-        payload = os.urandom(252)  # max PREIMAGE size — arbitrary data
+        payload = os.urandom(32)  # max PREIMAGE size (exactly 32 bytes) — arbitrary data
         spend = node.createrungtx(
             [{"txid": txid, "vout": vout}],
             [{"amount": output_amount, "conditions": dest_conditions}]
@@ -3951,11 +3951,11 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         self.log.info("  Spam test PASSED: structural limits enforced at broadcast")
 
     def test_spam_coil_address_limit(self, node):
-        """Coil address: max 520 bytes (standard scriptPubKey limit).
+        """Coil address: max 42 bytes (MAX_COIL_ADDRESS_SIZE).
 
         This is tested indirectly — the createrung RPC builds coils from
         standard parameters. There's no way to inject arbitrary coil data
-        through the RPC; the serialization layer enforces the 520-byte limit.
+        through the RPC; the serialization layer enforces the 42-byte limit.
         """
         self.log.info("Spam test: coil address limits (structural)...")
 
