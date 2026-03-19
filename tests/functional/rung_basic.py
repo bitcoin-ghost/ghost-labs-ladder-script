@@ -1250,7 +1250,7 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         )
         sign_result = node.signrungtx(
             result["hex"],
-            [{"input": 0, "blocks": [{"type": "ANCHOR_CHANNEL"}]}],
+            [{"input": 0, "blocks": [{"type": "ANCHOR_CHANNEL", "pubkeys": [pubkey_hex, remote_pubkey]}]}],
             [{"amount": amount, "scriptPubKey": spk}]
         )
         assert sign_result["complete"]
@@ -1273,6 +1273,7 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         conditions = [{"blocks": [{"type": "COMPARE", "fields": [
             {"type": "NUMERIC", "hex": numeric_hex(operator_gt)},  # operator
             {"type": "NUMERIC", "hex": numeric_hex(threshold)},    # value_b
+            {"type": "NUMERIC", "hex": numeric_hex(0)},            # value_c (padding)
         ]}]}]
 
         txid, vout, amount, spk = self.bootstrap_v4_output(node, conditions)
@@ -2380,7 +2381,7 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         )
         sign_result = node.signrungtx(
             spend["hex"],
-            [{"input": 0, "blocks": [{"type": "ANCHOR_CHANNEL"}]}],
+            [{"input": 0, "blocks": [{"type": "ANCHOR_CHANNEL", "pubkeys": [pubkey_hex, remote_pubkey]}]}],
             [{"amount": amount, "scriptPubKey": spk}]
         )
         assert sign_result["complete"]
@@ -3258,7 +3259,7 @@ class LadderScriptBasicTest(BitcoinTestFramework):
         )
         sign_result = node.signrungtx(
             spend["hex"],
-            [{"input": 0, "blocks": [{"type": "ANCHOR_CHANNEL"}]}],
+            [{"input": 0, "blocks": [{"type": "ANCHOR_CHANNEL", "pubkeys": [pubkey_hex, remote_pubkey]}]}],
             [{"amount": amount, "scriptPubKey": spk}]
         )
         assert_raises_rpc_error(-26, None, node.sendrawtransaction, sign_result["hex"])

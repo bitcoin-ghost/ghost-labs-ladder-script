@@ -1523,9 +1523,41 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
         }
         break;
     }
-    default:
-        // Covenant/governance/recursion/PLC blocks — no witness fields needed
+    default: {
+        // Blocks without specific signing logic: auto-populate witness fields.
+        // For key-consuming blocks (ANCHOR_CHANNEL, VAULT_LOCK, PLC blocks with pubkeys),
+        // the witness needs PUBKEY fields for evaluation. Copy from user-provided pubkeys.
+        if (block_spec.exists("pubkeys")) {
+            const UniValue& pk_arr = block_spec["pubkeys"].get_array();
+            for (size_t i = 0; i < pk_arr.size(); ++i) {
+                auto pk = ParseHex(pk_arr[i].get_str());
+                block.fields.push_back({RungDataType::PUBKEY, std::move(pk)});
+            }
+        } else if (block_spec.exists("pubkey")) {
+            auto pk = ParseHex(block_spec["pubkey"].get_str());
+            block.fields.push_back({RungDataType::PUBKEY, std::move(pk)});
+        }
+        // Copy condition fields to witness (NUMERIC, HASH256, HASH160, SCHEME, SPEND_INDEX)
+        for (const auto& rung : conditions.rungs) {
+            for (const auto& cblk : rung.blocks) {
+                if (cblk.type == btype) {
+                    for (const auto& f : cblk.fields) {
+                        if (rung::IsConditionDataType(f.type)) {
+                            block.fields.push_back(f);
+                        }
+                    }
+                    goto default_done;
+                }
+            }
+        }
+        default_done:;
+        // Copy PREIMAGE fields if user provides them (for hash-bound blocks)
+        if (block_spec.exists("preimage")) {
+            auto preimage_data = ParseHex(block_spec["preimage"].get_str());
+            block.fields.push_back({RungDataType::PREIMAGE, std::move(preimage_data)});
+        }
         break;
+    }
     }
 
     return block;
