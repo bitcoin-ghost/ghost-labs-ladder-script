@@ -1290,8 +1290,48 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
         break;
     }
     case RungBlockType::VAULT_LOCK: {
-        // Vault lock: PQ or Schnorr signature
-        SignSingleKey(block_spec, block, mtx, input_idx, txdata, conditions, "VAULT_LOCK");
+        // Vault lock: needs 2 PUBKEYs (recovery + hot) + NUMERIC(delay) + SIGNATURE.
+        // The evaluator tries both keys. User provides both pubkeys + privkey for signing.
+        // Auto-populate both pubkeys if user provides "pubkeys" array.
+        if (block_spec.exists("pubkeys")) {
+            const UniValue& pk_arr = block_spec["pubkeys"].get_array();
+            for (size_t i = 0; i < pk_arr.size(); ++i) {
+                auto pk = ParseHex(pk_arr[i].get_str());
+                block.fields.push_back({RungDataType::PUBKEY, std::move(pk)});
+            }
+        }
+        // Copy NUMERIC(delay) from conditions
+        for (const auto& rung : conditions.rungs) {
+            for (const auto& cblk : rung.blocks) {
+                if (cblk.type == RungBlockType::VAULT_LOCK) {
+                    for (const auto& f : cblk.fields) {
+                        if (f.type == RungDataType::NUMERIC) {
+                            block.fields.push_back(f);
+                            goto vault_delay_done;
+                        }
+                    }
+                }
+            }
+        }
+        vault_delay_done:;
+        // Sign with the provided key
+        if (block_spec.exists("privkey")) {
+            std::string wif = block_spec["privkey"].get_str();
+            CKey privkey = DecodeSecret(wif);
+            if (!privkey.IsValid()) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "VAULT_LOCK: Invalid private key");
+            }
+            uint256 sighash;
+            if (!rung::SignatureHashLadder(txdata, mtx, input_idx, SIGHASH_DEFAULT, conditions, sighash)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "VAULT_LOCK: Failed to compute sighash");
+            }
+            unsigned char sig_buf[64];
+            uint256 aux_rand = GetRandHash();
+            if (!privkey.SignSchnorr(sighash, sig_buf, nullptr, aux_rand)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "VAULT_LOCK: Schnorr signing failed");
+            }
+            block.fields.push_back({RungDataType::SIGNATURE, std::vector<uint8_t>(sig_buf, sig_buf + 64)});
+        }
         break;
     }
     case RungBlockType::HASH_PREIMAGE:
@@ -1322,6 +1362,40 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
             }
             block.fields.push_back({RungDataType::PREIMAGE, preimage_data});
         }
+        break;
+    }
+    case RungBlockType::CTV: {
+        // CTV witness: [HASH256]. Copy from conditions.
+        for (const auto& rung : conditions.rungs) {
+            for (const auto& cblk : rung.blocks) {
+                if (cblk.type == RungBlockType::CTV) {
+                    for (const auto& f : cblk.fields) {
+                        if (f.type == RungDataType::HASH256) {
+                            block.fields.push_back(f);
+                            goto ctv_done;
+                        }
+                    }
+                }
+            }
+        }
+        ctv_done:;
+        break;
+    }
+    case RungBlockType::COSIGN: {
+        // COSIGN witness: [HASH256]. Copy from conditions.
+        for (const auto& rung : conditions.rungs) {
+            for (const auto& cblk : rung.blocks) {
+                if (cblk.type == RungBlockType::COSIGN) {
+                    for (const auto& f : cblk.fields) {
+                        if (f.type == RungDataType::HASH256) {
+                            block.fields.push_back(f);
+                            goto cosign_done;
+                        }
+                    }
+                }
+            }
+        }
+        cosign_done:;
         break;
     }
     case RungBlockType::CSV:
@@ -1537,12 +1611,15 @@ static RungBlock BuildWitnessBlock(const UniValue& block_spec,
             auto pk = ParseHex(block_spec["pubkey"].get_str());
             block.fields.push_back({RungDataType::PUBKEY, std::move(pk)});
         }
-        // Copy condition fields to witness (NUMERIC, HASH256, HASH160, SCHEME, SPEND_INDEX)
+        // Copy non-embedding condition fields to witness (NUMERIC, SCHEME, SPEND_INDEX).
+        // HASH256/HASH160 are blocked in witness for layout-less blocks (IsDataEmbeddingType).
+        // Users provide PREIMAGE via the "preimage" key instead.
         for (const auto& rung : conditions.rungs) {
             for (const auto& cblk : rung.blocks) {
                 if (cblk.type == btype) {
                     for (const auto& f : cblk.fields) {
-                        if (rung::IsConditionDataType(f.type)) {
+                        if (rung::IsConditionDataType(f.type) &&
+                            !rung::IsDataEmbeddingType(f.type)) {
                             block.fields.push_back(f);
                         }
                     }
