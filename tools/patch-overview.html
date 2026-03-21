@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patch Overview — Ladder Script</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #222; --border: #333;
+  --text: #d4d4d4; --dim: #888; --amber: #e6a817; --green: #2ea043;
+  --red: #c43030; --cyan: #39a5b7; --blue: #2d7dd2;
+  --font: 'IBM Plex Mono', monospace;
+}
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; }
+.container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+
+h1 { color: var(--amber); font-size: 24px; letter-spacing: 2px; margin-bottom: 8px; }
+.subtitle { color: var(--dim); font-size: 14px; margin-bottom: 40px; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 40px; }
+.stat { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; }
+.stat-value { font-size: 32px; font-weight: 700; color: var(--amber); }
+.stat-label { font-size: 11px; color: var(--dim); letter-spacing: 1px; margin-top: 4px; }
+
+h2 { font-size: 16px; color: var(--amber); letter-spacing: 1px; margin: 40px 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+p { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 24px; }
+th { text-align: left; color: var(--dim); font-weight: 600; letter-spacing: 1px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+td { padding: 6px 12px; border-bottom: 1px solid #1e1e1e; }
+tr:hover td { background: var(--bg2); }
+.file { color: var(--cyan); }
+.lines { color: var(--green); text-align: right; }
+.desc { color: var(--dim); }
+.badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+.badge-new { background: rgba(46, 160, 67, 0.15); color: var(--green); border: 1px solid rgba(46, 160, 67, 0.3); }
+.badge-mod { background: rgba(230, 168, 23, 0.15); color: var(--amber); border: 1px solid rgba(230, 168, 23, 0.3); }
+.badge-patch { background: rgba(45, 125, 210, 0.15); color: var(--blue); border: 1px solid rgba(45, 125, 210, 0.3); }
+
+.section-note { background: var(--bg2); border-left: 3px solid var(--amber); padding: 12px 16px; margin: 16px 0; font-size: 12px; color: var(--dim); border-radius: 0 4px 4px 0; }
+
+.diff-block { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 16px 0; font-size: 11px; overflow-x: auto; }
+.diff-add { color: var(--green); }
+.diff-file { color: var(--cyan); margin-bottom: 4px; }
+
+a { color: var(--amber); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.nav { display: flex; gap: 16px; margin-bottom: 32px; font-size: 12px; }
+.nav a { color: var(--dim); }
+.nav a:hover { color: var(--amber); }
+.nav a.active { color: var(--amber); }
+
+@media (max-width: 600px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="nav">
+  <a href="ladder-script.html">Ladder Script</a>
+  <a href="ladder-engine.html">Engine</a>
+  <a href="block-docs/">Block Reference</a>
+  <a href="docs/">Docs</a>
+  <a href="patch-overview.html" class="active">Patch</a>
+  <a href="https://github.com/defenwycke/ghost-labs-ladder-script">GitHub</a>
+</div>
+
+<h1>PATCH OVERVIEW</h1>
+<p class="subtitle">What changes are needed to add Ladder Script to Bitcoin Core</p>
+
+<div class="summary-grid">
+  <div class="stat">
+    <div class="stat-value">154</div>
+    <div class="stat-label">LINES ADDED</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">16</div>
+    <div class="stat-label">FILES MODIFIED</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">11,318</div>
+    <div class="stat-label">NEW CODE (RUNG LIB)</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">21</div>
+    <div class="stat-label">NEW FILES</div>
+  </div>
+</div>
+
+<div class="section-note">
+  Ladder Script adds a self-contained library (<code>src/rung/</code>) to Bitcoin Core. The patch to existing Bitcoin Core code is minimal: 154 lines across 16 files. The bulk of the implementation (11,318 lines) lives in new files that don't touch existing code.
+</div>
+
+<h2>PATCH TO EXISTING BITCOIN CORE</h2>
+<p>These are the only modifications to existing Bitcoin Core files. Each change is surgical and additive.</p>
+
+<table>
+  <thead><tr><th>File</th><th>Change</th><th>Lines</th></tr></thead>
+  <tbody>
+    <tr><td class="file">validation.cpp</td><td class="desc">Route v4 RUNG_TX inputs spending MLSC outputs to VerifyRungTx. Pass block_height through CheckInputScripts. ValidateRungOutputs call. MLSC-only flag on mainnet.</td><td class="lines">+43</td></tr>
+    <tr><td class="file">script/interpreter.cpp</td><td class="desc">Precompute ladder sighash caches for v4 transactions. Reuses BIP341 hash infrastructure.</td><td class="lines">+13</td></tr>
+    <tr><td class="file">script/interpreter.h</td><td class="desc">Add <code>SigVersion::LADDER = 4</code> and <code>m_ladder_ready</code> flag to PrecomputedTransactionData.</td><td class="lines">+5</td></tr>
+    <tr><td class="file">primitives/transaction.h</td><td class="desc">Define <code>RUNG_TX_VERSION = 4</code>.</td><td class="lines">+4</td></tr>
+    <tr><td class="file">script/script_error.cpp</td><td class="desc">Add SCRIPT_ERR_LADDER_INVALID_WITNESS and SCRIPT_ERR_LADDER_EVAL_FALSE error strings.</td><td class="lines">+4</td></tr>
+    <tr><td class="file">script/solver.cpp</td><td class="desc">Detect 0xC2 prefix as TxoutType::RUNG_CONDITIONS in the script solver.</td><td class="lines">+7</td></tr>
+    <tr><td class="file">script/solver.h</td><td class="desc">Add RUNG_CONDITIONS to TxoutType enum.</td><td class="lines">+1</td></tr>
+    <tr><td class="file">policy/policy.cpp</td><td class="desc">Route v4 transactions to rung::IsStandardRungTx. Bypass standard input/witness checks for MLSC outputs.</td><td class="lines">+17</td></tr>
+    <tr><td class="file">rpc/mempool.cpp</td><td class="desc">Skip burn-amount check for MLSC outputs in sendrawtransaction and submitpackage.</td><td class="lines">+5</td></tr>
+    <tr><td class="file">rpc/util.cpp</td><td class="desc">Add LadderDestination visitor for address description RPC.</td><td class="lines">+8</td></tr>
+    <tr><td class="file">addresstype.cpp</td><td class="desc">Extract LadderDestination from RUNG_CONDITIONS outputs. Encode as scriptPubKey.</td><td class="lines">+14</td></tr>
+    <tr><td class="file">addresstype.h</td><td class="desc">Define LadderDestination struct. Add to CTxDestination variant.</td><td class="lines">+24</td></tr>
+    <tr><td class="file">key_io.cpp</td><td class="desc">Encode/decode rung1... Bech32m addresses.</td><td class="lines">+35</td></tr>
+    <tr><td class="file">bech32.h</td><td class="desc">Add RUNG_ADDRESS character limit (500) for rung addresses.</td><td class="lines">+1</td></tr>
+    <tr><td class="file">CMakeLists.txt</td><td class="desc">Add <code>add_subdirectory(rung)</code> and link <code>bitcoin_rung</code>.</td><td class="lines">+5</td></tr>
+    <tr><td class="file">test/CMakeLists.txt</td><td class="desc">Add rung_tests.cpp to test binary.</td><td class="lines">+1</td></tr>
+  </tbody>
+</table>
+
+<h2>NEW RUNG LIBRARY (src/rung/)</h2>
+<p>Self-contained library. No modifications to existing Bitcoin Core code. Builds as <code>libbitcoin_rung.a</code>.</p>
+
+<table>
+  <thead><tr><th>File</th><th>Lines</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td class="file">evaluator.cpp</td><td class="lines">3,503</td><td class="desc">All 61 block evaluators, EvalBlock dispatch, EvalRung (AND), EvalLadder (OR), VerifyRungTx entry point, BatchVerifier</td></tr>
+    <tr><td class="file">rpc.cpp</td><td class="lines">2,605</td><td class="desc">RPC commands: createrung, createrungtx, signrungtx, decoderung, parseladder, formatladder, computectvhash, generatepqkeypair</td></tr>
+    <tr><td class="file">types.h</td><td class="lines">1,423</td><td class="desc">Block type enum (61 types), data types, RungCoil, implicit field layouts, micro-header table, BlockDescriptor table</td></tr>
+    <tr><td class="file">serialize.cpp</td><td class="lines">944</td><td class="desc">Wire format: micro-headers, implicit fields, DeserializeLadderWitness, SerializeLadderWitness, anti-spam enforcement</td></tr>
+    <tr><td class="file">conditions.cpp</td><td class="lines">657</td><td class="desc">MLSC Merkle tree: leaf computation, proof verification, merkle_pub_key, CreateMLSCScript</td></tr>
+    <tr><td class="file">descriptor.cpp</td><td class="lines">566</td><td class="desc">Conditions descriptor language: ParseDescriptor, FormatDescriptor</td></tr>
+    <tr><td class="file">evaluator.h</td><td class="lines">266</td><td class="desc">Evaluator declarations, LadderSignatureChecker, BatchVerifier, RungEvalContext, TxAggregateContext</td></tr>
+    <tr><td class="file">conditions.h</td><td class="lines">202</td><td class="desc">RungConditions, MLSCProof, MLSC output helpers, Merkle leaf computation declarations</td></tr>
+    <tr><td class="file">adaptor.cpp</td><td class="lines">187</td><td class="desc">Adaptor signature verification and secret extraction</td></tr>
+    <tr><td class="file">policy.cpp</td><td class="lines">149</td><td class="desc">Mempool policy: IsBaseBlockType, IsCovenantBlockType, IsStatefulBlockType, IsStandardRungTx</td></tr>
+    <tr><td class="file">sighash.cpp</td><td class="lines">146</td><td class="desc">SignatureHashLadder: tagged hash, ANYPREVOUT/ANYPREVOUTANYSCRIPT skip rules</td></tr>
+    <tr><td class="file">pq_verify.cpp</td><td class="lines">145</td><td class="desc">Post-quantum signature verification: FALCON-512, FALCON-1024, Dilithium3, SPHINCS+</td></tr>
+    <tr><td class="file">serialize.h</td><td class="lines">123</td><td class="desc">Constants (MAX_RUNGS=16, MAX_BLOCKS=8, etc.), SerializationContext</td></tr>
+    <tr><td class="file">sighash.h</td><td class="lines">64</td><td class="desc">SignatureHashLadder declaration, ANYPREVOUT constants</td></tr>
+    <tr><td class="file">descriptor.h</td><td class="lines">58</td><td class="desc">ParseDescriptor, FormatDescriptor declarations</td></tr>
+    <tr><td class="file">adaptor.h</td><td class="lines">57</td><td class="desc">Adaptor signature types and declarations</td></tr>
+    <tr><td class="file">pq_verify.h</td><td class="lines">51</td><td class="desc">PQ verification declarations, scheme detection</td></tr>
+    <tr><td class="file">aggregate.h</td><td class="lines">51</td><td class="desc">AggregateProof, TxAggregateContext structs</td></tr>
+    <tr><td class="file">types.cpp</td><td class="lines">45</td><td class="desc">RungField::IsValid implementation</td></tr>
+    <tr><td class="file">aggregate.cpp</td><td class="lines">41</td><td class="desc">VerifyAggregateSpend, VerifyDeferredAttestation</td></tr>
+    <tr><td class="file">policy.h</td><td class="lines">35</td><td class="desc">Policy function declarations</td></tr>
+  </tbody>
+</table>
+
+<h2>TEST COVERAGE</h2>
+<table>
+  <thead><tr><th>Layer</th><th>Count</th><th>What</th></tr></thead>
+  <tbody>
+    <tr><td class="file">Unit tests</td><td class="lines">480</td><td class="desc">Block evaluation, serialisation, sighash, conditions, policy, MLSC proofs, field validation</td></tr>
+    <tr><td class="file">Regtest functional</td><td class="lines">60</td><td class="desc">Every block type: create, sign, broadcast, mine, spend on live regtest node</td></tr>
+    <tr><td class="file">TLA+ formal specs</td><td class="lines">80</td><td class="desc">9 specifications, 3.3M states checked: evaluation semantics, anti-spam, wire format, Merkle proofs, sighash, covenants, cross-input</td></tr>
+  </tbody>
+</table>
+
+<h2>PATCH FILES</h2>
+<p>Two patch files apply to Bitcoin Core v30.1 (ghost-core fork):</p>
+
+<div class="diff-block">
+  <div class="diff-file">patches/bitcoin-core-v30-ladder-script.patch</div>
+  <div class="diff-add">+154 lines across 16 files</div>
+  <div style="color: var(--dim); margin-top: 8px;">Core integration: routing, sighash, script solver, policy, address encoding, RPC, build system</div>
+</div>
+
+<div class="diff-block">
+  <div class="diff-file">patches/validation-block-height.patch</div>
+  <div class="diff-add">+43 lines across 2 files</div>
+  <div style="color: var(--dim); margin-top: 8px;">Block height plumbing for EPOCH_GATE and height-dependent governance blocks</div>
+</div>
+
+<div class="section-note">
+  The total change to existing Bitcoin Core is <strong>197 lines across 18 files</strong>. The remaining 11,318 lines are new, self-contained code in <code>src/rung/</code> that does not modify any existing function.
+</div>
+
+<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--dim);">
+  <a href="https://github.com/defenwycke/ghost-labs-ladder-script">Source</a> ·
+  <a href="ladder-engine.html">Engine</a> ·
+  <a href="block-docs/">Block Reference</a> ·
+  <a href="docs/">Documentation</a>
+</div>
+
+</div>
+</body>
+</html>
