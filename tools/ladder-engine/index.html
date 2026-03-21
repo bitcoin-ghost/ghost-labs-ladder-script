@@ -2267,6 +2267,116 @@ body {
   color: var(--text-secondary);
   text-align: center;
 }
+
+/* ═══ GUIDED WALKTHROUGH ═══ */
+.walkthrough-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 100000;
+  pointer-events: none;
+}
+.walkthrough-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 100000;
+  pointer-events: auto;
+}
+.walkthrough-card {
+  position: fixed;
+  z-index: 100002;
+  pointer-events: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--amber);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px var(--amber-glow);
+  padding: 20px 24px 16px;
+  max-width: 380px;
+  width: 380px;
+  font-family: var(--font-mono);
+  animation: walkthrough-fadein 0.25s ease-out;
+}
+@keyframes walkthrough-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.walkthrough-step-counter {
+  font-size: 9px;
+  color: var(--amber);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.walkthrough-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+.walkthrough-body {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+.walkthrough-body code {
+  color: var(--amber);
+  background: var(--bg-primary);
+  padding: 1px 4px;
+  font-size: 10px;
+}
+.walkthrough-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.walkthrough-btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.walkthrough-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--amber-dim);
+}
+.walkthrough-btn.primary {
+  background: var(--amber-dim);
+  border-color: var(--amber);
+  color: var(--amber-bright);
+}
+.walkthrough-btn.primary:hover {
+  background: var(--amber);
+  color: var(--bg-primary);
+}
+.walkthrough-btn.skip {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 6px 8px;
+}
+.walkthrough-btn.skip:hover {
+  color: var(--text-secondary);
+}
+.walkthrough-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.walkthrough-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s;
+}
+.walkthrough-dot.active { background: var(--amber); }
+.walkthrough-dot.done { background: var(--amber-dim); }
 </style>
 </head>
 <body>
@@ -2326,17 +2436,21 @@ const BLOCK_FAMILIES = [
   {
     name: 'HASH', color: '#00e676',
     blocks: [
-      { type: 'HASH_PREIMAGE', label: 'HASH_PRE', desc: 'DEPRECATED: Use HTLC or HASH_SIG instead', deprecated: true, fields: [
+      { type: 'HASH_PREIMAGE', label: 'HASH_PRE', desc: 'DEPRECATED: Use HTLC, HASH_SIG, or HASH_GUARDED instead', deprecated: true, fields: [
         { name: 'preimage', dataType: 'PREIMAGE', label: 'Preimage (secret)', placeholder: 'Hex data' },
         { name: 'hash', dataType: 'HASH256', label: 'Hash (read-only)', placeholder: 'Auto-computed', computed: true }
       ]},
-      { type: 'HASH160_PREIMAGE', label: 'HASH160', desc: 'DEPRECATED: Use HTLC or HASH_SIG instead', deprecated: true, fields: [
+      { type: 'HASH160_PREIMAGE', label: 'HASH160', desc: 'DEPRECATED: Use HTLC, HASH_SIG, or HASH_GUARDED instead', deprecated: true, fields: [
         { name: 'preimage', dataType: 'PREIMAGE', label: 'Preimage (secret)', placeholder: 'Hex data' },
         { name: 'hash', dataType: 'HASH160', label: 'Hash (read-only)', placeholder: 'Auto-computed', computed: true }
       ]},
       { type: 'TAGGED_HASH', label: 'TAGGED', desc: 'BIP-340 tagged hash verification', fields: [
         { name: 'tag', dataType: 'HASH256', label: 'Tag Hash', placeholder: '32-byte hex' },
         { name: 'hash', dataType: 'HASH256', label: 'Expected', placeholder: '32-byte hex' }
+      ]},
+      { type: 'HASH_GUARDED', label: 'GUARDED', desc: 'Raw SHA-256 preimage verification (non-invertible)', fields: [
+        { name: 'hash', dataType: 'HASH256', label: 'Committed Hash', placeholder: '32-byte hex' },
+        { name: 'preimage', dataType: 'PREIMAGE', label: 'Preimage', placeholder: 'Hex data' }
       ]},
     ]
   },
@@ -2412,8 +2526,8 @@ const BLOCK_FAMILIES = [
       { type: 'ANCHOR_ORACLE', label: 'A_ORACLE', desc: 'Oracle attestation anchor', fields: [
         { name: 'oracle_pk', dataType: 'PUBKEY', label: 'Oracle Key', placeholder: '02abc...' }
       ]},
-      { type: 'DATA_RETURN', label: 'DATA_RET', desc: 'On-chain data (max 32 bytes) appended to MLSC output, replaces OP_RETURN', fields: [
-        { name: 'data', dataType: 'DATA', label: 'Data', placeholder: 'hex data (max 32 bytes)' }
+      { type: 'DATA_RETURN', label: 'DATA_RET', desc: 'On-chain data (max 40 bytes) appended to MLSC output, replaces OP_RETURN', fields: [
+        { name: 'data', dataType: 'DATA', label: 'Data', placeholder: 'hex data (max 40 bytes)' }
       ]},
     ]
   },
@@ -2607,7 +2721,7 @@ const DATA_TYPE_SIZES = {
   PREIMAGE: { min: 32, max: 32, note: 'Hash preimage (witness only)' },
   SCRIPT_BODY: { min: 1, max: 80, note: 'Serialised inner conditions for P2SH/P2WSH/P2TR_SCRIPT (witness only)' },
   SIGNATURE: { min: 1, max: 50000, note: 'Schnorr 64-65B, ECDSA 8-72B, PQ up to ~49216B' },
-  DATA: { min: 1, max: 80, note: 'Raw data for DATA_RETURN. Appended to MLSC scriptPubKey (0x0B)' },
+  DATA: { min: 1, max: 40, note: 'Raw data for DATA_RETURN. Appended to MLSC scriptPubKey (0x0B)' },
   SPEND_INDEX: { min: 4, max: 4, note: 'uint32 LE index reference' },
   NUMERIC: { min: 1, max: 4, note: 'Unsigned 32-bit integer, little-endian' },
   SCHEME: { min: 1, max: 1, note: 'Signature scheme selector byte' },
@@ -2624,9 +2738,10 @@ const BLOCK_RULES = {
   CSV_TIME: 'Relative timelock in seconds (BIP-68 time-based). Same logic as CSV but with time flag.',
   CLTV: 'Absolute timelock by block height (BIP-65). Satisfied when nLockTime >= specified height.',
   CLTV_TIME: 'Absolute timelock by median-time-past. Same logic as CLTV but compared against MTP.',
-  HASH_PREIMAGE: 'DEPRECATED. Rejected at consensus. Use HTLC (hash + dual-key + timelock) or HASH_SIG (hash + signature) instead.',
-  HASH160_PREIMAGE: 'DEPRECATED. Rejected at consensus. Use HTLC (hash + dual-key + timelock) or HASH_SIG (hash + signature) instead.',
+  HASH_PREIMAGE: 'DEPRECATED. Rejected at consensus. Use HTLC, HASH_SIG, or HASH_GUARDED instead.',
+  HASH160_PREIMAGE: 'DEPRECATED. Rejected at consensus. Use HTLC, HASH_SIG, or HASH_GUARDED instead.',
   TAGGED_HASH: 'BIP-340 tagged hash: SHA256(tag || tag || preimage) must equal expected hash.',
+  HASH_GUARDED: 'Raw SHA-256 preimage verification. SHA256(preimage) must equal the committed hash. Non-invertible (fail-closed). Safe replacement for deprecated HASH_PREIMAGE.',
   CTV: 'BIP-119 CheckTemplateVerify. Spending transaction must match the committed template hash exactly.',
   VAULT_LOCK: 'Two-path vault: recovery key sweeps immediately, hot key requires CSV delay. No SIGNATURE = ERROR.',
   AMOUNT_LOCK: 'Satisfied when output amount is within [min, max] satoshis inclusive.',
@@ -2642,7 +2757,7 @@ const BLOCK_RULES = {
   ANCHOR_RESERVE: 'Reserve anchor: N-of-M guardian set. Requires N <= M.',
   ANCHOR_SEAL: 'Seal anchor: permanently binds UTXO to a data commitment.',
   ANCHOR_ORACLE: 'Oracle anchor: requires oracle pubkey and quorum count.',
-  DATA_RETURN: 'On-chain data (max 32 bytes) appended to MLSC output (0xC2 + root + data). Visible at fund time. Replaces OP_RETURN at 4 WU/byte. Max 1 per tx, zero-value.',
+  DATA_RETURN: 'On-chain data (max 40 bytes) appended to MLSC output (0xC2 + root + data). Visible at fund time. Replaces OP_RETURN at 4 WU/byte. Max 1 per tx, zero-value.',
   HYSTERESIS_FEE: 'Satisfied when tx fee rate falls within [low, high] sat/vB.',
   HYSTERESIS_VALUE: 'Satisfied when output amount falls within [low, high] sats.',
   TIMER_CONTINUOUS: 'Satisfied when accumulated >= target blocks.',
@@ -2827,6 +2942,9 @@ BlockRegistry.HASH160_PREIMAGE.evaluate = (block, simState) =>
 
 BlockRegistry.TAGGED_HASH.evaluate = (block, simState) =>
   simState.knownPreimages?.has(block.values.hash) ? 'satisfied' : 'unsatisfied';
+
+BlockRegistry.HASH_GUARDED.evaluate = (block, simState) =>
+  block.values.preimage ? 'satisfied' : (simState.knownPreimages?.has(block.values.hash) ? 'satisfied' : 'unsatisfied');
 
 BlockRegistry.AMOUNT_LOCK.evaluate = (block, simState) => {
   const min = parseInt(block.values.min) || 0;
@@ -3065,6 +3183,7 @@ BlockRegistry.CSV_TIME.testData = () => ({ seconds: '86400' });
 BlockRegistry.CLTV.testData = () => ({ height: '850000' });
 BlockRegistry.CLTV_TIME.testData = () => ({ timestamp: '1700000000' });
 BlockRegistry.HASH_PREIMAGE.testData = () => ({ preimage: TEST_PREIMAGE });
+BlockRegistry.HASH_GUARDED.testData = () => ({ hash: TEST_HASH256, preimage: TEST_PREIMAGE });
 BlockRegistry.HASH160_PREIMAGE.testData = () => ({ preimage: TEST_PREIMAGE });
 BlockRegistry.TAGGED_HASH.testData = () => ({ tag: TEST_HASH256, hash: TEST_HASH256_B });
 BlockRegistry.CTV.testData = () => ({ template_hash: TEST_HASH256 });
@@ -3154,6 +3273,7 @@ BlockRegistry.PTLC.fundNeeds = () => _singleKey('signing_key');
 BlockRegistry.CLTV_SIG.fundNeeds = () => _singleKey('pubkey');
 BlockRegistry.TIMELOCKED_MULTISIG.fundNeeds = () => _multiKey('pubkeys');
 BlockRegistry.HASH_PREIMAGE.fundNeeds = () => _hashNeed('preimage', 'SHA256');
+BlockRegistry.HASH_GUARDED.fundNeeds = () => _hashNeed('preimage', 'SHA256');
 BlockRegistry.HASH160_PREIMAGE.fundNeeds = () => _hashNeed('preimage', 'HASH160');
 BlockRegistry.TAGGED_HASH.fundNeeds = () => _hashNeed('hash', 'TAGGED');
 BlockRegistry.VAULT_LOCK.fundNeeds = () => ({ keys: [{ field: 'recovery_key', multi: false }, { field: 'hot_key', multi: false }], hashes: [] });
@@ -3268,6 +3388,12 @@ BlockRegistry.TAGGED_HASH.buildSigner = (block, keyLookup, preimages) => {
   const preimage = preimages?.[block.values.hash];
   if (!preimage) return null;
   return { type: 'TAGGED_HASH', preimage };
+};
+
+BlockRegistry.HASH_GUARDED.buildSigner = (block, keyLookup, preimages) => {
+  const preimage = block.values.preimage || preimages?.[block.values.hash];
+  if (!preimage) return null;
+  return { type: 'HASH_GUARDED', preimage };
 };
 
 // ── Legacy family buildSigner ──
@@ -5734,7 +5860,7 @@ function getTypeHex(type) {
   const map = {
     SIG:'0001',MULTISIG:'0002',ADAPTOR_SIG:'0003',MUSIG_THRESHOLD:'0004',KEY_REF_SIG:'0005',
     CSV:'0101',CSV_TIME:'0102',CLTV:'0103',CLTV_TIME:'0104',
-    HASH_PREIMAGE:'0201',HASH160_PREIMAGE:'0202',TAGGED_HASH:'0203',
+    HASH_PREIMAGE:'0201',HASH160_PREIMAGE:'0202',TAGGED_HASH:'0203',HASH_GUARDED:'0204',
     CTV:'0301',VAULT_LOCK:'0302',AMOUNT_LOCK:'0303',
     RECURSE_SAME:'0401',RECURSE_MODIFIED:'0402',RECURSE_UNTIL:'0403',
     RECURSE_COUNT:'0404',RECURSE_SPLIT:'0405',RECURSE_DECAY:'0406',
@@ -10944,6 +11070,169 @@ function appReducer(state, action) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// GUIDED WALKTHROUGH
+// ═══════════════════════════════════════════════════════════════
+const WALKTHROUGH_STEPS = [
+  {
+    title: 'Welcome to Ladder Script Engine',
+    body: 'This is a visual builder for Ladder Script transactions -- a new programmable spending language for Bitcoin. Drag blocks to construct spending conditions, simulate execution, and broadcast to a live signet node.',
+    targetSelector: null,
+  },
+  {
+    title: 'Templates',
+    body: 'Click <code>EXAMPLES</code> to browse pre-built programs. Try loading <strong style="color:var(--amber-bright)">2-of-3 MULTISIG VAULT</strong> to see a real multi-party spending policy with timelock recovery.',
+    targetSelector: '.header-actions .header-btn.primary',
+  },
+  {
+    title: 'The Ladder Diagram',
+    body: 'Each horizontal <strong>rung</strong> is an OR path -- any satisfied rung unlocks the output. Within a rung, <strong>blocks</strong> are AND logic -- all must pass. The left rail shows <strong>inputs</strong>, the right rail shows <strong>outputs</strong> (coils). Click blocks to configure their parameters.',
+    targetSelector: '.ladder-area',
+  },
+  {
+    title: 'Signet Mode',
+    body: 'Switch to the <code>SEND</code> tab to interact with a live Ghost signet node. This is where you create, fund, sign, and broadcast real transactions on the test network.',
+    targetSelector: '.mode-tabs',
+  },
+  {
+    title: 'Generate Keys',
+    body: 'In the SEND tab, use <code>GENERATE NEW ADDRESS</code> to create a fresh signet keypair. The engine supports Schnorr, ECDSA, and post-quantum signature schemes (Falcon, Dilithium, SPHINCS+).',
+    targetSelector: '.mode-tabs',
+  },
+  {
+    title: 'Get Test Coins',
+    body: 'Paste your new address into the <code>FAUCET</code> field and click <code>REQUEST 0.001 tBTC</code>. This sends test coins from the signet faucet so you can fund real transactions.',
+    targetSelector: '.mode-tabs',
+  },
+  {
+    title: 'Create & Broadcast',
+    body: 'Once funded, the three-step pipeline <code>CREATE &rarr; SIGN &rarr; BROADCAST</code> sends your Ladder Script transaction to the network. The engine handles key assignment and signing automatically.',
+    targetSelector: '.mode-tabs',
+  },
+  {
+    title: 'You\'re Ready!',
+    body: 'Explore the other templates -- <strong>HTLC Atomic Swap</strong>, <strong>Dead Man\'s Switch</strong>, <strong>CTV Vault</strong>, and more. Use <code>SIMULATE</code> mode to step through rung evaluation. Check the <code>HELP</code> button for the full engine guide.',
+    targetSelector: null,
+  },
+];
+
+function GuidedWalkthrough({ active, onClose }) {
+  const [step, setStep] = useState(0);
+  const [spotlightRect, setSpotlightRect] = useState(null);
+  const [cardPos, setCardPos] = useState({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
+
+  const currentStep = WALKTHROUGH_STEPS[step];
+
+  // Measure target element and position the card
+  useEffect(() => {
+    if (!active) return;
+    const s = WALKTHROUGH_STEPS[step];
+    if (!s.targetSelector) {
+      setSpotlightRect(null);
+      setCardPos({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
+      return;
+    }
+    const el = document.querySelector(s.targetSelector);
+    if (!el) {
+      setSpotlightRect(null);
+      setCardPos({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const pad = 8;
+    setSpotlightRect({
+      top: r.top - pad,
+      left: r.left - pad,
+      width: r.width + pad * 2,
+      height: r.height + pad * 2,
+    });
+    // Position card below or above target
+    const cardW = 380;
+    const cardH = 260;
+    let top = r.bottom + 16;
+    let left = Math.max(16, r.left + r.width / 2 - cardW / 2);
+    if (left + cardW > window.innerWidth - 16) left = window.innerWidth - cardW - 16;
+    if (top + cardH > window.innerHeight - 16) {
+      top = Math.max(16, r.top - cardH - 16);
+    }
+    setCardPos({ top: top + 'px', left: left + 'px', transform: 'none' });
+  }, [step, active]);
+
+  // ESC to close
+  useEffect(() => {
+    if (!active) return;
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [active, onClose]);
+
+  if (!active) return null;
+
+  const isLast = step === WALKTHROUGH_STEPS.length - 1;
+  const isFirst = step === 0;
+
+  const handleNext = () => {
+    if (isLast) {
+      try { localStorage.setItem('ladder-walkthrough-complete', '1'); } catch(e) {}
+      onClose();
+    } else {
+      setStep(step + 1);
+    }
+  };
+
+  const handleSkip = () => {
+    try { localStorage.setItem('ladder-walkthrough-complete', '1'); } catch(e) {}
+    onClose();
+  };
+
+  // Build SVG mask with cutout
+  const svgMask = spotlightRect ? (
+    <svg style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 100001, pointerEvents: 'none' }}>
+      <defs>
+        <mask id="walkthrough-mask">
+          <rect x="0" y="0" width="100%" height="100%" fill="white" />
+          <rect
+            x={spotlightRect.left} y={spotlightRect.top}
+            width={spotlightRect.width} height={spotlightRect.height}
+            rx="4" fill="black"
+          />
+        </mask>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.72)" mask="url(#walkthrough-mask)" />
+      <rect
+        x={spotlightRect.left} y={spotlightRect.top}
+        width={spotlightRect.width} height={spotlightRect.height}
+        rx="4" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeDasharray="6 3"
+        style={{ filter: 'drop-shadow(0 0 6px var(--amber-glow))' }}
+      />
+    </svg>
+  ) : null;
+
+  return (
+    <div className="walkthrough-overlay">
+      <div className="walkthrough-backdrop" style={{ background: spotlightRect ? 'transparent' : 'rgba(0,0,0,0.72)' }} onClick={handleSkip} />
+      {svgMask}
+      <div className="walkthrough-card" style={cardPos} onClick={e => e.stopPropagation()}>
+        <div className="walkthrough-step-counter">STEP {step + 1} OF {WALKTHROUGH_STEPS.length}</div>
+        <div className="walkthrough-title">{currentStep.title}</div>
+        <div className="walkthrough-body" dangerouslySetInnerHTML={{ __html: currentStep.body }} />
+        <div className="walkthrough-dots">
+          {WALKTHROUGH_STEPS.map((_, i) => (
+            <div key={i} className={`walkthrough-dot ${i === step ? 'active' : i < step ? 'done' : ''}`} />
+          ))}
+        </div>
+        <div className="walkthrough-actions">
+          <button className="walkthrough-btn skip" onClick={handleSkip}>SKIP</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {!isFirst && <button className="walkthrough-btn" onClick={() => setStep(step - 1)}>BACK</button>}
+            <button className="walkthrough-btn primary" onClick={handleNext}>{isLast ? 'FINISH' : 'NEXT'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [state, dispatch] = useReducer(appReducer, INITIAL_STATE);
   const { mode, showExamples, showTooltips, ladderFullscreen, rungs, txInputs, txOutputs, locktime,
@@ -10957,6 +11246,11 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const ex = params.get('example');
     return ex !== null ? parseInt(ex, 10) : null;
+  });
+
+  // Walkthrough state -- auto-show on first visit
+  const [walkthroughActive, setWalkthroughActive] = useState(() => {
+    try { return !localStorage.getItem('ladder-walkthrough-complete'); } catch(e) { return false; }
   });
 
   // Right panel resize
@@ -11943,6 +12237,7 @@ ${ladderRows.map(r => `
           <button className="header-btn" onClick={handleImport} title={showTooltips ? 'Import createrungtx JSON from clipboard' : undefined}>IMPORT</button>
           <button className="header-btn" onClick={handleCopyJson} title={showTooltips ? 'Validate and copy wire-format JSON to clipboard' : undefined}>COPY JSON</button>
           <button className="header-btn" onClick={handlePrint} title={showTooltips ? 'Print ladder diagram' : undefined}>PRINT</button>
+          <button className="header-btn" onClick={() => setWalkthroughActive(true)} title={showTooltips ? 'Start the guided walkthrough tutorial' : undefined} style={{ color: 'var(--cyan)' }}>TUTORIAL</button>
         </div>
       </div>
 
@@ -12124,6 +12419,7 @@ ${ladderRows.map(r => `
       {showExamples && (
         <ExamplesModal onClose={() => dispatch({ type: 'SET_SHOW_EXAMPLES', value: false })} onLoad={handleLoadExample} />
       )}
+      <GuidedWalkthrough active={walkthroughActive} onClose={() => setWalkthroughActive(false)} />
       {showValidationPanel && validationResult && (
         <div className="validation-overlay" onClick={() => dispatch({ type: 'SET_SHOW_VALIDATION', value: false })}>
           <div className="validation-panel" onClick={e => e.stopPropagation()}>
