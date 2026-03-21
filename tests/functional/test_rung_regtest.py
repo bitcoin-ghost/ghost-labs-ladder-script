@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Exhaustive regtest functional test for all 60 evaluable Ladder Script block types.
+Exhaustive regtest functional test for all 59 active Ladder Script block types.
 Tests create -> sign -> broadcast -> mine -> spend for every testable block type
 and common combinations (AND composition, OR composition, inversion).
 

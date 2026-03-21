@@ -63,20 +63,6 @@
     </thead>
     <tbody>
       <tr>
-        <td class="field-name">signing_key_commit</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the signing public key</td>
-      </tr>
-      <tr>
-        <td class="field-name">adaptor_point_commit</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the adaptor point</td>
-      </tr>
-      <tr>
         <td class="field-name">signing_key</td>
         <td class="field-type">PUBKEY</td>
         <td class="field-size">32-33 B</td>
@@ -92,6 +78,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Both public keys folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 2). No key fields in conditions.</p>
 </div>
 
 <!-- Wire Format -->
@@ -136,7 +123,7 @@
   <div class="eval-box">
     <div class="eval-step">
       <span class="eval-step-num">1.</span>
-      <span class="eval-step-text">Resolve both <span class="eval-keyword">PUBKEY_COMMIT</span> fields: verify SHA256(signing_key) and SHA256(adaptor_point) match their respective commitments. If either mismatches &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
+      <span class="eval-step-text">Verify both witness pubkeys (signing_key and adaptor_point) against Merkle leaf (merkle_pub_key). If either mismatches &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">2.</span>
@@ -159,8 +146,8 @@
   <table class="result-table">
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
-      <tr><td>Missing PUBKEY_COMMIT, PUBKEY, or SIGNATURE fields</td><td class="r-err">ERROR</td></tr>
-      <tr><td>Fewer than 2 PUBKEY_COMMIT in conditions</td><td class="r-err">ERROR</td></tr>
+      <tr><td>Missing PUBKEY or SIGNATURE in witness</td><td class="r-err">ERROR</td></tr>
+      <tr><td>Fewer than 2 pubkeys in Merkle leaf (PubkeyCountForBlock = 2)</td><td class="r-err">ERROR</td></tr>
       <tr><td>Adaptor point not valid x-only point</td><td class="r-err">ERROR</td></tr>
       <tr><td>Signing key commitment mismatch</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Adaptor point commitment mismatch</td><td class="r-unsat">UNSATISFIED</td></tr>
@@ -179,8 +166,8 @@
   <span class="json-key">"type"</span>: <span class="json-str">"ADAPTOR_SIG"</span>,
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes (signing key)"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"d7e2f1...32 bytes (adaptor point)"</span> }
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes (signing key)"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"03def2...33 bytes (adaptor point)"</span> }
   ]
 }</pre></div>
 

@@ -63,13 +63,6 @@
     </thead>
     <tbody>
       <tr>
-        <td class="field-name">pubkey_commit</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the signing public key</td>
-      </tr>
-      <tr>
         <td class="field-name">scheme</td>
         <td class="field-type">SCHEME</td>
         <td class="field-size">1 B</td>
@@ -88,7 +81,7 @@
         <td class="field-type">PUBKEY</td>
         <td class="field-size">32-33 B</td>
         <td class="field-side-w">Witness</td>
-        <td class="field-desc">Public key (must hash to pubkey_commit)</td>
+        <td class="field-desc">Public key (verified via Merkle leaf)</td>
       </tr>
       <tr>
         <td class="field-name">signature</td>
@@ -99,6 +92,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Public key folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 1). No key field in conditions.</p>
 </div>
 
 <!-- Evaluation Logic -->
@@ -107,7 +101,7 @@
   <div class="eval-box">
     <div class="eval-step">
       <span class="eval-step-num">1.</span>
-      <span class="eval-step-text">Verify <span class="eval-keyword">PUBKEY_COMMIT</span> = SHA256(PUBKEY). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
+      <span class="eval-step-text">Verify witness <span class="eval-keyword">PUBKEY</span> against Merkle leaf (merkle_pub_key). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">2.</span>
@@ -135,7 +129,7 @@
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
       <tr><td>Missing required fields</td><td class="r-err">ERROR</td></tr>
-      <tr><td>PUBKEY_COMMIT != SHA256(PUBKEY)</td><td class="r-unsat">UNSATISFIED</td></tr>
+      <tr><td>Merkle leaf verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Signature verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>CLTV locktime check fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Signature valid AND locktime reached</td><td class="r-sat">SATISFIED</td></tr>
@@ -152,7 +146,7 @@
   <span class="json-key">"type"</span>: <span class="json-str">"CLTV_SIG"</span>,
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"SCHEME"</span>, <span class="json-key">"value"</span>: <span class="json-num">1</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">850000</span> }
   ]

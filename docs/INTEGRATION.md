@@ -421,6 +421,50 @@ Block-level validation applies the same `CScriptCheck` framework used for all tr
 
 The current wallet does not natively construct v4 transactions. The `SigVersion::LADDER` case is explicitly noted as unused in wallet fee bumping (`feebumper.h`). Transaction construction and signing are performed through the dedicated RPC interface (`createrungtx`, `signrungtx`).
 
+---
+
+## 11. Descriptor Language
+
+### 11.1 Overview
+
+Ladder Script includes a descriptor language for expressing conditions as compact strings. The `parseladder` and `formatladder` RPCs convert between descriptor strings and wire-format conditions. Implementation: `src/rung/descriptor.h` and `src/rung/descriptor.cpp`.
+
+### 11.2 Grammar
+
+```
+ladder(or(rung1, rung2, ...))
+rung = block | and(block, block, ...)
+block = sig(@alias) | sig(@alias, scheme)
+       | csv(N) | csv_time(N) | cltv(N) | cltv_time(N)
+       | multisig(M, @pk1, @pk2, ...) | multisig(M, @pk1, @pk2, ..., scheme)
+       | hash_guarded(hex) | tagged_hash(hex1, hex2)
+       | ctv(hex) | amount_lock(min, max)
+       | timelocked_sig(@alias, N) | htlc(@alias1, @alias2, hex, N)
+       | hash_sig(@alias, hex) | cltv_sig(@alias, N)
+       | output_check(idx, min, max, hex)
+       | !block  (inverted)
+```
+
+Scheme names: `schnorr`, `ecdsa`, `falcon512`, `falcon1024`, `dilithium3`, `sphincs_sha`.
+
+Key aliases are prefixed with `@` and resolved against a key map provided at parse time.
+
+### 11.3 RPCs
+
+| RPC | Purpose |
+|-----|---------|
+| `parseladder` | Parse a descriptor string into serialised conditions |
+| `formatladder` | Format serialised conditions as a descriptor string |
+
+### 11.4 Examples
+
+```
+ladder(or(sig(@alice), and(csv(144), sig(@bob))))
+ladder(or(and(multisig(2, @a, @b, @c), output_check(0, 100000, 5000000, abcd...ef))))
+```
+
+---
+
 ### 10.6 P2P Relay
 
 v4 transactions are relayed through the standard P2P transaction relay mechanism. The mempool's `IsStandard()` check delegates to `IsStandardRungTx()` (thin deserialize-only check) for v4 transactions. Output validation is performed by `ValidateRungOutputs()` at the consensus layer. Nodes without Ladder Script support would reject v4 transactions as non-standard but would accept blocks containing them (consensus-valid).

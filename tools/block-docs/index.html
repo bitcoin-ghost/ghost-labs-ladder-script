@@ -187,7 +187,7 @@
 <!-- Hash Family -->
 <div class="family-section">
   <h2 class="family-title family-hash">Hash Family — 0x0200</h2>
-  <p class="intro-text">Hash blocks verify knowledge of a preimage that produces a committed hash digest. Used for hash locks, atomic swaps, and commitment schemes. HASH_PREIMAGE has a direct Tapscript equivalent; HASH160 and TAGGED_HASH do not.</p>
+  <p class="intro-text">Hash blocks verify knowledge of a preimage that produces a committed hash digest. Used for hash locks, atomic swaps, and commitment schemes. HASH_PREIMAGE and HASH160_PREIMAGE are deprecated; use HTLC, HASH_SIG, or HASH_GUARDED instead.</p>
 
   <div class="index-grid">
     <a href="hash-preimage.html" class="block-card">
@@ -208,6 +208,13 @@
       <div class="block-card-code">0x0203</div>
       <div class="block-card-name">TAGGED_HASH</div>
       <div class="block-card-desc">BIP-340 tagged hash preimage verification. SHA256(SHA256(tag) || SHA256(tag) || preimage). Domain-separated hashing for protocol-specific commitments.</div>
+      <div class="block-card-badge badge-hash">Hash</div>
+    </a>
+
+    <a href="hash-guarded.html" class="block-card">
+      <div class="block-card-code">0x0204</div>
+      <div class="block-card-name">HASH_GUARDED</div>
+      <div class="block-card-desc">Raw SHA-256 preimage verification. Non-invertible, fail-closed. Safe replacement for deprecated HASH_PREIMAGE. SHA256(preimage) must equal committed hash.</div>
       <div class="block-card-badge badge-hash">Hash</div>
     </a>
   </div>
@@ -621,7 +628,7 @@
     <a href="compact-sig.html" class="block-card">
       <div class="block-card-code">COMPACT 0x01</div>
       <div class="block-card-name">COMPACT_SIG</div>
-      <div class="block-card-desc">Compact single-key signature rung. Stores PUBKEY_COMMIT (32B) and SCHEME (1B) inline with no block overhead. Resolves to a SIG block at evaluation. Used for change outputs and simple single-key spending.</div>
+      <div class="block-card-desc">Compact single-key signature rung. Stores SCHEME (1B) inline with no block overhead; public key folded into Merkle leaf. Resolves to a SIG block at evaluation. Used for change outputs and simple single-key spending.</div>
       <div class="block-card-badge" style="color:#98c379;border-color:#98c37940">Compact</div>
     </a>
   </div>

@@ -32,7 +32,7 @@ Transaction version 4 (`RUNG_TX`). Soft fork activation -- non-upgraded nodes se
 
 **Legacy migration.** Seven legacy block types wrap P2PK, P2PKH, P2SH, P2WPKH, P2WSH, P2TR key-path, and P2TR script-path as typed Ladder Script blocks. Identical spending semantics, fully typed fields. Designed for a three-phase migration: coexistence, legacy-in-blocks, then sunset of raw legacy formats.
 
-## 60 Block Types
+## 61 Block Types
 
 | Family | Blocks |
 |--------|--------|
@@ -44,7 +44,7 @@ Transaction version 4 (`RUNG_TX`). Soft fork activation -- non-upgraded nodes se
 | Anchor | ANCHOR, ANCHOR_CHANNEL, ANCHOR_POOL, ANCHOR_RESERVE, ANCHOR_SEAL, ANCHOR_ORACLE, DATA_RETURN |
 | PLC | HYSTERESIS_FEE, HYSTERESIS_VALUE, TIMER_CONTINUOUS, TIMER_OFF_DELAY, LATCH_SET, LATCH_RESET, COUNTER_DOWN, COUNTER_PRESET, COUNTER_UP, COMPARE, SEQUENCER, ONE_SHOT, RATE_LIMIT, COSIGN |
 | Compound | TIMELOCKED_SIG, HTLC, HASH_SIG, PTLC, CLTV_SIG, TIMELOCKED_MULTISIG |
-| Governance | EPOCH_GATE, WEIGHT_LIMIT, INPUT_COUNT, OUTPUT_COUNT, RELATIVE_VALUE, ACCUMULATOR |
+| Governance | EPOCH_GATE, WEIGHT_LIMIT, INPUT_COUNT, OUTPUT_COUNT, RELATIVE_VALUE, ACCUMULATOR, OUTPUT_CHECK |
 | Legacy | P2PK_LEGACY, P2PKH_LEGACY, P2SH_LEGACY, P2WPKH_LEGACY, P2WSH_LEGACY, P2TR_LEGACY, P2TR_SCRIPT_LEGACY |
 
 ## Try it
@@ -53,7 +53,7 @@ The [Ladder Engine](https://bitcoinghost.org/labs/ladder-engine.html) is a brows
 
 ## Tests
 
-- **437 unit tests** (`src/test/rung_tests.cpp`) -- serialization, evaluation, all 60 block types, inversion, anti-spam, PQ signatures, legacy blocks
+- **437 unit tests** (`src/test/rung_tests.cpp`) -- serialization, evaluation, all 61 block types, inversion, anti-spam, PQ signatures, legacy blocks
 - **229 functional tests** across 6 test suites -- end-to-end RPC flows, P2P relay, MLSC Merkle proofs, PQ block stress tests, signet integration
 
 ```bash
@@ -83,7 +83,7 @@ proxy/                 FastAPI signet proxy for live testing
 ## Documentation
 
 - [BIP Draft](docs/BIP-XXXX.md) -- formal Bitcoin Improvement Proposal
-- [Block Library](docs/BLOCK_LIBRARY.md) -- all 60 blocks with fields and semantics
+- [Block Library](docs/BLOCK_LIBRARY.md) -- all 61 blocks with fields and semantics
 - [Examples](docs/EXAMPLES.md) -- worked scenarios with RPC JSON
 - [Review Guide](docs/REVIEW_GUIDE.md) -- recommended reading order for the C++
 - [Engine Guide](docs/ENGINE_GUIDE.md) -- how to use the visual builder
@@ -97,13 +97,14 @@ proxy/                 FastAPI signet proxy for live testing
 | File | Purpose |
 |------|---------|
 | `src/rung/types.h` | Core types: block types, data types, schemes, structs |
-| `src/rung/evaluator.cpp` | Block evaluators for all 60 types, rung/ladder logic |
+| `src/rung/evaluator.cpp` | Block evaluators for all 61 types, rung/ladder logic |
 | `src/rung/serialize.cpp` | Wire format with micro-headers and implicit fields |
 | `src/rung/conditions.cpp` | MLSC Merkle tree, `merkle_pub_key` leaf computation |
 | `src/rung/sighash.cpp` | Tagged sighash computation |
 | `src/rung/pq_verify.cpp` | Post-quantum signature verification (liboqs) |
 | `src/rung/adaptor.cpp` | Adaptor signature support |
 | `src/rung/aggregate.cpp` | Block-level signature aggregation |
+| `src/rung/descriptor.cpp` | Descriptor language: `parseladder` / `formatladder` RPCs |
 | `src/rung/rpc.cpp` | RPC commands: `createrung`, `createrungtx`, `signrungtx`, etc. |
 | `src/rung/policy.cpp` | Mempool policy enforcement |
 

@@ -458,7 +458,7 @@ single spending condition. Represented by the `RungBlock` struct containing:
 ### RungBlockType
 
 An enum (`uint16_t`) identifying the type of a block. Encoded as 2 bytes (little-endian)
-in the wire format. 60 block types are defined across 10 families. The numeric ranges
+in the wire format. 61 block types are defined across 10 families. The numeric ranges
 partition the type space by family:
 
 | Range | Family |
@@ -565,7 +565,9 @@ context. For Ladder Script, the sighash is computed by `SignatureHashLadder()` u
 the `TaggedHash("LadderSighash")` construction. See **LadderSighash** for the full
 commitment structure. Sighash types follow Bitcoin convention: SIGHASH_DEFAULT (0x00),
 SIGHASH_ALL (0x01), SIGHASH_NONE (0x02), SIGHASH_SINGLE (0x03), with the
-SIGHASH_ANYONECANPAY modifier (0x80).
+SIGHASH_ANYONECANPAY modifier (0x80). Additionally, SIGHASH_ANYPREVOUT (0x40) skips
+prevouts commitment for LN-Symmetry/eltoo, and SIGHASH_ANYPREVOUTANYSCRIPT (0xC0)
+skips both prevouts and conditions commitments for fully rebindable signatures.
 
 ### Spent
 

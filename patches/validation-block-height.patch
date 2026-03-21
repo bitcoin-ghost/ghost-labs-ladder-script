@@ -79,7 +79,7 @@ index 8190e9c..fd2e858 100644
      const CScriptWitness *witness = &ptxTo->vin[nIn].scriptWitness;
      ScriptError error{SCRIPT_ERR_UNKNOWN_ERROR};
 +
-+    // LADDER SCRIPT: Route v3 RUNG_TX transactions to ladder witness evaluator
++    // LADDER SCRIPT: Route v4 RUNG_TX transactions to ladder witness evaluator
 +    if (ptxTo->version == CTransaction::RUNG_TX_VERSION) {
 +        CachingTransactionSignatureChecker checker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *m_signature_cache, *txdata);
 +        if (rung::VerifyRungTx(*ptxTo, nIn, m_tx_out, nFlags, checker, *txdata, &error, m_block_height)) {

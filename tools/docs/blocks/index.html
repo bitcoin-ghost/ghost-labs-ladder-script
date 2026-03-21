@@ -187,20 +187,20 @@
 <!-- Hash Family -->
 <div class="family-section">
   <h2 class="family-title family-hash">Hash Family -- 0x0200</h2>
-  <p class="intro-text">Hash blocks verify knowledge of a preimage that produces a committed hash digest. Used for commitment schemes and domain-separated verification. HASH_PREIMAGE and HASH160_PREIMAGE are deprecated -- use HTLC or HASH_SIG compound blocks instead.</p>
+  <p class="intro-text">Hash blocks verify knowledge of a preimage that produces a committed hash digest. Used for commitment schemes and domain-separated verification. HASH_PREIMAGE and HASH160_PREIMAGE are deprecated -- use HTLC, HASH_SIG, or HASH_GUARDED instead.</p>
 
   <div class="index-grid">
     <a href="hash-preimage.html" class="block-card" style="opacity:0.5">
       <div class="block-card-code">0x0201</div>
       <div class="block-card-name">HASH_PREIMAGE</div>
-      <div class="block-card-desc">DEPRECATED -- rejected at consensus. Use HTLC or HASH_SIG instead. SHA-256 hash preimage verification.</div>
+      <div class="block-card-desc">DEPRECATED -- rejected at consensus. Use HTLC, HASH_SIG, or HASH_GUARDED instead. SHA-256 hash preimage verification.</div>
       <div class="block-card-badge badge-hash">Hash</div>
     </a>
 
     <a href="hash160-preimage.html" class="block-card" style="opacity:0.5">
       <div class="block-card-code">0x0202</div>
       <div class="block-card-name">HASH160_PREIMAGE</div>
-      <div class="block-card-desc">DEPRECATED -- rejected at consensus. Use HTLC or HASH_SIG instead. RIPEMD160(SHA256) hash preimage verification.</div>
+      <div class="block-card-desc">DEPRECATED -- rejected at consensus. Use HTLC, HASH_SIG, or HASH_GUARDED instead. RIPEMD160(SHA256) hash preimage verification.</div>
       <div class="block-card-badge badge-hash">Hash</div>
     </a>
 
@@ -208,6 +208,13 @@
       <div class="block-card-code">0x0203</div>
       <div class="block-card-name">TAGGED_HASH</div>
       <div class="block-card-desc">BIP-340 tagged hash preimage verification. SHA256(SHA256(tag) || SHA256(tag) || preimage). Domain-separated hashing for protocol-specific commitments.</div>
+      <div class="block-card-badge badge-hash">Hash</div>
+    </a>
+
+    <a href="hash-guarded.html" class="block-card">
+      <div class="block-card-code">0x0204</div>
+      <div class="block-card-name">HASH_GUARDED</div>
+      <div class="block-card-desc">Raw SHA-256 preimage verification. Non-invertible, fail-closed. Safe replacement for deprecated HASH_PREIMAGE. SHA256(preimage) must equal committed hash.</div>
       <div class="block-card-badge badge-hash">Hash</div>
     </a>
   </div>
@@ -478,7 +485,7 @@
     <a href="hash-sig.html" class="block-card">
       <div class="block-card-code">0x0703</div>
       <div class="block-card-name">HASH_SIG</div>
-      <div class="block-card-desc">Hash preimage verification combined with signature check. The recommended replacement for deprecated HASH_PREIMAGE. Saves 8 bytes vs separate blocks.</div>
+      <div class="block-card-desc">Hash preimage verification combined with signature check. A recommended replacement for deprecated HASH_PREIMAGE (alongside HASH_GUARDED). Saves 8 bytes vs separate blocks.</div>
       <div class="block-card-badge badge-compound">Compound</div>
     </a>
 

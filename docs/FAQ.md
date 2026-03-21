@@ -19,7 +19,7 @@ Both use the same wire format: rungs containing blocks containing typed fields.
 
 Three:
 
-- **Programmability.** 60 block types across 10 families -- signatures, timelocks,
+- **Programmability.** 61 block types (59 active, 2 deprecated) across 10 families -- signatures, timelocks,
   hash locks, covenants, recursion, PLC state machines, governance constraints,
   and more -- that compose freely within rungs and ladders. Any combination of
   AND/OR spending logic, built declaratively.
@@ -111,17 +111,20 @@ Ladder Script uses a tagged hash: `TaggedHash("LadderSighash")`. The sighash
 commits to:
 
 - Epoch (currently 0)
-- Hash type (SIGHASH_DEFAULT, ALL, NONE, SINGLE, ANYONECANPAY)
+- Hash type (SIGHASH_DEFAULT, ALL, NONE, SINGLE, ANYONECANPAY, ANYPREVOUT, ANYPREVOUTANYSCRIPT)
 - Transaction version and locktime
-- Prevouts hash, amounts hash, sequences hash (unless ANYONECANPAY)
+- Prevouts hash, amounts hash, sequences hash (unless ANYONECANPAY; prevouts skipped if ANYPREVOUT)
 - Outputs hash (unless SIGHASH_NONE)
 - Spend type (always 0; no annex or extensions)
 - Input-specific data (prevout or index)
 - **Conditions hash**: SHA-256 of the serialised rung conditions from the spent
-  output's scriptPubKey (for `0xC1`), or the conditions root directly (for `0xC2`)
+  output's scriptPubKey (for `0xC1`), or the conditions root directly (for `0xC2`).
+  Skipped if ANYPREVOUTANYSCRIPT.
 
 The conditions hash binds the signature to the exact set of conditions being
-satisfied, preventing condition substitution attacks.
+satisfied, preventing condition substitution attacks. ANYPREVOUT (0x40) skips
+prevouts commitment, enabling LN-Symmetry/eltoo. ANYPREVOUTANYSCRIPT (0xC0)
+skips both prevouts and conditions commitments for fully rebindable signatures.
 
 ### 9. What are the output format prefixes?
 
@@ -674,7 +677,7 @@ Merkle proof exists -- and the funds are permanently burned.
 ### 35. What are micro-headers?
 
 Micro-headers are a wire format optimisation. Instead of encoding a block's
-type as a 2-byte `uint16_t`, all 60 block types are assigned a 1-byte slot
+type as a 2-byte `uint16_t`, all 61 block types are assigned a 1-byte slot
 index (0x00 to 0x3D) in a compile-time lookup table. This saves 1 byte per
 block.
 
@@ -747,6 +750,7 @@ transaction size limits, I/O fanout bounds, and value ratios:
 - **RELATIVE_VALUE** (0x0805): Output must be >= a ratio of the input value
   (anti-siphon protection).
 - **ACCUMULATOR** (0x0806): Merkle set membership proof for allowlists.
+- **OUTPUT_CHECK** (0x0807): Per-output value and script constraint.
 
 ### 41. How does ACCUMULATOR work?
 
@@ -902,7 +906,7 @@ Several things that are either impossible or require contentious new opcodes:
 
 Taproot provides MAST (hiding unused spending paths behind a Merkle root) and
 Schnorr signatures. MLSC provides the same MAST privacy model with tagged hashing
-and sorted interior nodes, extended to 60 block types including covenants, PLC
+and sorted interior nodes, extended to 61 block types including covenants, PLC
 state machines, governance constraints, and PQ signatures.
 
 Taproot script-path spends execute Bitcoin Script inside a revealed leaf. MLSC
@@ -913,7 +917,7 @@ surface.
 
 Yes. Two optimisations stack:
 
-- **Micro-headers:** 1 byte per block type instead of 2 (all 60 types have slots).
+- **Micro-headers:** 1 byte per block type instead of 2 (all 61 types have slots).
 - **Implicit fields:** Field type bytes omitted when the layout is known from the
   block type (saves 1 byte per field). Fixed-size fields skip the length prefix.
 

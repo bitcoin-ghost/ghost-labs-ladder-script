@@ -67,13 +67,6 @@
         <td class="field-desc">Merkle root of the script tree. <strong>Node-computed</strong> &mdash; the node derives this from the PREIMAGE (script leaf). Raw hash input is rejected.</td>
       </tr>
       <tr>
-        <td class="field-name">pubkey_commit</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">Internal key commitment (SHA-256 of internal pubkey). <strong>Node-computed</strong> &mdash; the user provides PUBKEY (internal key) and the node computes this field automatically. Raw hash input is rejected.</td>
-      </tr>
-      <tr>
         <td class="field-name">preimage</td>
         <td class="field-type">PREIMAGE</td>
         <td class="field-size">var</td>
@@ -89,6 +82,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Public key folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 1). No key field in conditions.</p>
 </div>
 
 <!-- Wire Format -->
@@ -102,8 +96,7 @@
       <span class="wire-segment wire-inv">0</span>
       <span class="wire-segment wire-count">2</span>
       <span class="wire-segment wire-field-pubkey" style="min-width:130px">HASH256 &middot; 32B</span>
-      <span class="wire-segment wire-field-sig" style="min-width:160px">PUBKEY_COMMIT &middot; 32B</span>
-      <span class="wire-bytes">= 70 bytes</span>
+      <span class="wire-bytes">= 38 bytes</span>
     </div>
   </div>
 
@@ -156,8 +149,8 @@
   <table class="result-table">
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
-      <tr><td>Missing HASH256, PUBKEY_COMMIT, or PREIMAGE</td><td class="r-err">ERROR</td></tr>
-      <tr><td>HASH256 or PUBKEY_COMMIT wrong size</td><td class="r-err">ERROR</td></tr>
+      <tr><td>Missing HASH256 or PREIMAGE</td><td class="r-err">ERROR</td></tr>
+      <tr><td>HASH256 wrong size or Merkle leaf pubkey count mismatch</td><td class="r-err">ERROR</td></tr>
       <tr><td>SHA256(PREIMAGE) != HASH256 (Merkle root)</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>PREIMAGE fails to deserialize as Ladder conditions</td><td class="r-err">ERROR</td></tr>
       <tr><td>Inner conditions evaluation fails</td><td class="r-unsat">UNSATISFIED</td></tr>
@@ -177,7 +170,7 @@
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
     { <span class="json-key">"type"</span>: <span class="json-str">"HASH256"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"e3b0c4...32 bytes (Merkle root)"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes (internal key)"</span> }
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes (internal key)"</span> }
   ]
 }</pre></div>
 
@@ -199,9 +192,9 @@
   <ul class="doc-notes">
     <li>Closes the taproot inscription vector &mdash; the primary data-embedding surface in Bitcoin today.</li>
     <li>Revealed script leaf must deserialize as valid Ladder Script conditions. Arbitrary data is rejected.</li>
-    <li>Both PUBKEY_COMMIT and HASH256 are <strong>node-computed</strong>: the user provides PUBKEY (internal key) and PREIMAGE (script leaf), and the node derives both commitments automatically. Submitting raw hash values directly is rejected.</li>
+    <li>HASH256 is <strong>node-computed</strong>: the user provides PREIMAGE (script leaf) and the node derives the hash automatically. PUBKEY (internal key) is folded into the Merkle leaf via merkle_pub_key. Submitting raw hash values directly is rejected.</li>
     <li>Recursion depth limited to 2.</li>
-    <li>PUBKEY_COMMIT is the internal key commitment, used for key-path/script-path binding.</li>
+    <li>The internal key is folded into the Merkle leaf, used for key-path/script-path binding.</li>
     <li>For key-path-only spending, see P2TR_LEGACY (0x0906).</li>
   </ul>
 </div>

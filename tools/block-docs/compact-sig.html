@@ -22,7 +22,7 @@
 <div class="block-title-section">
   <div class="block-type-code">COMPACT TYPE 0x01 &middot; WIRE FORMAT OPTIMISATION</div>
   <h1 class="block-title">COMPACT_SIG</h1>
-  <p class="block-subtitle">Compact rung encoding for single-key signature conditions. Stores PUBKEY_COMMIT and SCHEME directly on the rung with no block overhead. Resolves to a standard SIG block at evaluation time. Primarily used for change outputs and single-key spending.</p>
+  <p class="block-subtitle">Compact rung encoding for single-key signature conditions. Stores SCHEME directly on the rung with no block overhead (public key folded into Merkle leaf via merkle_pub_key). Resolves to a standard SIG block at evaluation time. Primarily used for change outputs and single-key spending.</p>
   <span class="block-family-badge" style="color: #ff1744; border-color: #ff174440;">Signature</span>
   <span class="block-family-badge" style="color: #98c379; border-color: #98c37940;">Compact</span>
 </div>
@@ -79,13 +79,6 @@
         <td class="field-desc">Compact type identifier: 0x01 = COMPACT_SIG</td>
       </tr>
       <tr>
-        <td class="field-name">pubkey_commit</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the signing public key</td>
-      </tr>
-      <tr>
         <td class="field-name">scheme</td>
         <td class="field-type">SCHEME</td>
         <td class="field-size">1 B</td>
@@ -94,6 +87,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Public key folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 1). No key field in conditions.</p>
 
   <p class="section-text" style="margin-top:16px">The witness for a compact SIG rung uses a <strong>normal SIG block</strong> with PUBKEY and SIGNATURE fields &mdash; the compact encoding only applies to the conditions side.</p>
 
@@ -129,16 +123,15 @@
     <div class="wire-row">
       <span class="wire-segment wire-count">0x00</span>
       <span class="wire-segment wire-type">0x01</span>
-      <span class="wire-segment wire-field-pubkey" style="min-width:160px">PUBKEY_COMMIT &middot; 32B</span>
       <span class="wire-segment wire-field-sig" style="min-width:70px">SCHEME &middot; 1B</span>
-      <span class="wire-bytes">= 35 bytes</span>
+      <span class="wire-bytes">= 3 bytes</span>
     </div>
   </div>
 
   <p class="section-text" style="margin-top:16px; margin-bottom:8px">
     The <code style="color:#98c379">0x00</code> byte is the <code>n_blocks</code> sentinel &mdash; zero blocks signals compact encoding.
     The <code style="color:#98c379">0x01</code> byte is the compact type (COMPACT_SIG).
-    PUBKEY_COMMIT and SCHEME follow as raw bytes with no field headers.
+    SCHEME follows as a raw byte with no field header. The public key is folded into the Merkle leaf via merkle_pub_key.
   </p>
 
   <p class="section-text" style="margin-bottom:16px">Witness side (normal SIG block in witness rung):</p>
@@ -179,15 +172,15 @@
     </div>
     <div class="eval-step">
       <span class="eval-step-num">2.</span>
-      <span class="eval-step-text"><strong>Resolve:</strong> Build an equivalent <span class="eval-keyword">SIG</span> block with PUBKEY_COMMIT and SCHEME fields from compact data.</span>
+      <span class="eval-step-text"><strong>Resolve:</strong> Build an equivalent <span class="eval-keyword">SIG</span> block with SCHEME field from compact data. Public key resolved via Merkle leaf.</span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">3.</span>
-      <span class="eval-step-text">During merge, conditions compact data provides PUBKEY_COMMIT + SCHEME; witness provides PUBKEY + SIGNATURE.</span>
+      <span class="eval-step-text">During merge, conditions compact data provides SCHEME; public key is folded into Merkle leaf (merkle_pub_key). Witness provides PUBKEY + SIGNATURE.</span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">4.</span>
-      <span class="eval-step-text">Verify <span class="eval-keyword">PUBKEY_COMMIT</span> = SHA256(PUBKEY). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
+      <span class="eval-step-text">Verify witness <span class="eval-keyword">PUBKEY</span> against Merkle leaf (merkle_pub_key). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">5.</span>
@@ -207,10 +200,10 @@
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
       <tr><td>Unknown compact type (not 0x01)</td><td class="r-err">ERROR</td></tr>
-      <tr><td>pubkey_commit not 32 bytes</td><td class="r-err">ERROR</td></tr>
+      <tr><td>Merkle leaf pubkey count mismatch</td><td class="r-err">ERROR</td></tr>
       <tr><td>Unknown scheme byte</td><td class="r-err">ERROR</td></tr>
       <tr><td>Witness block missing or not SIG type</td><td class="r-err">ERROR</td></tr>
-      <tr><td>PUBKEY_COMMIT != SHA256(PUBKEY)</td><td class="r-unsat">UNSATISFIED</td></tr>
+      <tr><td>Merkle leaf verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Signature verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Signature valid</td><td class="r-sat">SATISFIED</td></tr>
     </tbody>
@@ -225,7 +218,7 @@
   <div class="json-block"><pre>{
   <span class="json-key">"compact"</span>: <span class="json-num">true</span>,
   <span class="json-key">"compact_type"</span>: <span class="json-str">"COMPACT_SIG"</span>,
-  <span class="json-key">"pubkey_commit"</span>: <span class="json-str">"a3b1c4d5...32 bytes"</span>,
+  <span class="json-key">"pubkey"</span>: <span class="json-str">"02abc1d5...33 bytes"</span>,
   <span class="json-key">"scheme"</span>: <span class="json-str">"SCHNORR"</span>
 }</pre></div>
 
@@ -241,7 +234,7 @@
   <div class="json-label" style="margin-top:16px">RPC: createrungtx (compact rung spec)</div>
   <div class="json-block"><pre>{
   <span class="json-key">"compact_type"</span>: <span class="json-str">"COMPACT_SIG"</span>,
-  <span class="json-key">"pubkey_commit"</span>: <span class="json-str">"a3b1c4d5...32 bytes hex"</span>,
+  <span class="json-key">"pubkey"</span>: <span class="json-str">"02abc1d5...33 bytes hex"</span>,
   <span class="json-key">"scheme"</span>: <span class="json-str">"SCHNORR"</span>
 }</pre></div>
 </div>
@@ -256,7 +249,7 @@
     </div>
     <div class="eval-step">
       <span class="eval-step-num">&bull;</span>
-      <span class="eval-step-text">PUBKEY_COMMIT must be exactly 32 bytes</span>
+      <span class="eval-step-text">Merkle leaf must contain exactly 1 pubkey (PubkeyCountForBlock = 1)</span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">&bull;</span>
@@ -295,7 +288,7 @@
 
   <div class="use-case">
     <div class="use-case-title">Not a Block Type</div>
-    <div class="use-case-desc">COMPACT_SIG is a <em>compact rung encoding</em>, not a new block type in the RungBlockType enum. It uses the <code>n_blocks == 0</code> sentinel within a rung to signal that the rung carries inline compact data rather than an array of blocks. The 59 active block types (2 deprecated) is unchanged.</div>
+    <div class="use-case-desc">COMPACT_SIG is a <em>compact rung encoding</em>, not a new block type in the RungBlockType enum. It uses the <code>n_blocks == 0</code> sentinel within a rung to signal that the rung carries inline compact data rather than an array of blocks. The 60 active block types (2 deprecated) is unchanged.</div>
   </div>
 
   <div class="use-case">

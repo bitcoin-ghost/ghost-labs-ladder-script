@@ -24,7 +24,7 @@ The format is a single soft fork that subsumes OP_CTV, OP_VAULT, OP_CAT, and eve
 
 **Human readable.** A CFO can audit a ladder diagram. A PLC engineer can read it immediately. No stack simulation required.
 
-## 60 Block Types
+## 61 Block Types
 
 | Category | Blocks |
 |----------|--------|
@@ -36,7 +36,7 @@ The format is a single soft fork that subsumes OP_CTV, OP_VAULT, OP_CAT, and eve
 | Anchor | ANCHOR, ANCHOR_CHANNEL, ANCHOR_POOL, ANCHOR_RESERVE, ANCHOR_SEAL, ANCHOR_ORACLE, DATA_RETURN |
 | PLC | HYSTERESIS_FEE, HYSTERESIS_VALUE, TIMER_CONTINUOUS, TIMER_OFF_DELAY, LATCH_SET, LATCH_RESET, COUNTER_DOWN, COUNTER_PRESET, COUNTER_UP, COMPARE, SEQUENCER, ONE_SHOT, RATE_LIMIT, COSIGN |
 | Compound | TIMELOCKED_SIG, HTLC, HASH_SIG, PTLC, CLTV_SIG, TIMELOCKED_MULTISIG |
-| Governance | EPOCH_GATE, WEIGHT_LIMIT, INPUT_COUNT, OUTPUT_COUNT, RELATIVE_VALUE, ACCUMULATOR |
+| Governance | EPOCH_GATE, WEIGHT_LIMIT, INPUT_COUNT, OUTPUT_COUNT, RELATIVE_VALUE, ACCUMULATOR, OUTPUT_CHECK |
 | Legacy | P2PK_LEGACY, P2PKH_LEGACY, P2SH_LEGACY, P2WPKH_LEGACY, P2WSH_LEGACY, P2TR_LEGACY, P2TR_SCRIPT_LEGACY |
 
 ## Try it
@@ -58,7 +58,7 @@ proxy/             FastAPI signet proxy for live testing
 
 ## Documentation
 
-- [Block Library](docs/BLOCK_LIBRARY.md) -- all 60 blocks with fields and semantics
+- [Block Library](docs/BLOCK_LIBRARY.md) -- all 61 blocks with fields and semantics
 - [BIP Draft](docs/BIP-XXXX.md) -- formal Bitcoin Improvement Proposal
 - [Examples](docs/EXAMPLES.md) -- 8 worked scenarios with JSON
 - [Implementation Notes](docs/IMPLEMENTATION_NOTES.md) -- spec deviations and why

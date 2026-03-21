@@ -1,6 +1,6 @@
 # Ladder Script Block Library
 
-60 block types across 10 families. Each block evaluates a single spending condition within a rung. Blocks are combined with AND logic within a rung and OR logic across rungs (first satisfied rung wins).
+61 block types (59 active + 2 deprecated) across 10 families. Each block evaluates a single spending condition within a rung. Blocks are combined with AND logic within a rung and OR logic across rungs (first satisfied rung wins).
 
 Full reference with field tables, evaluation logic, and ladder diagrams: [Block Reference](/labs/block-docs/)
 
@@ -125,6 +125,7 @@ Transaction structure introspection and spending policy enforcement.
 | 0x0804 | OUTPUT_COUNT | Output count constraint |
 | 0x0805 | RELATIVE_VALUE | Output-to-input value ratio enforcement |
 | 0x0806 | ACCUMULATOR | Merkle proof membership verification |
+| 0x0807 | OUTPUT_CHECK | Per-output value and script constraint |
 
 ## Legacy Family (0x09xx)
 

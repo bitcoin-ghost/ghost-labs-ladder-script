@@ -12,7 +12,7 @@ This matters because Bitcoin adoption depends on people being able to use it. No
 
 By restructuring how transactions work at the wire level, Ladder Script opens up capabilities that weren't practical before:
 
-- **60 block types across 10 families.** Signatures, timelocks, hash verification, covenants, recursion, anchors, programmable logic, compound patterns, governance constraints, and legacy Bitcoin wrappers. These compose freely. A vault with fee-gated spending and a dead man's switch is three blocks on a rung.
+- **61 block types (59 active + 2 deprecated) across 10 families.** Signatures, timelocks, hash verification, covenants, recursion, anchors, programmable logic, compound patterns, governance constraints, and legacy Bitcoin wrappers. These compose freely. A vault with fee-gated spending and a dead man's switch is three blocks on a rung.
 
 - **MLSC (Merkelised Ladder Script Conditions).** The entire spending policy compresses to a 33-byte output regardless of complexity. Only the exercised path is revealed at spend time. Unused paths stay permanently hidden. This is better for privacy and significantly lighter on-chain.
 
@@ -39,7 +39,7 @@ This site has everything you need to understand, experiment with, and build on L
 - **[Ladder Script Overview](/labs/ladder-script.html)**. How it works, block families, MLSC, use cases, and 30 example diagrams
 - **[Documentation](/labs/docs/)** . BIP spec, technical specification, block library, integration guide, glossary
 - **[Ladder Engine](/labs/ladder-engine.html)** . Visual IDE: build, simulate, and broadcast transactions on the live signet. Pick an example from the preset library or build from scratch
-- **[Block Reference](/labs/docs/#BLOCKS)** . Deep-dive documentation on all 60 block types
+- **[Block Reference](/labs/docs/#BLOCKS)** . Deep-dive documentation on all 61 block types
 
 The best way to understand Ladder Script is to play with it. Open the Engine, load an example, and see how the blocks wire together. Modify something. Break something. See what happens.
 

@@ -37,11 +37,11 @@ DEFINED  -->  STARTED  -->  LOCKED_IN  -->  ACTIVE
 - **ACTIVE:** The new consensus rules are enforced.
 - **FAILED:** The `timeout` has passed without reaching the threshold.
 
-All 60 block types across 10 families activate as a single deployment. Partial activation of individual block types is not supported - the evaluation engine, wire format, and sighash computation form an interdependent whole.
+All 61 block types (59 active + 2 deprecated) across 10 families activate as a single deployment. Partial activation of individual block types is not supported - the evaluation engine, wire format, and sighash computation form an interdependent whole.
 
 ## 3. Risk by Family
 
-All 60 block types are documented in the BIP and Block Library. This section summarises the risk profile and new capabilities introduced by each family, relevant to activation review.
+All 61 block types (59 active + 2 deprecated) are documented in the BIP and Block Library. This section summarises the risk profile and new capabilities introduced by each family, relevant to activation review.
 
 ### Signature, Timelock, and Hash (0x0001-0x02FF) - 11 block types
 
@@ -67,11 +67,11 @@ All 60 block types are documented in the BIP and Block Library. This section sum
 
 **Enables:** Compact atomic swaps, payment channel constructions, time-delayed multisig, all with fewer wire bytes.
 
-### Governance (0x0800-0x08FF) - 6 block types
+### Governance (0x0800-0x08FF) - 7 block types
 
-**Risk:** Moderate. Transaction structure introspection (weight, I/O counts, value ratios). ACCUMULATOR introduces Merkle proof verification.
+**Risk:** Moderate. Transaction structure introspection (weight, I/O counts, value ratios). ACCUMULATOR introduces Merkle proof verification. OUTPUT_CHECK introduces per-output value and script constraints.
 
-**Enables:** Treasury spending windows, transaction structure enforcement, allowlist-based spending, anti-siphon protection.
+**Enables:** Treasury spending windows, transaction structure enforcement, allowlist-based spending, anti-siphon protection, per-output value/script enforcement.
 
 ### Legacy (0x0900-0x09FF) - 7 block types
 
@@ -242,7 +242,7 @@ The MAX_LADDER_WITNESS_SIZE limit of 100,000 bytes applies per input.
 | Reference implementation review | Code review of `src/rung/` by independent reviewers. Fuzz testing campaigns. |
 | Testnet deployment | Ladder Script activated on signet/testnet. Wallet developers begin integration testing. |
 | Signalling start | BIP-9 signalling begins on mainnet. |
-| Activation | All 60 block types become consensus-enforced and policy-standard. |
+| Activation | All 59 active block types become consensus-enforced and policy-standard. |
 
 **Failure criteria:** If the deployment fails to reach the 90% threshold within its 1-year timeout, it enters FAILED state. A new BIP-9 deployment with a fresh version bit and updated parameters would be required to retry.
 

@@ -1,6 +1,6 @@
 # Ladder Script Review Guide
 
-This document is a starting point for reviewers. Ladder Script is 60 block types (2 deprecated) across 10 families, but each block type is a self-contained unit that can be reviewed independently.
+This document is a starting point for reviewers. Ladder Script is 61 block types (59 active + 2 deprecated) across 10 families, but each block type is a self-contained unit that can be reviewed independently.
 
 ## Where to Start
 
@@ -37,7 +37,7 @@ The top-level entry point evaluates a ladder witness:
 
 **File:** `src/rung/serialize.cpp`
 
-Wire format v3 uses micro-headers (single-byte encoding for common block types), implicit fields (block types with known layouts omit type bytes), and varint NUMERIC encoding. The key insight: deserialization validates every byte against the type system. Unknown types, oversized fields, and malformed data are all rejected.
+The wire format uses micro-headers (single-byte encoding for common block types), implicit fields (block types with known layouts omit type bytes), and varint NUMERIC encoding. The key insight: deserialization validates every byte against the type system. Unknown types, oversized fields, and malformed data are all rejected.
 
 ### 5. Understand the Anti-Spam Property (5 minutes)
 
@@ -48,7 +48,7 @@ Every hash commitment stored in the UTXO set is computed by the node:
 - User provides PREIMAGE/SCRIPT_BODY → node computes HASH256 (SHA-256) or HASH160
 - Raw hash values are rejected for all node-computed block types
 
-No condition field across all 60 block types accepts arbitrary user-chosen bytes.
+No condition field across all 61 block types accepts arbitrary user-chosen bytes.
 
 ## File Map
 
@@ -77,7 +77,7 @@ No condition field across all 60 block types accepts arbitrary user-chosen bytes
 | Anchor | 6 | 0x0500-0x05FF | L2 anchors (channels, pools, oracles) |
 | PLC | 14 | 0x0600-0x06FF | Industrial logic (timers, counters, latches, rate limits) |
 | Compound | 6 | 0x0700-0x07FF | Collapsed multi-block patterns (HTLC, PTLC) |
-| Governance | 6 | 0x0800-0x08FF | Transaction-level constraints (weight, I/O counts) |
+| Governance | 7 | 0x0800-0x08FF | Transaction-level constraints (weight, I/O counts, output checks) |
 | Legacy | 7 | 0x0900-0x09FF | Wrapped Bitcoin tx types (P2PK through P2TR) |
 
 ## Running Tests

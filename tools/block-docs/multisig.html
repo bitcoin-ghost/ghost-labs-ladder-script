@@ -75,13 +75,6 @@
         <td class="field-desc">Required number of valid signatures (M)</td>
       </tr>
       <tr>
-        <td class="field-name">pubkey_commit[0..N]</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B each</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to each of the N public keys</td>
-      </tr>
-      <tr>
         <td class="field-name">pubkey[0..N]</td>
         <td class="field-type">PUBKEY</td>
         <td class="field-size">32-33 B each</td>
@@ -104,6 +97,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Public keys folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = N). No key fields in conditions.</p>
 </div>
 
 <!-- Wire Format -->
@@ -157,7 +151,7 @@
     </div>
     <div class="eval-step">
       <span class="eval-step-num">2.</span>
-      <span class="eval-step-text">Resolve each <span class="eval-keyword">PUBKEY_COMMIT</span> to a witness PUBKEY via SHA256 match. If any commit unresolved &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
+      <span class="eval-step-text">Verify each witness <span class="eval-keyword">PUBKEY</span> against Merkle leaf (merkle_pub_key). If any key fails verification &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">3.</span>
@@ -176,10 +170,10 @@
   <table class="result-table">
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
-      <tr><td>Missing NUMERIC or PUBKEY_COMMIT fields</td><td class="r-err">ERROR</td></tr>
+      <tr><td>Missing NUMERIC field or Merkle leaf pubkey count mismatch</td><td class="r-err">ERROR</td></tr>
       <tr><td>Threshold M &lt; 1 or M &gt; N</td><td class="r-err">ERROR</td></tr>
       <tr><td>Fewer than N pubkeys in witness</td><td class="r-err">ERROR</td></tr>
-      <tr><td>PUBKEY_COMMIT resolution fails for any key</td><td class="r-unsat">UNSATISFIED</td></tr>
+      <tr><td>Merkle leaf verification fails for any key</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Fewer than M valid signatures</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>M or more valid signatures from distinct keys</td><td class="r-sat">SATISFIED</td></tr>
     </tbody>
@@ -196,9 +190,9 @@
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">2</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"d7e2f1...32 bytes"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"9c4a88...32 bytes"</span> }
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"03def2...33 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02789a...33 bytes"</span> }
   ]
 }</pre></div>
 

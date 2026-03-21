@@ -53,7 +53,6 @@
   <table class="field-table">
     <thead><tr><th>Field</th><th>Data Type</th><th>Size</th><th>Side</th><th>Description</th></tr></thead>
     <tbody>
-      <tr><td class="field-name">pubkey_commit</td><td class="field-type">PUBKEY_COMMIT</td><td class="field-size">32 B</td><td class="field-side-c">Conditions</td><td class="field-desc">SHA-256 commitment to the signing public key</td></tr>
       <tr><td class="field-name">hash</td><td class="field-type">HASH256</td><td class="field-size">32 B</td><td class="field-side-c">Conditions</td><td class="field-desc">SHA-256 hash the preimage must match. <strong>Node-computed</strong> &mdash; the user provides PREIMAGE and the node computes this field automatically. Raw hash input is rejected.</td></tr>
       <tr><td class="field-name">scheme</td><td class="field-type">SCHEME</td><td class="field-size">1 B</td><td class="field-side-c">Conditions</td><td class="field-desc">Signature scheme identifier (0x01 = Schnorr, 0x02 = ECDSA). Routes to post-quantum verifier when PQ scheme set.</td></tr>
       <tr><td class="field-name">pubkey</td><td class="field-type">PUBKEY</td><td class="field-size">32-33 B</td><td class="field-side-w">Witness</td><td class="field-desc">Public key matching the commitment</td></tr>
@@ -61,6 +60,7 @@
       <tr><td class="field-name">preimage</td><td class="field-type">PREIMAGE</td><td class="field-size">32 B</td><td class="field-side-w">Witness</td><td class="field-desc">Data whose SHA-256 equals the hash field &mdash; provided by the user. The node derives HASH256 from this data at creation time.</td></tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Public key folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 1). No key field in conditions.</p>
 </div>
 
 <!-- Wire Format -->
@@ -71,7 +71,6 @@
       <span class="wire-segment wire-type">0x0703</span>
       <span class="wire-segment wire-inv">0</span>
       <span class="wire-segment wire-count">3</span>
-      <span class="wire-segment wire-field-pubkey">PUBKEY_COMMIT &middot; 32B</span>
       <span class="wire-segment wire-field-hash">HASH256 &middot; 32B</span>
       <span class="wire-segment wire-field-sig">SCHEME &middot; 1B</span>
       <span class="wire-bytes">Conditions = 73 bytes</span>
@@ -97,7 +96,7 @@
   <div class="section-label">Evaluation Logic</div>
   <div class="eval-box">
     <div class="eval-step"><span class="eval-step-num">1.</span><span class="eval-step-text">Compute SHA256(<span class="eval-keyword">PREIMAGE</span>). If != <span class="eval-keyword">HASH256</span> &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span></div>
-    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Verify <span class="eval-keyword">PUBKEY_COMMIT</span> = SHA256(PUBKEY). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span></div>
+    <div class="eval-step"><span class="eval-step-num">2.</span><span class="eval-step-text">Verify witness <span class="eval-keyword">PUBKEY</span> against Merkle leaf (merkle_pub_key). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span></div>
     <div class="eval-step"><span class="eval-step-num">3.</span><span class="eval-step-text">Verify <span class="eval-keyword">SIGNATURE</span> against PUBKEY. If invalid &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span></div>
     <div class="eval-step"><span class="eval-step-num">4.</span><span class="eval-step-text">Both passed &rarr; <span class="eval-result-sat">SATISFIED</span></span></div>
   </div>
@@ -110,7 +109,7 @@
   <div class="json-block"><pre>{
   <span class="json-key">"type"</span>: <span class="json-str">"HASH_SIG"</span>,
   <span class="json-key">"fields"</span>: [
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"HASH256"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"e3b0c442...32 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"SCHEME"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"01"</span> }
   ]

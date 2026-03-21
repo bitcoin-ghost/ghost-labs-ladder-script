@@ -18,11 +18,16 @@
 
 <div class="doc-content">
 
+<!-- DEPRECATED BANNER -->
+<div style="background: #ff4444; color: #050505; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; font-weight: 700; font-size: 16px; text-align: center; letter-spacing: 1px;">
+  DEPRECATED — Rejected at deserialization. Use HTLC, HASH_SIG, or HASH_GUARDED instead.
+</div>
+
 <!-- Title -->
 <div class="block-title-section">
-  <div class="block-type-code">TYPE 0x0201 &middot; HASH FAMILY</div>
-  <h1 class="block-title">HASH_PREIMAGE</h1>
-  <p class="block-subtitle">SHA-256 hash preimage verification. Proves knowledge of data whose SHA-256 hash matches a committed value.</p>
+  <div class="block-type-code">TYPE 0x0201 &middot; HASH FAMILY &middot; DEPRECATED</div>
+  <h1 class="block-title" style="text-decoration: line-through; opacity: 0.5;">HASH_PREIMAGE</h1>
+  <p class="block-subtitle">SHA-256 hash preimage verification. <strong>Deprecated as part of anti-spam hardening.</strong> Standalone hash preimage blocks with invertible, writable hash fields created a data embedding surface. Use the compound blocks HTLC (hash + signature + timelock), HASH_SIG (hash + signature), or HASH_GUARDED (non-invertible standalone hash check) instead.</p>
   <span class="block-family-badge badge-hash">Hash</span>
   <span class="invertible-badge inv-yes">Invertible</span>
 </div>

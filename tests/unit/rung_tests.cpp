@@ -1937,7 +1937,7 @@ BOOST_AUTO_TEST_CASE(debug_recurse_modified_layout)
 
 BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_59_types_conditions)
 {
-    // Test CONDITIONS context round-trip for all 60 block types.
+    // Test CONDITIONS context round-trip for all 61 block types.
     // Types with implicit conditions layouts use matching fields.
     // Types without implicit conditions layouts use explicit NUMERIC fields.
 

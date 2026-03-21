@@ -63,13 +63,6 @@
     </thead>
     <tbody>
       <tr>
-        <td class="field-name">pubkey_commit</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the signing public key</td>
-      </tr>
-      <tr>
         <td class="field-name">scheme</td>
         <td class="field-type">SCHEME</td>
         <td class="field-size">1 B</td>
@@ -99,6 +92,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Public key folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 1). No key field in conditions.</p>
 </div>
 
 <!-- Wire Format -->
@@ -111,10 +105,9 @@
       <span class="wire-segment wire-type" style="min-width:60px">0x0701</span>
       <span class="wire-segment wire-inv">0</span>
       <span class="wire-segment wire-count">3</span>
-      <span class="wire-segment wire-field-pubkey" style="min-width:160px">PUBKEY_COMMIT &middot; 32B</span>
       <span class="wire-segment wire-field-sig" style="min-width:80px">SCHEME &middot; 1B</span>
       <span class="wire-segment wire-field-num" style="min-width:100px">NUMERIC &middot; 3B</span>
-      <span class="wire-bytes">= 44 bytes</span>
+      <span class="wire-bytes">= 12 bytes</span>
     </div>
   </div>
 
@@ -144,7 +137,7 @@
   <div class="eval-box">
     <div class="eval-step">
       <span class="eval-step-num">1.</span>
-      <span class="eval-step-text">Verify <span class="eval-keyword">PUBKEY_COMMIT</span> = SHA256(PUBKEY). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
+      <span class="eval-step-text">Verify witness <span class="eval-keyword">PUBKEY</span> against Merkle leaf (merkle_pub_key). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">2.</span>
@@ -176,10 +169,10 @@
     <thead><tr><th>Condition</th><th>Result</th></tr></thead>
     <tbody>
       <tr><td>Missing required fields</td><td class="r-err">ERROR</td></tr>
-      <tr><td>PUBKEY_COMMIT present but PUBKEY missing</td><td class="r-err">ERROR</td></tr>
+      <tr><td>Merkle leaf pubkey count mismatch</td><td class="r-err">ERROR</td></tr>
       <tr><td>Negative timelock value</td><td class="r-err">ERROR</td></tr>
       <tr><td>Signature size out of range</td><td class="r-err">ERROR</td></tr>
-      <tr><td>PUBKEY_COMMIT != SHA256(PUBKEY)</td><td class="r-unsat">UNSATISFIED</td></tr>
+      <tr><td>Merkle leaf verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Signature verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>CSV sequence check fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Signature valid AND timelock elapsed</td><td class="r-sat">SATISFIED</td></tr>
@@ -196,7 +189,7 @@
   <span class="json-key">"type"</span>: <span class="json-str">"TIMELOCKED_SIG"</span>,
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"SCHEME"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"01"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">144</span> }
   ]

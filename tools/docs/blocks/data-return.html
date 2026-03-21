@@ -21,7 +21,7 @@
 <div class="block-title-section">
   <div class="block-type-code">TYPE 0x0507 &middot; ANCHOR FAMILY</div>
   <h1 class="block-title">DATA_RETURN</h1>
-  <p class="block-subtitle">Typed replacement for OP_RETURN. Commits up to 32 bytes of arbitrary data in an unspendable output. Evaluator always returns ERROR  -- the output can never be spent, only created. Maximum one DATA_RETURN output per transaction (consensus-enforced).</p>
+  <p class="block-subtitle">Typed replacement for OP_RETURN. Commits up to 40 bytes of arbitrary data in an unspendable output. Evaluator always returns ERROR  -- the output can never be spent, only created. Maximum one DATA_RETURN output per transaction (consensus-enforced).</p>
   <span class="block-family-badge badge-anchor">Anchor</span>
   <span class="invertible-badge inv-no">Not Invertible</span>
 </div>
@@ -37,7 +37,7 @@
       <line x1="440" y1="50" x2="600" y2="50" stroke="#ff1744" stroke-width="2"/>
       <rect x="160" y="20" width="280" height="60" rx="2" fill="#2a2a2a" stroke="#56b6c2" stroke-width="1.5"/>
       <text x="300" y="42" text-anchor="middle" fill="#56b6c2" font-family="Share Tech Mono" font-size="13" letter-spacing="2">DATA_RETURN</text>
-      <text x="300" y="62" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">DATA (exactly 32 bytes)</text>
+      <text x="300" y="62" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">DATA (1-40 bytes)</text>
       <!-- Labels -->
       <text x="300" y="105" text-anchor="middle" fill="#555555" font-family="IBM Plex Mono" font-size="9">output.nValue == 0</text>
       <text x="300" y="120" text-anchor="middle" fill="#ff1744" font-family="IBM Plex Mono" font-size="9">ALWAYS &rarr; ERROR (unspendable)</text>
@@ -51,7 +51,7 @@
   <table class="field-table">
     <thead><tr><th>Field</th><th>Data Type</th><th>Size</th><th>Side</th><th>Description</th></tr></thead>
     <tbody>
-      <tr><td class="field-name">data</td><td class="field-type">DATA (0x0B)</td><td class="field-size">1&ndash;80 bytes</td><td class="field-side-c">Conditions</td><td class="field-desc">Arbitrary data payload. Maximum 32 bytes (matches legacy OP_RETURN limit). Minimum 1 byte  -- empty DATA_RETURN is rejected.</td></tr>
+      <tr><td class="field-name">data</td><td class="field-type">DATA (0x0B)</td><td class="field-size">1&ndash;40 bytes</td><td class="field-side-c">Conditions</td><td class="field-desc">Arbitrary data payload. Maximum 40 bytes. Minimum 1 byte  -- empty DATA_RETURN is rejected.</td></tr>
     </tbody>
   </table>
   <p class="section-text" style="margin-top:12px">No witness fields. DATA_RETURN is a conditions-only block  -- it is unspendable by design.</p>
@@ -66,12 +66,12 @@
       <span class="wire-segment wire-type">0x0507</span>
       <span class="wire-segment wire-inv">0</span>
       <span class="wire-segment wire-count">1</span>
-      <span class="wire-segment wire-field">DATA &middot; 1-32B</span>
+      <span class="wire-segment wire-field">DATA &middot; 1-40B</span>
       <span class="wire-bytes">Conditions = 6 + data bytes</span>
     </div>
     <div class="wire-total">
-      <span class="wire-total-label">Total (typical 80B payload)</span>
-      <span class="wire-total-bytes">~86 bytes</span>
+      <span class="wire-total-label">Total (typical 40B payload)</span>
+      <span class="wire-total-bytes">~46 bytes</span>
     </div>
   </div>
 </div>
@@ -119,7 +119,7 @@
     { <span class="json-key">"type"</span>: <span class="json-str">"DATA"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"48656c6c6f20776f726c64"</span> }
   ]
 }</pre></div>
-  <p class="section-text" style="margin-top:12px">The DATA field carries the raw payload bytes. In this example: "Hello world" (11 bytes). Maximum 32 bytes.</p>
+  <p class="section-text" style="margin-top:12px">The DATA field carries the raw payload bytes. In this example: "Hello world" (11 bytes). Maximum 40 bytes.</p>
 </div>
 
 <!-- Use Cases -->
@@ -131,11 +131,11 @@
   </div>
   <div class="use-case">
     <div class="use-case-title">Commitment Anchoring</div>
-    <div class="use-case-desc">Commit a hash digest (32 bytes) to anchor off-chain state on-chain. The 80-byte limit fits a hash plus a protocol tag. Unlike the ANCHOR block, DATA_RETURN outputs are unspendable and zero-value  -- they don't lock any coins.</div>
+    <div class="use-case-desc">Commit a hash digest (32 bytes) to anchor off-chain state on-chain. The 40-byte limit fits a hash commitment plus metadata. Unlike the ANCHOR block, DATA_RETURN outputs are unspendable and zero-value  -- they don't lock any coins.</div>
   </div>
   <div class="use-case">
     <div class="use-case-title">Anti-spam OP_RETURN Replacement</div>
-    <div class="use-case-desc">DATA_RETURN closes OP_RETURN as a data-embedding vector by routing it through the typed field system. The 80-byte DATA field matches legacy OP_RETURN capacity while enforcing structured typing, zero-value, and single-output limits at consensus.</div>
+    <div class="use-case-desc">DATA_RETURN closes OP_RETURN as a data-embedding vector by routing it through the typed field system. The 40-byte DATA field is tighter than legacy OP_RETURN while enforcing structured typing, zero-value, and single-output limits at consensus.</div>
   </div>
 </div>
 

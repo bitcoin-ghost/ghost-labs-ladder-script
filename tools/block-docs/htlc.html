@@ -61,20 +61,6 @@
     <thead><tr><th>Field</th><th>Data Type</th><th>Size</th><th>Side</th><th>Description</th></tr></thead>
     <tbody>
       <tr>
-        <td class="field-name">pubkey_commit_1</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the claim public key (receiver)</td>
-      </tr>
-      <tr>
-        <td class="field-name">pubkey_commit_2</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the refund public key (sender)</td>
-      </tr>
-      <tr>
         <td class="field-name">hash</td>
         <td class="field-type">HASH256</td>
         <td class="field-size">32 B</td>
@@ -118,6 +104,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Both public keys folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 2). No key fields in conditions.</p>
 </div>
 
 <!-- Wire Format -->
@@ -130,11 +117,9 @@
       <span class="wire-segment wire-type" style="min-width:60px">0x0702</span>
       <span class="wire-segment wire-inv">0</span>
       <span class="wire-segment wire-count">4</span>
-      <span class="wire-segment wire-field-pubkey" style="min-width:140px">PUBKEY_COMMIT &middot; 32B</span>
-      <span class="wire-segment wire-field-pubkey" style="min-width:140px">PUBKEY_COMMIT &middot; 32B</span>
       <span class="wire-segment wire-field-hash" style="min-width:120px">HASH256 &middot; 32B</span>
       <span class="wire-segment wire-field-num" style="min-width:90px">NUMERIC &middot; 3B</span>
-      <span class="wire-bytes">= 109 bytes</span>
+      <span class="wire-bytes">= 45 bytes</span>
     </div>
   </div>
 
@@ -175,7 +160,7 @@
     </div>
     <div class="eval-step">
       <span class="eval-step-num">3.</span>
-      <span class="eval-step-text">Verify <span class="eval-keyword">PUBKEY_COMMIT</span> = SHA256(PUBKEY). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
+      <span class="eval-step-text">Verify witness <span class="eval-keyword">PUBKEY</span> against Merkle leaf (merkle_pub_key). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">4.</span>
@@ -214,8 +199,8 @@
   <span class="json-key">"type"</span>: <span class="json-str">"HTLC"</span>,
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"d7e2f8...32 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"03def2...33 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"HASH256"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"e3b0c44298fc1c...32 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">144</span> }
   ]

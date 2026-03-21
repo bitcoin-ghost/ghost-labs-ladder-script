@@ -66,13 +66,6 @@
     </thead>
     <tbody>
       <tr>
-        <td class="field-name">pubkey_commit</td>
-        <td class="field-type">PUBKEY_COMMIT</td>
-        <td class="field-size">32 B</td>
-        <td class="field-side-c">Conditions</td>
-        <td class="field-desc">SHA-256 commitment to the aggregate public key (MuSig2/FROST combined key)</td>
-      </tr>
-      <tr>
         <td class="field-name">threshold_m</td>
         <td class="field-type">NUMERIC</td>
         <td class="field-size">1-4 B</td>
@@ -91,7 +84,7 @@
         <td class="field-type">PUBKEY</td>
         <td class="field-size">32-33 B</td>
         <td class="field-side-w">Witness</td>
-        <td class="field-desc">Aggregate public key (must hash to pubkey_commit)</td>
+        <td class="field-desc">Aggregate public key (verified via Merkle leaf)</td>
       </tr>
       <tr>
         <td class="field-name">signature</td>
@@ -102,6 +95,7 @@
       </tr>
     </tbody>
   </table>
+  <p class="section-text" style="margin-top:8px;font-size:12px;color:#888">Public key folded into Merkle leaf via merkle_pub_key (PubkeyCountForBlock = 1). No key field in conditions.</p>
 </div>
 
 <!-- Wire Format -->
@@ -114,10 +108,9 @@
       <span class="wire-segment wire-type" style="min-width:60px">0x0004</span>
       <span class="wire-segment wire-inv">0</span>
       <span class="wire-segment wire-count">3</span>
-      <span class="wire-segment wire-field-pubkey" style="min-width:160px">PUBKEY_COMMIT &middot; 32B</span>
       <span class="wire-segment wire-field-num" style="min-width:80px">NUMERIC M</span>
       <span class="wire-segment wire-field-num" style="min-width:80px">NUMERIC N</span>
-      <span class="wire-bytes">= 42 bytes</span>
+      <span class="wire-bytes">= 10 bytes</span>
     </div>
   </div>
 
@@ -151,7 +144,7 @@
     </div>
     <div class="eval-step">
       <span class="eval-step-num">2.</span>
-      <span class="eval-step-text">Verify <span class="eval-keyword">PUBKEY_COMMIT</span> = SHA256(PUBKEY). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
+      <span class="eval-step-text">Verify witness <span class="eval-keyword">PUBKEY</span> against Merkle leaf (merkle_pub_key). If mismatch &rarr; <span class="eval-result-unsat">UNSATISFIED</span></span>
     </div>
     <div class="eval-step">
       <span class="eval-step-num">3.</span>
@@ -177,7 +170,7 @@
       <tr><td>Missing required fields</td><td class="r-err">ERROR</td></tr>
       <tr><td>M = 0 or M > N or N > 100</td><td class="r-err">ERROR</td></tr>
       <tr><td>PQ signature scheme requested</td><td class="r-err">ERROR</td></tr>
-      <tr><td>PUBKEY_COMMIT != SHA256(PUBKEY)</td><td class="r-unsat">UNSATISFIED</td></tr>
+      <tr><td>Merkle leaf verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Schnorr signature verification fails</td><td class="r-unsat">UNSATISFIED</td></tr>
       <tr><td>Aggregate key matches commitment AND signature valid</td><td class="r-sat">SATISFIED</td></tr>
     </tbody>
@@ -193,7 +186,7 @@
   <span class="json-key">"type"</span>: <span class="json-str">"MUSIG_THRESHOLD"</span>,
   <span class="json-key">"inverted"</span>: <span class="json-num">false</span>,
   <span class="json-key">"fields"</span>: [
-    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY_COMMIT"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"a3b1c4...32 bytes"</span> },
+    { <span class="json-key">"type"</span>: <span class="json-str">"PUBKEY"</span>, <span class="json-key">"hex"</span>: <span class="json-str">"02abc1...33 bytes"</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">2</span> },
     { <span class="json-key">"type"</span>: <span class="json-str">"NUMERIC"</span>, <span class="json-key">"value"</span>: <span class="json-num">3</span> }
   ]

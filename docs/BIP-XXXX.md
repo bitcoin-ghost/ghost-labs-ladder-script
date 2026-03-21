@@ -10,7 +10,7 @@ Created: 2026-03-06
 
 ## Abstract
 
-Ladder Script introduces transaction version 4 (`RUNG_TX`) with typed, structured spending conditions that replace opcode-based Script for participating outputs. Conditions are organised as named function blocks within rungs, evaluated with AND-within-rung, OR-across-rungs, first-match semantics. Every byte in a Ladder Script witness belongs to a declared data type with enforced size constraints. No arbitrary data pushes are possible. The system provides 60 block types across 10 families covering signatures, timelocks, hashes, covenants, anchors, recursion, programmable logic controllers, compound patterns, governance constraints, and legacy Bitcoin wrappers. All block types activate as a single deployment.
+Ladder Script introduces transaction version 4 (`RUNG_TX`) with typed, structured spending conditions that replace opcode-based Script for participating outputs. Conditions are organised as named function blocks within rungs, evaluated with AND-within-rung, OR-across-rungs, first-match semantics. Every byte in a Ladder Script witness belongs to a declared data type with enforced size constraints. No arbitrary data pushes are possible. The system provides 61 block types (59 active + 2 deprecated) across 10 families covering signatures, timelocks, hashes, covenants, anchors, recursion, programmable logic controllers, compound patterns, governance constraints, and legacy Bitcoin wrappers. All block types activate as a single deployment.
 
 ## Motivation
 
@@ -63,7 +63,7 @@ The first element of the segregated witness stack for each v4 input is a seriali
 
 **Evaluation entry point:**
 
-The function `VerifyRungTx` is called for each input of a v4 transaction. For `0xC1` inputs, it deserializes conditions from the spent output's `scriptPubKey` and the witness from the spending input. For `0xC2` inputs, it deserializes the revealed conditions and Merkle proof from the witness, verifies the proof against the UTXO root, then evaluates the ladder. All 60 block evaluators are identical for both output formats.
+The function `VerifyRungTx` is called for each input of a v4 transaction. For `0xC1` inputs, it deserializes conditions from the spent output's `scriptPubKey` and the witness from the spending input. For `0xC2` inputs, it deserializes the revealed conditions and Merkle proof from the witness, verifies the proof against the UTXO root, then evaluates the ladder. All 59 active block evaluators are identical for both output formats.
 
 ### Wire Format
 
@@ -89,6 +89,10 @@ LADDER WITNESS / RUNG CONDITIONS:
     [n_blocks: varint]
       for each block:
         <block encoding>                  same encoding as input blocks
+[n_rung_destinations: varint]             number of per-rung destination overrides (0 = none)
+  for each rung destination:
+    [rung_index: uint16_t LE]             target rung index
+    [address_hash: 32 bytes]              SHA256(destination scriptPubKey) for this rung
 [n_relays: varint]                        number of relay definitions (0 = none)
   for each relay:
     [n_blocks: varint]                    number of blocks in this relay
@@ -114,7 +118,7 @@ Each block begins with a single byte that determines the encoding mode:
 | `0x80` | Escape | Followed by `type(uint16_t LE)`; inverted = false |
 | `0x81` | Escape + inverted | Followed by `type(uint16_t LE)`; inverted = true |
 
-The micro-header lookup table maps 128 slot indices to block type values. All 60 active block types have assigned slots. Slots `0x07` and `0x08` are reserved (formerly HASH_PREIMAGE and HASH160_PREIMAGE, now deprecated). Deprecated slots are rejected during deserialization.
+The micro-header lookup table maps 128 slot indices to block type values. All 59 active block types have assigned slots. Slots `0x07` and `0x08` are reserved (formerly HASH_PREIMAGE and HASH160_PREIMAGE, now deprecated). Deprecated slots are rejected during deserialization.
 
 | Slot | Block Type | Slot | Block Type | Slot | Block Type |
 |------|------------|------|------------|------|------------|
@@ -138,9 +142,9 @@ The micro-header lookup table maps 128 slot indices to block type values. All 60
 | 0x11 | RECURSE_SPLIT | 0x26 | COSIGN | 0x3B | P2TR_SCRIPT_LEGACY |
 | 0x12 | RECURSE_DECAY | 0x27 | TIMELOCKED_SIG | 0x3C | DATA_RETURN |
 | 0x13 | ANCHOR | 0x28 | HTLC | 0x3D | HASH_GUARDED |
-| 0x14 | ANCHOR_CHANNEL | 0x29 | HASH_SIG | | |
+| 0x14 | ANCHOR_CHANNEL | 0x29 | HASH_SIG | 0x3E | OUTPUT_CHECK |
 
-Slots `0x3E`-`0x7F` are reserved for future block types. Unknown micro-header slots are rejected during deserialization.
+Slots `0x3F`-`0x7F` are reserved for future block types. Unknown micro-header slots are rejected during deserialization.
 
 A micro-header is used when all three conditions are met:
 1. The block type has an assigned micro-header slot.
@@ -429,6 +433,7 @@ The Governance family provides transaction-level constraints that restrict how a
 | `0x0804` | OUTPUT_COUNT | NUMERIC(min_outputs) + NUMERIC(max_outputs) | Output count bounds. SATISFIED when the spending transaction has between min_outputs and max_outputs outputs (inclusive). |
 | `0x0805` | RELATIVE_VALUE | NUMERIC(numerator) + NUMERIC(denominator) | Output-to-input value ratio. SATISFIED when the ratio of the output value to the input value is at least numerator/denominator. Ensures a minimum proportion of value is preserved. |
 | `0x0806` | ACCUMULATOR | HASH256(merkle_root) + HASH256(leaf). Witness: PREIMAGE (Merkle proof). Max 10 HASH256 fields (root + 8 proof nodes + leaf). | Merkle set membership proof. SATISFIED when the witness Merkle proof demonstrates that leaf is a member of the set committed to by merkle_root. Enables whitelist/blacklist patterns. |
+| `0x0807` | OUTPUT_CHECK | NUMERIC(output_index) + NUMERIC(min_sats) + NUMERIC(max_sats) + HASH256(script_hash) | Per-output value and script constraint. SATISFIED when the spending transaction's output at the specified index has a value within [min_sats, max_sats] and its scriptPubKey hashes to script_hash. Non-invertible. |
 
 #### Legacy Family (0x0900-0x09FF)
 
@@ -898,7 +903,7 @@ Activation uses BIP-9 version bits signaling with Speedy Trial parameters, follo
 | Threshold | 90% (1,815 of 2,016 blocks per retarget period) |
 | Minimum activation height | (to be determined) |
 
-All 60 block types activate simultaneously as a single deployment. Upon activation, all block types across all ten families are consensus-enforced and policy-standard. Partial activation of individual block types is not supported; the evaluation engine, wire format, and sighash computation form an interdependent whole.
+All 59 active block types activate simultaneously as a single deployment. Upon activation, all block types across all ten families are consensus-enforced and policy-standard. Partial activation of individual block types is not supported; the evaluation engine, wire format, and sighash computation form an interdependent whole.
 
 Nodes that have not upgraded treat version 4 transactions as anyone-can-spend, consistent with the soft fork upgrade path established by BIP-141 and BIP-341.
 
@@ -911,17 +916,18 @@ The reference implementation is located in the `src/rung/` directory. A step-by-
 | `types.h` / `types.cpp` | Core type definitions: `RungBlockType`, `RungDataType`, `RungCoilType`, `RungAttestationMode`, `RungScheme`, helper functions (`IsKnownBlockType`, `IsKeyConsumingBlockType`, `IsInvertibleBlockType`, `PubkeyCountForBlock`), and all struct definitions. |
 | `conditions.h` / `conditions.cpp` | Conditions (locking side): `RungConditions`, serialization to/from `CScript` with `0xC1` prefix, `ComputeRungLeaf` with pubkey folding, `ComputeConditionsRoot`, template inheritance resolution. |
 | `serialize.h` / `serialize.cpp` | Wire format serialization/deserialization with micro-headers, implicit fields, varint NUMERIC, context-aware encoding, and policy limit constants. |
-| `evaluator.h` / `evaluator.cpp` | Block evaluators for all 60 block types. Rung AND logic, ladder OR logic, selective inversion enforcement. `VerifyRungTx` entry point. `ValidateRungOutputs` (consensus-level output validation). `LadderSignatureChecker` for Schnorr/PQ signature verification. |
+| `evaluator.h` / `evaluator.cpp` | Block evaluators for all 61 block types (59 active + 2 deprecated). Rung AND logic, ladder OR logic, selective inversion enforcement. `VerifyRungTx` entry point. `ValidateRungOutputs` (consensus-level output validation). `LadderSignatureChecker` for Schnorr/PQ signature verification. |
 | `sighash.h` / `sighash.cpp` | `SignatureHashLadder` tagged hash computation. |
 | `policy.h` / `policy.cpp` | Mempool policy enforcement: `IsStandardRungTx` (thin deserialize-only check). `IsStandardRungOutput` removed — output validation is consensus via `ValidateRungOutputs`. |
 | `aggregate.h` / `aggregate.cpp` | Block-level signature aggregation and deferred attestation. |
 | `adaptor.h` / `adaptor.cpp` | Adaptor signature creation, verification, and secret extraction. |
 | `pq_verify.h` / `pq_verify.cpp` | Post-quantum signature verification via liboqs (FALCON-512/1024, Dilithium3, SPHINCS_SHA). |
-| `rpc.cpp` | RPC commands: `createrung`, `decoderung`, `validateladder`, `createrungtx`, `signrungtx`, `computectvhash`, `generatepqkeypair`, `pqpubkeycommit`, `extractadaptorsecret`, `verifyadaptorpresig`. |
+| `descriptor.h` / `descriptor.cpp` | Descriptor language: `ParseDescriptor` and `FormatDescriptor` for compact string representation of conditions. `parseladder` and `formatladder` RPCs. |
+| `rpc.cpp` | RPC commands: `createrung`, `decoderung`, `validateladder`, `createrungtx`, `signrungtx`, `computectvhash`, `generatepqkeypair`, `pqpubkeycommit`, `extractadaptorsecret`, `verifyadaptorpresig`, `parseladder`, `formatladder`. |
 
 ### Implementation Footprint
 
-Despite activating 60 block types across 10 families, Ladder Script's consensus footprint is smaller and more contained than previous soft forks:
+Despite activating 59 active block types across 10 families, Ladder Script's consensus footprint is smaller and more contained than previous soft forks:
 
 | Metric | SegWit (BIP 141/143/144) | Taproot (BIP 340/341/342) | Ladder Script |
 |--------|--------------------------|---------------------------|---------------|
@@ -944,10 +950,10 @@ The implementation includes comprehensive test coverage across two layers:
 
 **Unit tests** (`src/test/rung_tests.cpp`): 440+ test cases covering:
 - Field validation for all 10 active data types with boundary conditions
-- Serialization round-trips for all 60 active block types
+- Serialization round-trips for all 59 active block types
 - Deserialization rejection of deprecated types (HASH_PREIMAGE, HASH160_PREIMAGE)
 - Deserialization rejection of malformed inputs (empty, truncated, trailing bytes, oversized, unknown types)
-- Block evaluation for all 60 block types
+- Block evaluation for all 59 active block types
 - Inversion logic including ERROR non-inversion and selective inversion enforcement
 - Rung AND logic and ladder OR logic
 - Policy enforcement (standard/non-standard classification)

@@ -308,7 +308,7 @@
       <a href="#README" class="sidebar-link" data-doc="README.md" data-title="README">README</a>
       <div class="sidebar-divider"></div>
       <div class="sidebar-label">Block Reference</div>
-      <a href="#BLOCKS" class="sidebar-link" data-doc="__BLOCK_INDEX__" data-title="Block Reference">All 59 Blocks</a>
+      <a href="#BLOCKS" class="sidebar-link" data-doc="__BLOCK_INDEX__" data-title="Block Reference">All 61 Blocks</a>
     </aside>
 
     <main class="content">
@@ -324,7 +324,7 @@
     const links = document.querySelectorAll('.sidebar-link');
     let currentDoc = null;
 
-    // Block reference data — all 59 blocks organized by family
+    // Block reference data — all 61 blocks organized by family
     const BLOCK_FAMILIES = [
       {
         name: 'Signature Family', range: '0x0000', cls: 'signature',
@@ -349,9 +349,10 @@
       },
       {
         name: 'Hash Family', range: '0x0200', cls: 'hash',
-        intro: 'BIP-340 domain-separated hash verification. HASH_PREIMAGE and HASH160_PREIMAGE are deprecated \u2014 use HTLC or HASH_SIG compound blocks for hash-lock use cases.',
+        intro: 'BIP-340 domain-separated hash verification and guarded preimage checks. HASH_PREIMAGE and HASH160_PREIMAGE are deprecated \u2014 use HTLC, HASH_SIG, or HASH_GUARDED for hash-lock use cases.',
         blocks: [
           { code: '0x0203', name: 'TAGGED_HASH', file: 'tagged-hash', desc: 'BIP-340 tagged hash preimage verification. Domain-separated hashing for protocol-specific commitments.' },
+          { code: '0x0204', name: 'HASH_GUARDED', file: 'hash-guarded', desc: 'Raw SHA-256 preimage verification. Non-invertible, fail-closed. Safe replacement for deprecated HASH_PREIMAGE.' },
         ]
       },
       {
@@ -385,7 +386,7 @@
           { code: '0x0504', name: 'ANCHOR_RESERVE', file: 'anchor-reserve', desc: 'Reserve proof anchor. Commits to a minimum reserve amount.' },
           { code: '0x0505', name: 'ANCHOR_SEAL', file: 'anchor-seal', desc: 'Tamper-evident seal. Single-use commitment for client-side validation.' },
           { code: '0x0506', name: 'ANCHOR_ORACLE', file: 'anchor-oracle', desc: 'Oracle attestation anchor. Requires oracle\'s signed attestation of event outcome.' },
-          { code: '0x0507', name: 'DATA_RETURN', file: 'data-return', desc: 'Unspendable data output (max 32 bytes). Typed replacement for OP_RETURN.' },
+          { code: '0x0507', name: 'DATA_RETURN', file: 'data-return', desc: 'Unspendable data output (max 40 bytes). Typed replacement for OP_RETURN.' },
         ]
       },
       {
@@ -430,6 +431,7 @@
           { code: '0x0804', name: 'OUTPUT_COUNT', file: 'output-count', desc: 'Bounds on number of outputs in the spending transaction.' },
           { code: '0x0805', name: 'RELATIVE_VALUE', file: 'relative-value', desc: 'Anti-siphon ratio enforcement between input and output values.' },
           { code: '0x0806', name: 'ACCUMULATOR', file: 'accumulator', desc: 'Merkle set membership proof using sorted-pair Merkle proofs.' },
+          { code: '0x0807', name: 'OUTPUT_CHECK', file: 'output-check', desc: 'Per-output value and script constraint.' },
         ]
       },
       {
@@ -628,7 +630,7 @@
 
     function renderBlockIndex() {
       let html = '<h1 style="font-size:32px;font-weight:800;color:var(--white);margin-bottom:8px;">Block Reference</h1>';
-      html += '<p style="font-size:15px;color:var(--gray-400);margin-bottom:32px;max-width:640px;line-height:1.7;">Deep-dive documentation for each of the 59 block types in the Ladder Script evaluation engine. Each page covers wire format, fields, evaluation logic, JSON output, and real-world use cases.</p>';
+      html += '<p style="font-size:15px;color:var(--gray-400);margin-bottom:32px;max-width:640px;line-height:1.7;">Deep-dive documentation for each of the 61 block types in the Ladder Script evaluation engine. Each page covers wire format, fields, evaluation logic, JSON output, and real-world use cases.</p>';
 
       for (const family of BLOCK_FAMILIES) {
         html += `<div class="family-section">`;
