@@ -138,200 +138,98 @@ a:hover { text-decoration: underline; }
 <div class="main">
 
   <h1 class="page-title">Ladder Script</h1>
-  <p class="page-sub">Typed structured transaction conditions for Bitcoin</p>
+  <p class="page-sub">A proposal to replace Bitcoin Script with typed, structured spending conditions</p>
 
-  <div class="stats-row">
-    <div class="stat"><span class="stat-val">4</span><span class="stat-key">TX Version</span></div>
-    <div class="stat"><span class="stat-val">61</span><span class="stat-key">Block Types</span></div>
-    <div class="stat"><span class="stat-val">10</span><span class="stat-key">Families</span></div>
-    <div class="stat"><span class="stat-val">480</span><span class="stat-key">Unit Tests</span></div>
-    <div class="stat"><span class="stat-val">60</span><span class="stat-key">Func Tests</span></div>
-    <div class="stat"><span class="stat-val">80</span><span class="stat-key">TLA+ Props</span></div>
+  <!-- THE PROBLEM -->
+  <div class="section">
+    <div class="section-head">The problem</div>
+    <p>Bitcoin Script is a stack-based language from 2009. It works, but it has real limitations. Writing correct scripts is hard. Analysing them requires execution simulation. There is no way to express covenants, recursive conditions, or transaction-level constraints without ugly workarounds. The opcode model allows arbitrary data embedding (inscriptions, stamps), and there is no native path to post-quantum signatures.</p>
+    <p>Every proposal to fix one of these problems (CTV, APO, OP_VAULT, OP_CAT) adds individual opcodes that interact in unpredictable ways with each other and with the existing opcode set. The result is a growing pile of narrow fixes with no coherent model underneath.</p>
   </div>
 
-  <!-- -- OVERVIEW -- -->
+  <!-- THE APPROACH -->
   <div class="section">
-    <div class="section-head">Overview</div>
-    <p>Ladder Script introduces transaction version 4 (RUNG_TX). Spending conditions are declared as named, typed blocks organised into rungs -- a model borrowed from industrial PLC ladder diagrams. Every byte in every block has a declared type with enforced size constraints. Evaluation is deterministic with bounded execution time.</p>
-    <p>61 block types (59 active + 2 deprecated) across 10 families: signatures, timelocks, hash verification, covenants, recursion, anchors, programmable logic, compound patterns, governance, and legacy Bitcoin transaction types.</p>
+    <div class="section-head">What Ladder Script does</div>
+    <p>Ladder Script replaces the opcode model entirely. Instead of a stack machine that executes arbitrary instructions, spending conditions are declared as <strong>typed blocks</strong> arranged in <strong>rungs</strong>. Each block has a fixed type, fixed fields with enforced sizes, and a single evaluation function. No loops, no stack manipulation, no arbitrary data.</p>
+    <p>The name comes from ladder logic, the programming model used in industrial automation for decades. A ladder diagram has two vertical rails (power in, power out) connected by horizontal rungs. Each rung contains contacts (conditions) and a coil (output). Power flows left to right through a rung only if every contact is closed. If a rung fails, the next one is tried.</p>
+    <p>In Ladder Script, <strong>blocks within a rung are AND</strong> (all must pass) and <strong>rungs are OR</strong> (first passing rung wins). This gives you the same expressiveness as Bitcoin Script's IF/ELSE branching but with a deterministic, bounded evaluation model.</p>
   </div>
 
-  <!-- -- HOW IT WORKS -- -->
+  <!-- HOW IT WORKS -->
   <div class="section">
-    <div class="section-head">Evaluation Model</div>
-    <p>Rungs = OR. Blocks within a rung = AND. First rung where every block returns SATISFIED wins. If no rung passes, the transaction is invalid.</p>
-    <div class="code-block"><span class="comment">// EvalLadder iterates rungs (OR)</span>
-<span class="comment">//   EvalRung iterates blocks (AND)</span>
-<span class="comment">//     EvalBlock dispatches to type-specific evaluator</span>
+    <div class="section-head">How it works</div>
+    <p>A simple example: a vault with a hot key for daily spending and a multisig fallback for recovery.</p>
+    <div class="code-block"><span class="keyword">Rung 0:</span>  <span class="value">SIG(hot_key)</span>  AND  <span class="value">CSV(144 blocks)</span>    &rarr; UNLOCK
+<span class="keyword">Rung 1:</span>  <span class="value">MULTISIG(2-of-3)</span>                     &rarr; UNLOCK
 
-<span class="keyword">Rung 0:</span>  <span class="value">SIG(hot_key)</span> AND <span class="value">CSV(144)</span>     -> UNLOCK
-<span class="keyword">Rung 1:</span>  <span class="value">MULTISIG(2-of-3)</span>              -> UNLOCK
-
-<span class="comment">// Rung 0 satisfied? Power flows. Done.</span>
-<span class="comment">// Rung 0 fails? Try Rung 1.</span></div>
-    <p>Each rung terminates in a coil: UNLOCK (standard spend), UNLOCK_TO (spend to specific address), or COVENANT (constrain spending tx structure). Relays provide shared condition blocks that multiple rungs reference via relay_refs for cross-rung AND composition.</p>
+<span class="comment">// Try rung 0 first: hot key signs, but must wait 144 blocks.</span>
+<span class="comment">// If rung 0 fails, try rung 1: any 2 of 3 recovery keys, no delay.</span></div>
+    <p>The spending conditions are stored as a 33-byte Merkle root on-chain (MLSC format). The actual condition structure is only revealed at spend time in the witness. Unrevealed rungs stay private.</p>
+    <p>You can describe conditions in a compact notation:</p>
+    <div class="code-block"><span class="value">ladder(or(
+  and(sig(@hot_key), csv(144)),
+  multisig(2, @key_a, @key_b, @key_c)
+))</span></div>
   </div>
 
-  <!-- -- ANTI-SPAM -- -->
+  <!-- WHAT YOU CAN BUILD -->
   <div class="section">
-    <div class="section-head">Anti-Spam Hardening</div>
-    <p>Three coordinated defences close all practical data-embedding surfaces:</p>
-    <div class="env">
-      <div class="env-line"><span class="env-key">merkle_pub_key=</span><span class="env-val highlight">pubkeys folded into Merkle leaf hash, no writable pubkey slot in conditions</span></div>
-      <div class="env-line"><span class="env-key">selective_inversion=</span><span class="env-val highlight">key-consuming blocks (SIG, MULTISIG, HTLC, ...) cannot be inverted</span></div>
-      <div class="env-line"><span class="env-key">hash_lock_deprecation=</span><span class="env-val highlight">HASH_PREIMAGE/HASH160_PREIMAGE removed; use HTLC, HASH_SIG, or HASH_GUARDED</span></div>
-    </div>
-    <p>With MLSC (0xC2), the on-chain output is a fixed 33-byte scriptPubKey regardless of condition complexity. Conditions are never stored on-chain -- only a 32-byte Merkle root appears in the UTXO set.</p>
-  </div>
-
-  <!-- -- POST-QUANTUM -- -->
-  <div class="section">
-    <div class="section-head">Post-Quantum</div>
-    <p>Four native PQ signature schemes: FALCON-512, FALCON-1024, Dilithium3, SPHINCS+. A single SCHEME field routes any signature block to classical or PQ verification without changing wire format. With merkle_pub_key, condition size is constant regardless of key size -- a 33-byte Schnorr key and a 1,952-byte Dilithium3 key produce the same Merkle leaf.</p>
-    <p>COSIGN lets a single PQ-secured UTXO serve as a co-spending guardian for unlimited classical UTXOs -- incremental migration without a flag day.</p>
-  </div>
-
-  <!-- -- TYPED DATA -- -->
-  <div class="section">
-    <div class="section-head">Typed Data Model</div>
-    <div class="code-block"><span class="comment">// Condition fields (stored on-chain)</span>
-<span class="keyword">HASH256</span>      <span class="comment">// 32 bytes       SHA-256 digest</span>
-<span class="keyword">HASH160</span>      <span class="comment">// 20 bytes       RIPEMD160(SHA256)</span>
-<span class="keyword">SPEND_INDEX</span>  <span class="comment">// 4 bytes        uint32 LE</span>
-<span class="keyword">NUMERIC</span>      <span class="comment">// 1-4 bytes      uint32 LE</span>
-<span class="keyword">SCHEME</span>       <span class="comment">// 1 byte         01=Schnorr 02=ECDSA 10=FALCON-512 ...</span>
-
-<span class="comment">// Witness fields (revealed at spend time)</span>
-<span class="keyword">PUBKEY</span>       <span class="comment">// 1-2,048 bytes  bound by Merkle leaf</span>
-<span class="keyword">SIGNATURE</span>    <span class="comment">// 1-50,000 bytes</span>
-<span class="keyword">PREIMAGE</span>     <span class="comment">// exactly 32 bytes</span></div>
-    <p>Static analysis requires only parsing, not execution simulation. Every field can be identified, validated, and displayed without running any code.</p>
-  </div>
-
-  <!-- -- WIRE FORMAT -- -->
-  <div class="section">
-    <div class="section-head">Wire Format</div>
-    <p>Two output formats. Inline (0xC1) stores full serialised conditions. MLSC (0xC2) stores only a 32-byte Merkle root -- conditions revealed at spend time in the witness.</p>
-    <p>Blocks use micro-headers -- a 1-byte lookup table (0x00-0x3C) that encodes block type, inversion flag, and implicit field layout in a single byte. Known blocks skip the 2-byte type code and field metadata entirely. Escape codes (0x80/0x81) fall back to full headers.</p>
-    <div class="code-block"><span class="comment">// MLSC output: 33-byte scriptPubKey</span>
-<span class="keyword">0xC2</span> || <span class="value">conditions_root</span> (32 bytes)
-
-<span class="comment">// Witness structure</span>
-[<span class="keyword">n_rungs</span>: varint]
-  [<span class="keyword">n_blocks</span>: varint]
-    [<span class="keyword">micro_header</span>: uint8]   <span class="comment">// 0x00-0x3C lookup</span>
-    [<span class="keyword">fields...</span>]              <span class="comment">// implicit layout</span>
-  [<span class="keyword">coil_type</span>: uint8]
-  [<span class="keyword">attestation</span>: uint8]
-  [<span class="keyword">n_relays</span>: varint]</div>
-  </div>
-
-  <!-- -- BLOCK FAMILIES -- -->
-  <div class="section">
-    <div class="section-head">Block Type Families</div>
-    <p>61 block types across 10 numbered families. See the <a href="block-docs/">block reference</a> for deep-dive documentation on each type.</p>
-
-    <div class="families">
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#c0392b;">Signature</span><span class="family-range">0x0001-0x00FF</span></div>
-        <div class="family-desc">Identity verification with native PQ support via SCHEME field.</div>
-        <div class="family-blocks">
-          <span class="family-block">SIG</span><span class="family-block">MULTISIG</span><span class="family-block">ADAPTOR_SIG</span><span class="family-block">MUSIG_THRESHOLD</span><span class="family-block">KEY_REF_SIG</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#e67e22;">Timelock</span><span class="family-range">0x0100-0x01FF</span></div>
-        <div class="family-desc">Relative (BIP-68) and absolute timelocks in blocks or seconds.</div>
-        <div class="family-blocks">
-          <span class="family-block">CSV</span><span class="family-block">CSV_TIME</span><span class="family-block">CLTV</span><span class="family-block">CLTV_TIME</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#8e44ad;">Hash</span><span class="family-range">0x0200-0x02FF</span></div>
-        <div class="family-desc">Domain-separated hash verification. HASH_PREIMAGE/HASH160_PREIMAGE deprecated.</div>
-        <div class="family-blocks">
-          <span class="family-block">TAGGED_HASH</span><span class="family-block">HASH_GUARDED</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#c0392b;">Covenant</span><span class="family-range">0x0300-0x03FF</span></div>
-        <div class="family-desc">Output constraints. Template verification (BIP-119), vaults, amount bounds.</div>
-        <div class="family-blocks">
-          <span class="family-block">CTV</span><span class="family-block">VAULT_LOCK</span><span class="family-block">AMOUNT_LOCK</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#d35400;">Recursion</span><span class="family-range">0x0400-0x04FF</span></div>
-        <div class="family-desc">Self-referential conditions for perpetual covenants and state machines.</div>
-        <div class="family-blocks">
-          <span class="family-block">RECURSE_SAME</span><span class="family-block">RECURSE_MODIFIED</span><span class="family-block">RECURSE_UNTIL</span><span class="family-block">RECURSE_COUNT</span><span class="family-block">RECURSE_SPLIT</span><span class="family-block">RECURSE_DECAY</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#2980b9;">Anchor</span><span class="family-range">0x0500-0x05FF</span></div>
-        <div class="family-desc">Typed L2 metadata for channels, pools, reserves, seals, oracles.</div>
-        <div class="family-blocks">
-          <span class="family-block">ANCHOR</span><span class="family-block">ANCHOR_CHANNEL</span><span class="family-block">ANCHOR_POOL</span><span class="family-block">ANCHOR_RESERVE</span><span class="family-block">ANCHOR_SEAL</span><span class="family-block">ANCHOR_ORACLE</span><span class="family-block">DATA_RETURN</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#27ae60;">PLC</span><span class="family-range">0x0600-0x06FF</span></div>
-        <div class="family-desc">Industrial automation patterns for stateful, rate-governed, sequenced tx logic.</div>
-        <div class="family-blocks">
-          <span class="family-block">HYSTERESIS_FEE</span><span class="family-block">HYSTERESIS_VALUE</span><span class="family-block">TIMER_CONTINUOUS</span><span class="family-block">TIMER_OFF_DELAY</span><span class="family-block">LATCH_SET</span><span class="family-block">LATCH_RESET</span><span class="family-block">COUNTER_DOWN</span><span class="family-block">COUNTER_PRESET</span><span class="family-block">COUNTER_UP</span><span class="family-block">COMPARE</span><span class="family-block">SEQUENCER</span><span class="family-block">ONE_SHOT</span><span class="family-block">RATE_LIMIT</span><span class="family-block">COSIGN</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#555;">Compound</span><span class="family-range">0x0700-0x07FF</span></div>
-        <div class="family-desc">Multi-block patterns collapsed into single blocks for wire savings.</div>
-        <div class="family-blocks">
-          <span class="family-block">TIMELOCKED_SIG</span><span class="family-block">HTLC</span><span class="family-block">HASH_SIG</span><span class="family-block">PTLC</span><span class="family-block">CLTV_SIG</span><span class="family-block">TIMELOCKED_MULTISIG</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#7f8c8d;">Governance</span><span class="family-range">0x0800-0x08FF</span></div>
-        <div class="family-desc">Transaction-level constraints: weight, I/O counts, value ratios, spending windows.</div>
-        <div class="family-blocks">
-          <span class="family-block">EPOCH_GATE</span><span class="family-block">WEIGHT_LIMIT</span><span class="family-block">INPUT_COUNT</span><span class="family-block">OUTPUT_COUNT</span><span class="family-block">RELATIVE_VALUE</span><span class="family-block">ACCUMULATOR</span>
-        </div>
-      </div>
-      <div class="family">
-        <div class="family-header"><span class="family-name" style="color:#2980b9;">Legacy</span><span class="family-range">0x0900-0x09FF</span></div>
-        <div class="family-desc">Wraps P2PK through P2TR script-path as typed blocks. Closes inscription vectors.</div>
-        <div class="family-blocks">
-          <span class="family-block">P2PK_LEGACY</span><span class="family-block">P2PKH_LEGACY</span><span class="family-block">P2SH_LEGACY</span><span class="family-block">P2WPKH_LEGACY</span><span class="family-block">P2WSH_LEGACY</span><span class="family-block">P2TR_LEGACY</span><span class="family-block">P2TR_SCRIPT_LEGACY</span>
-        </div>
-      </div>
+    <div class="section-head">What you can build</div>
+    <p>Ladder Script has 61 block types across 10 families. Here are some things they enable that Bitcoin Script cannot do today:</p>
+    <div style="margin-top:16px">
+      <p><strong style="color:var(--accent)">Vaults with clawback.</strong> Lock funds with a hot key + timelock on rung 0, cold key sweep (no delay) on rung 1. The VAULT_LOCK block handles this in a single block.</p>
+      <p><strong style="color:var(--accent)">Rate-limited wallets.</strong> RATE_LIMIT restricts how many satoshis per block can be spent. Even if your key is compromised, the attacker can only drain at the rate you set.</p>
+      <p><strong style="color:var(--accent)">Recursive covenants.</strong> RECURSE_SAME forces the output to carry the same conditions as the input. RECURSE_COUNT counts down each hop. RECURSE_SPLIT lets a UTXO split into multiple re-encumbered outputs. All with bounded depth.</p>
+      <p><strong style="color:var(--accent)">Per-output governance.</strong> OUTPUT_CHECK verifies that a specific output has the right value and script. Enforce that treasury spends route funds to the correct address.</p>
+      <p><strong style="color:var(--accent)">Cross-input dependencies.</strong> COSIGN requires that another UTXO (identified by its script hash) is spent in the same transaction. Creates physical "key" UTXOs that must be present to authorise spending.</p>
+      <p><strong style="color:var(--accent)">Post-quantum migration.</strong> Any signature block works with Schnorr, ECDSA, FALCON-512, FALCON-1024, Dilithium3, or SPHINCS+ by changing a single SCHEME byte. No new opcodes needed.</p>
+      <p><strong style="color:var(--accent)">LN-Symmetry channels.</strong> ANYPREVOUT sighash support enables eltoo-style payment channels where any state can replace any earlier state.</p>
     </div>
   </div>
 
-  <!-- -- LINKS -- -->
+  <!-- HOW SMALL IS THE CHANGE -->
   <div class="section">
-    <div class="section-head">Links</div>
+    <div class="section-head">How small is the change</div>
+    <p>Ladder Script adds <strong>197 lines</strong> of changes to existing Bitcoin Core code across 16 files. Everything else is a self-contained library of 11,318 lines in 21 new files. The patch does not modify any existing Bitcoin Script evaluation, signature verification, or consensus logic.</p>
+    <div class="stats-row">
+      <div class="stat"><span class="stat-val">197</span><span class="stat-key">Lines patched</span></div>
+      <div class="stat"><span class="stat-val">11,318</span><span class="stat-key">New lines</span></div>
+      <div class="stat"><span class="stat-val">61</span><span class="stat-key">Block types</span></div>
+      <div class="stat"><span class="stat-val">480</span><span class="stat-key">Unit tests</span></div>
+      <div class="stat"><span class="stat-val">60</span><span class="stat-key">Functional tests</span></div>
+      <div class="stat"><span class="stat-val">80</span><span class="stat-key">Formal properties</span></div>
+    </div>
+    <p>The formal properties come from 9 TLA+ specifications that were model-checked across 3.3 million states, verifying evaluation semantics, anti-spam guarantees, wire format correctness, Merkle proof security, sighash binding, covenant termination, and cross-input rules.</p>
+  </div>
+
+  <!-- TRY IT -->
+  <div class="section">
+    <div class="section-head">Try it</div>
+    <p>Ladder Script is live on a dedicated signet. You can try it right now:</p>
     <div class="link-grid">
       <a href="ladder-engine.html" class="link-item">
-        <div class="link-label">Engine</div>
-        <div class="link-desc">Visual builder with live signet connection</div>
+        <div class="link-label">Open the Engine</div>
+        <div class="link-desc">Build, simulate, and broadcast transactions in your browser. No install needed. Connects to live signet.</div>
       </a>
       <a href="get-started.html" class="link-item">
-        <div class="link-label">Get Started</div>
-        <div class="link-desc">Download binary, configure, run</div>
+        <div class="link-label">Run a Node</div>
+        <div class="link-desc">Download the 7.4 MB binary, connect to signet, create transactions from the command line.</div>
       </a>
       <a href="patch-overview.html" class="link-item">
-        <div class="link-label">Patch Overview</div>
-        <div class="link-desc">What changes and how much code</div>
+        <div class="link-label">Review the Patch</div>
+        <div class="link-desc">See exactly what changes in Bitcoin Core. 197 lines across 16 files.</div>
       </a>
       <a href="block-docs/" class="link-item">
         <div class="link-label">Block Reference</div>
-        <div class="link-desc">Documentation for all 61 block types</div>
+        <div class="link-desc">Documentation for all 61 block types with evaluation logic, wire format, and examples.</div>
       </a>
-      <a href="rung-tx-anatomy.html" class="link-item">
-        <div class="link-label">RUNG_TX Anatomy</div>
-        <div class="link-desc">Transaction format layer by layer</div>
+      <a href="docs/" class="link-item">
+        <div class="link-label">Documentation</div>
+        <div class="link-desc">BIP draft, FAQ, worked examples, integration guide, MLSC specification, glossary.</div>
       </a>
       <a href="https://github.com/defenwycke/ghost-labs-ladder-script" class="link-item">
         <div class="link-label">Source Code</div>
-        <div class="link-desc">Full repository on GitHub</div>
+        <div class="link-desc">Full repository with C++ reference implementation, tests, TLA+ specs, and tools.</div>
       </a>
     </div>
   </div>
