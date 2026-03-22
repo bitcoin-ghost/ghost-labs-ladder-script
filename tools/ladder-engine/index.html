@@ -10269,18 +10269,23 @@ function SpendPanel() {
       addLog('Signing with ' + signerBlocks.length + ' block(s), ' + scheme + ' scheme...');
       const signerEntry = { input: 0, blocks: signerBlocks };
       // MLSC inputs require conditions for Merkle proof computation.
-      // Ensure scheme is always set on signature blocks so the MLSC root matches.
+      // Export block fields and ensure SCHEME is included for signature blocks.
       if (voutRungs.length > 0) {
         const sigTypes = new Set(['SIG','MULTISIG','TIMELOCKED_SIG','HASH_SIG','CLTV_SIG','TIMELOCKED_MULTISIG','P2PK_LEGACY','P2TR_LEGACY','MUSIG_THRESHOLD']);
+        const schemeMap = { SCHNORR: '01', ECDSA: '02', FALCON512: '10', FALCON1024: '11', DILITHIUM3: '12', SPHINCS_SHA: '13' };
         signerEntry.conditions = voutRungs.map(r => ({
           blocks: (r.blocks || []).filter(b => b.type !== 'OUTPUT_REF').map(b => {
-            // Always ensure scheme is set for sig-family blocks
+            const exported = exportBlockFields(b);
+            // If this is a sig-family block and SCHEME is missing from exported fields, add it
             if (sigTypes.has(b.type)) {
-              const blockScheme = b.values?.scheme || scheme || 'SCHNORR';
-              const patched = { ...b, values: { ...b.values, scheme: blockScheme } };
-              return exportBlockFields(patched);
+              const hasScheme = exported.fields.some(f => f.type === 'SCHEME');
+              if (!hasScheme) {
+                const blockScheme = b.values?.scheme || scheme || 'SCHNORR';
+                const schemeHex = schemeMap[blockScheme] || '01';
+                exported.fields.unshift({ type: 'SCHEME', hex: schemeHex });
+              }
             }
-            return exportBlockFields(b);
+            return exported;
           })
         }));
       }
