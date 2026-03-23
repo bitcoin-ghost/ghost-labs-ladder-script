@@ -441,6 +441,82 @@ tr:nth-child(even) td { background: #fafafa; }
     <p>Key aliases are not preserved in the hex (the keys are hashed into the Merkle tree). When formatting back, unknown keys appear as <code>@?</code> or truncated hex.</p>
   </div>
 
+  <!-- WALLET INTEGRATION -->
+  <div class="section">
+    <div class="section-head">Build your first transaction</div>
+    <p>Three commands to create, sign, and broadcast a Ladder Script transaction on the live signet. This is the wallet integration path.</p>
+
+    <div class="example">
+      <div class="example-title">Step 1: Create</div>
+      <div class="example-desc">Get a keypair from the wallet, then build an unsigned transaction with a ladder output.</div>
+      <div class="code-block"><span class="cm"># Get a keypair</span>
+$ ghost-cli -signet getnewaddress
+<span class="num">tb1q...</span>
+
+$ ghost-cli -signet getaddressinfo tb1q... | jq .pubkey
+<span class="num">"02abc123..."</span>
+
+<span class="cm"># Create an unsigned tx with a vault condition:</span>
+<span class="cm"># hot key + 144-block delay, OR 2-of-3 multisig recovery</span>
+$ ghost-cli -signet createrungtx \
+  '[{"txid":"&lt;utxo&gt;","vout":0}]' \
+  '[{"amount":0.001,"conditions":[{
+    "blocks":[
+      {"type":"SIG","fields":[{"type":"PUBKEY","hex":"<span class="alias">02abc...</span>"},{"type":"SCHEME","hex":"01"}]},
+      {"type":"CSV","fields":[{"type":"NUMERIC","hex":"90000000"}]}
+    ]
+  }]}]' 0
+
+<span class="cm">→ {"hex":"04000000..."}</span></div>
+    </div>
+
+    <div class="example">
+      <div class="example-title">Step 2: Sign</div>
+      <div class="example-desc">Sign the spending transaction using descriptor notation. One string, one key map.</div>
+      <div class="code-block"><span class="cm"># Sign with signladder — the descriptor defines the conditions,</span>
+<span class="cm"># the key map provides WIF private keys</span>
+$ ghost-cli -signet signladder \
+  <span class="num">"04000000..."</span> \
+  <span class="fn">"ladder(and(sig(@hot), csv(144)))"</span> \
+  <span class="alias">'{"hot":"cVt4o7B..."}'</span> \
+  '[{"amount":0.001,"scriptPubKey":"c2..."}]'
+
+<span class="cm">→ {"hex":"04000000...signed...","complete":true}</span></div>
+    </div>
+
+    <div class="example">
+      <div class="example-title">Step 3: Broadcast</div>
+      <div class="example-desc">Send the signed transaction to the signet network.</div>
+      <div class="code-block">$ ghost-cli -signet sendrawtransaction <span class="num">"04000000...signed..."</span>
+
+<span class="cm">→ "a1b2c3d4e5f6..."  (txid)</span></div>
+    </div>
+
+    <div class="note">
+      <strong>That's it.</strong> Three commands: <code>createrungtx</code> builds the transaction, <code>signladder</code> signs it using a descriptor string, <code>sendrawtransaction</code> broadcasts it. The descriptor handles all serialization, Merkle commitment, and witness construction internally. No manual field ordering, no JSON block specs. Works for all 61 block types.
+    </div>
+  </div>
+
+  <!-- PROXY API -->
+  <div class="section">
+    <div class="section-head">HTTP API (no node required)</div>
+    <p>If you don't want to run a node, the same flow works via the public proxy API at <code>bitcoinghost.org</code>:</p>
+    <div class="code-block"><span class="cm"># Create</span>
+$ curl -X POST https://bitcoinghost.org/api/ladder/create \
+  -H "Content-Type: application/json" \
+  -d '{"inputs":[...],"outputs":[{"amount":0.001,"conditions":[...]}]}'
+
+<span class="cm"># Sign (descriptor path)</span>
+$ curl -X POST https://bitcoinghost.org/api/ladder/sign-descriptor \
+  -H "Content-Type: application/json" \
+  -d '{"hex":"...","descriptor":"ladder(sig(@alice))","keys":{"alice":"cVt..."},"spent_outputs":[...]}'
+
+<span class="cm"># Broadcast</span>
+$ curl -X POST https://bitcoinghost.org/api/ladder/broadcast \
+  -H "Content-Type: application/json" \
+  -d '{"hex":"...signed..."}'</div>
+  </div>
+
 </div>
 
 <footer class="site-footer">
