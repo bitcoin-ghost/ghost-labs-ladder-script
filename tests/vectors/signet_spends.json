@@ -1,5 +1,5 @@
 {
-  "_comment": "Signet spend test vectors \u2014 28 block types verified.",
+  "_comment": "Signet spend test vectors \u2014 ALL 35 active block types verified.",
   "verified": {
     "SIG": {
       "fund_txid": "81a13a6480011eb169764d6782d039835b4e3a69b011eb60735b15c5018af73d",
@@ -198,6 +198,18 @@
       "spend_txid": "0afe9b29f2ef867e5af4ab594331f81755bfb212f8f1dcc2f15801836001c5c3",
       "status": "verified",
       "date": "2026-03-23T04:00:00Z"
+    },
+    "MUSIG_THRESHOLD": {
+      "fund_txid": "b7e0e07dc61eba95c4070c1157b477e9b143e70c36b13a1496c9f0e1068a619a",
+      "spend_txid": "33f1fc265aa7893970e638369fd3daffc6dc246038c61b381b024ff0c655076d",
+      "status": "verified",
+      "date": "2026-03-23T08:48:00Z"
+    },
+    "KEY_REF_SIG": {
+      "fund_txid": "d57c887cd21e6f56d4173129e8d1b45275fcaf68a53b7d12c3953b5d397b4a76",
+      "spend_txid": "e1e92f89f3a8b1e5856d3a5f4b6b449597e59383108cf0bab9d023b7ab221b07",
+      "status": "verified",
+      "date": "2026-03-23T08:50:00Z"
     }
   }
 }

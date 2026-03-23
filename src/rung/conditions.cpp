@@ -648,6 +648,10 @@ bool VerifyMLSCProof(const MLSCProof& proof,
     uint256 computed_root = BuildMerkleTree(std::move(leaves));
     if (computed_root != expected_root) {
         error = "MLSC Merkle root mismatch";
+                " expected=" + expected_root.GetHex() +
+                " total_leaves=" + std::to_string(total_leaves) +
+                " rung_pks=" + std::to_string(rung_pubkeys.size()) +
+                " proof_hashes=" + std::to_string(proof.proof_hashes.size());
         return false;
     }
 

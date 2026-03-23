@@ -3423,6 +3423,7 @@ bool VerifyRungTx(const CTransaction& tx,
         // Verify Merkle proof using revealed conditions + coil + pubkeys from witness
         std::string verify_error;
         if (!VerifyMLSCProof(mlsc_proof, witness_ladder.coil, conditions_root, rung_pks, relay_pks, verify_error, &verified_leaves_data, mutation_target_pks)) {
+            LogPrintf("MLSC proof failed: %s\n", verify_error);
             if (serror) *serror = SCRIPT_ERR_UNKNOWN_ERROR;
             return false;
         }
