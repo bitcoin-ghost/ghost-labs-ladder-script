@@ -1340,12 +1340,15 @@ output types in Bitcoin and does not represent a compatibility regression.
 
 ### Removed Features
 
-- **Inline conditions (`0xC1` prefix):** Removed and always rejected. All
-  outputs must use the MLSC Merkle root format (`0xC2`).
-- **COVENANT coil type (`0x03`):** Removed. Only UNLOCK (`0x01`) and
-  UNLOCK_TO (`0x02`) are valid coil types.
-- **AGGREGATE (`0x02`) and DEFERRED (`0x03`) attestation modes:** Removed.
-  Only INLINE (`0x01`) is valid.
+- **Non-Merkelised conditions (`0xC1` prefix):** Earlier drafts allowed
+  conditions to be placed directly in the scriptPubKey without Merkle
+  commitment. This is removed; all outputs must use the MLSC format (`0xC2`
+  prefix + 32-byte Merkle root).
+- **COVENANT coil type (`0x03`):** Only UNLOCK (`0x01`) and UNLOCK_TO
+  (`0x02`) are valid coil types.
+- **AGGREGATE (`0x02`) and DEFERRED (`0x03`) attestation modes:** Only
+  witness-carried attestation (`0x01`) is valid. The attestation byte is
+  reserved for future extension.
 
 ## Activation
 
