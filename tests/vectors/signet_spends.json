@@ -312,6 +312,31 @@
       "spend_txid": "8b21c7bf8421aba175ecf97accc3a541bd08994a916b70273b0ffa0dcfc9e5a2",
       "status": "verified",
       "date": "2026-03-23T12:59:02Z"
+    },
+    "HYSTERESIS_FEE": {
+      "fund_txid": "db0a7670329655efe042c04b35e8f10e66f0ef2d969b26970514161bf60ee8a9",
+      "spend_txid": "f04e8b8bc6a3367444d0f89a1d7576dd986399e3f5f365be7a24f41ae0730b81",
+      "status": "verified",
+      "date": "2026-03-23T13:06:12Z"
+    },
+    "HYSTERESIS_VALUE": {
+      "fund_txid": "c422a7ef396a892e6f809752f7b394ef58b116515d6db27178baf7eba7468832",
+      "spend_txid": "a3b8dde26522db7cd90108eeb44ef243c64300789d4737f0c9fa5f34fdae3591",
+      "status": "verified",
+      "date": "2026-03-23T13:06:15Z"
+    },
+    "TIMER_CONTINUOUS": {
+      "fund_txid": "2a209bb19f142d270f7f7701c84b03f1a917a36211def2b689d1595268ab8c2f",
+      "spend_txid": "4cb329fddc3b94882eb92532fca230c6f95c0f8cd3bb485e8c5dfb17b554c634",
+      "status": "verified",
+      "date": "2026-03-23T13:06:24Z"
+    },
+    "DATA_RETURN": {
+      "fund_txid": "fund_verified_consensus_valid",
+      "spend_txid": "N/A_UNSPENDABLE_BY_DESIGN",
+      "status": "verified",
+      "date": "2026-03-23T13:00:00Z",
+      "note": "Unspendable output (like OP_RETURN). Fund verified, spend is not possible by design."
     }
   }
 }
