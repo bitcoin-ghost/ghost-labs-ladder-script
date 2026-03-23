@@ -34,7 +34,25 @@ a:hover { text-decoration: underline; }
 .header-nav a:hover { color: var(--accent); text-decoration: none; }
 .header-nav a.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
 
-.main { max-width: 1100px; margin: 0 auto; padding: 48px 32px 80px; }
+/* -- LAYOUT -- */
+.page-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 96px); }
+
+/* -- SIDEBAR -- */
+.sidebar { background: #fff; border-right: 1px solid var(--border); padding: 24px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.sidebar-label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-light); padding: 16px 20px 6px; }
+.sidebar-label:first-child { padding-top: 8px; }
+.sidebar-link { display: block; padding: 7px 20px; font-size: 14px; color: var(--text-dim); text-decoration: none; transition: all 0.15s; border-left: 2px solid transparent; }
+.sidebar-link:hover { color: var(--text); background: var(--bg-alt); text-decoration: none; }
+.sidebar-link.active { color: var(--accent); border-left-color: var(--accent); background: rgba(230, 126, 34, 0.04); }
+.sidebar-divider { height: 1px; background: var(--border-light); margin: 12px 0; }
+
+.main { max-width: 860px; padding: 48px 48px 80px; }
+
+@media (max-width: 768px) {
+  .page-layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .main { padding: 32px 16px 60px; }
+}
 .page-title { font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
 .page-sub { color: var(--text-dim); font-size: 15px; margin-bottom: 48px; }
 .section { margin-bottom: 56px; }
@@ -98,6 +116,35 @@ tr:nth-child(even) td { background: #fafafa; }
     </nav>
   </div>
 </header>
+
+<div class="page-layout">
+  <aside class="sidebar">
+    <div class="sidebar-label">Getting Started</div>
+    <a href="docs/#INTRODUCTION" class="sidebar-link">Introduction</a>
+    <a href="docs/#FAQ" class="sidebar-link">FAQ</a>
+    <a href="docs/#GLOSSARY" class="sidebar-link">Glossary</a>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">Specification</div>
+    <a href="docs/#BIP-XXXX" class="sidebar-link">BIP-XXXX</a>
+    <a href="docs/#BLOCK_LIBRARY" class="sidebar-link">Block Library</a>
+    <a href="docs/#MERKLE-UTXO-SPEC" class="sidebar-link">MLSC Specification</a>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">Guides</div>
+    <a href="docs/#EXAMPLES" class="sidebar-link">Examples</a>
+    <a href="docs/#INTEGRATION" class="sidebar-link">Integration Guide</a>
+    <a href="descriptor-notation.html" class="sidebar-link active">Descriptor Notation</a>
+    <a href="docs/#ENGINE_GUIDE" class="sidebar-link">Engine Guide</a>
+    <a href="docs/#SOFT_FORK_GUIDE" class="sidebar-link">Soft Fork Guide</a>
+    <a href="docs/#REVIEW_GUIDE" class="sidebar-link">Review Guide</a>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">More</div>
+    <a href="docs/#POSSIBILITIES" class="sidebar-link">Possibilities</a>
+    <a href="comparison.html" class="sidebar-link">Bitcoin Script Comparison</a>
+    <a href="mainnet-checklist.html" class="sidebar-link">Mainnet Checklist</a>
+  </aside>
 
 <div class="main">
 
@@ -517,6 +564,7 @@ $ curl -X POST https://bitcoinghost.org/api/ladder/broadcast \
   -d '{"hex":"...signed..."}'</div>
   </div>
 
+</div>
 </div>
 
 <footer class="site-footer">
