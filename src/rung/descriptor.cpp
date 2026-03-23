@@ -355,12 +355,16 @@ bool ParseAdaptorSig(ParseContext& ctx, RungBlock& block, std::vector<std::vecto
 
 bool ParseMusigThreshold(ParseContext& ctx, RungBlock& block, std::vector<std::vector<uint8_t>>& rung_pks)
 {
-    // musig_threshold(M, @pk1, @pk2, ...) — same pattern as multisig
+    // musig_threshold(M, @pk1, @pk2, ...)
+    // Conditions: [NUMERIC(M), NUMERIC(N)]
+    // Merkle leaf: 1 aggregate pubkey (pubkey_count=1 in descriptor table)
+    // For simplicity, we pass individual pubkeys and let the signing path handle aggregation.
     if (!Expect(ctx, '(')) return false;
     uint32_t threshold;
     if (!ReadUint32(ctx, threshold)) return false;
     block.type = RungBlockType::MUSIG_THRESHOLD;
     block.fields.push_back({RungDataType::NUMERIC, MakeNumericField(threshold)});
+    uint32_t n_keys = 0;
     while (true) {
         SkipWhitespace(ctx);
         if (ctx.pos >= ctx.desc.size() || ctx.desc[ctx.pos] == ')') break;
@@ -372,8 +376,10 @@ bool ParseMusigThreshold(ParseContext& ctx, RungBlock& block, std::vector<std::v
             std::vector<uint8_t> pk;
             if (!LookupKey(ctx, alias, pk)) return false;
             rung_pks.push_back(pk);
+            ++n_keys;
         } else break;
     }
+    block.fields.push_back({RungDataType::NUMERIC, MakeNumericField(n_keys)});
     return Expect(ctx, ')');
 }
 

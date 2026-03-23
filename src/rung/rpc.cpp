@@ -2814,109 +2814,68 @@ static RPCHelpMan signladder()
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to compute sighash");
         }
 
-        // 7. Build witness for the target rung
-        // For each block in the target rung's conditions, build the witness block
-        // by finding the right key from the pubkey list and signing.
+        // 7. Build witness for the target rung via BuildWitnessBlock
+        // Convert descriptor keys to JSON block specs and use the existing
+        // BuildWitnessBlock code path (same as signrungtx).
         const auto& target_cond_rung = conditions.rungs[target_rung];
         LadderWitness ladder;
         Rung wit_rung;
 
-        // Track which pubkey we're on for this rung (pubkeys are positional)
         size_t pk_cursor = 0;
         const auto& rung_pks = (target_rung < rung_pubkeys.size()) ? rung_pubkeys[target_rung] : std::vector<std::vector<uint8_t>>{};
 
         for (size_t b = 0; b < target_cond_rung.blocks.size(); ++b) {
             const auto& cond_block = target_cond_rung.blocks[b];
-            RungBlock wit_block;
-            wit_block.type = cond_block.type;
-
-            // Determine how many pubkeys this block uses
             size_t n_pks = rung::PubkeyCountForBlock(cond_block.type, cond_block);
 
-            // Find the private key(s) for this block's pubkeys
-            std::vector<CKey> block_privkeys;
-            for (size_t p = 0; p < n_pks && pk_cursor < rung_pks.size(); ++p, ++pk_cursor) {
+            // Build a JSON block spec that BuildWitnessBlock understands
+            UniValue block_spec(UniValue::VOBJ);
+            block_spec.pushKV("type", rung::BlockTypeName(cond_block.type));
+
+            bool is_sig = rung::IsKeyConsumingBlockType(cond_block.type);
+
+            if (is_sig && n_pks >= 1 && pk_cursor < rung_pks.size()) {
+                // Find WIF for the first pubkey
                 const auto& pk_bytes = rung_pks[pk_cursor];
-                // Find matching privkey
                 for (const auto& [alias, key] : privkey_map) {
                     CPubKey pub = key.GetPubKey();
                     if (std::vector<uint8_t>(pub.begin(), pub.end()) == pk_bytes) {
-                        block_privkeys.push_back(key);
+                        block_spec.pushKV("privkey", EncodeSecret(key));
                         break;
                     }
                 }
+
+                if (n_pks >= 2) {
+                    // Multi-key types: collect all pubkey hexes
+                    UniValue pk_arr(UniValue::VARR);
+                    for (size_t p = 0; p < n_pks && (pk_cursor + p) < rung_pks.size(); ++p) {
+                        pk_arr.push_back(HexStr(rung_pks[pk_cursor + p]));
+                    }
+                    block_spec.pushKV("pubkeys", pk_arr);
+
+                    // Multi-sig types: need privkeys array
+                    if (cond_block.type == RungBlockType::MULTISIG ||
+                        cond_block.type == RungBlockType::MUSIG_THRESHOLD ||
+                        cond_block.type == RungBlockType::TIMELOCKED_MULTISIG) {
+                        UniValue privkeys_arr(UniValue::VARR);
+                        for (size_t p = 0; p < n_pks && (pk_cursor + p) < rung_pks.size(); ++p) {
+                            for (const auto& [alias, key] : privkey_map) {
+                                CPubKey pub = key.GetPubKey();
+                                if (std::vector<uint8_t>(pub.begin(), pub.end()) == rung_pks[pk_cursor + p]) {
+                                    privkeys_arr.push_back(EncodeSecret(key));
+                                    break;
+                                }
+                            }
+                        }
+                        block_spec.pushKV("privkeys", privkeys_arr);
+                    }
+                }
+                pk_cursor += n_pks;
             }
 
-            // Build witness fields based on block type
-            bool is_sig_type = rung::IsKeyConsumingBlockType(cond_block.type);
-
-            if (is_sig_type && !block_privkeys.empty()) {
-                // Signature blocks: add pubkey(s) + signature(s)
-                if (cond_block.type == RungBlockType::MULTISIG ||
-                    cond_block.type == RungBlockType::MUSIG_THRESHOLD ||
-                    cond_block.type == RungBlockType::TIMELOCKED_MULTISIG) {
-                    // Multi-key: add ALL pubkeys, then signatures for available keys
-                    for (size_t p = 0; p < n_pks; ++p) {
-                        size_t pki = pk_cursor - n_pks + p;
-                        if (pki < rung_pks.size()) {
-                            wit_block.fields.push_back({RungDataType::PUBKEY, rung_pks[pki]});
-                        }
-                    }
-                    for (auto& key : block_privkeys) {
-                        unsigned char sig_buf[64];
-                        uint256 aux = GetRandHash();
-                        if (!key.SignSchnorr(sighash, sig_buf, nullptr, aux)) {
-                            throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-                        }
-                        wit_block.fields.push_back({RungDataType::SIGNATURE,
-                            std::vector<uint8_t>(sig_buf, sig_buf + 64)});
-                    }
-                } else {
-                    // Single-key sig types: PUBKEY + SIGNATURE
-                    CPubKey pub = block_privkeys[0].GetPubKey();
-                    wit_block.fields.push_back({RungDataType::PUBKEY,
-                        std::vector<uint8_t>(pub.begin(), pub.end())});
-
-                    unsigned char sig_buf[64];
-                    uint256 aux = GetRandHash();
-                    if (!block_privkeys[0].SignSchnorr(sighash, sig_buf, nullptr, aux)) {
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Schnorr signing failed");
-                    }
-                    wit_block.fields.push_back({RungDataType::SIGNATURE,
-                        std::vector<uint8_t>(sig_buf, sig_buf + 64)});
-
-                    // For 2-pubkey types (ADAPTOR_SIG, PTLC, VAULT_LOCK): add second pubkey
-                    if (n_pks >= 2) {
-                        size_t second_pk_idx = pk_cursor - n_pks + 1;
-                        if (second_pk_idx < rung_pks.size()) {
-                            wit_block.fields.push_back({RungDataType::PUBKEY, rung_pks[second_pk_idx]});
-                        }
-                    }
-                }
-
-                // Add NUMERIC from conditions (for TIMELOCKED_SIG, CLTV_SIG, VAULT_LOCK)
-                for (const auto& f : cond_block.fields) {
-                    if (f.type == RungDataType::NUMERIC) {
-                        wit_block.fields.push_back(f);
-                    }
-                }
-            } else {
-                // Non-signature blocks: copy relevant fields from conditions to witness
-                // Hash blocks need HASH256 + PREIMAGE echoed
-                for (const auto& f : cond_block.fields) {
-                    if (f.type == RungDataType::HASH256) {
-                        wit_block.fields.push_back(f);
-                    }
-                }
-                // NUMERIC fields echoed to witness
-                for (const auto& f : cond_block.fields) {
-                    if (f.type == RungDataType::NUMERIC) {
-                        wit_block.fields.push_back(f);
-                    }
-                }
-            }
-
-            wit_rung.blocks.push_back(std::move(wit_block));
+            // Use BuildWitnessBlock (the tested code path from signrungtx)
+            wit_rung.blocks.push_back(
+                BuildWitnessBlock(block_spec, mtx, input_idx, txdata, conditions));
         }
 
         ladder.rungs.push_back(std::move(wit_rung));

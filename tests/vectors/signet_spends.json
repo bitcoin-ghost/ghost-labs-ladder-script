@@ -186,6 +186,18 @@
       "spend_txid": "8dba10e6fae10ef0527b14b4a3ac91c66f86ff82075ba3d3ab093491a89a4eab",
       "status": "verified",
       "date": "2026-03-23T03:00:00Z"
+    },
+    "RECURSE_MODIFIED": {
+      "fund_txid": "0b0301c74e244d8c41cc183a70ddd9af347bc92a7536f51c7d33a84975d1eb65",
+      "spend_txid": "113b078eb3c95c1277d2c65370bb569d336fdf7b58208b8ddd805ed600face36",
+      "status": "verified",
+      "date": "2026-03-23T04:00:00Z"
+    },
+    "RECURSE_DECAY": {
+      "fund_txid": "3a75f5b706298c81958daee01f7bb3ba1f3bc861353d4bc5c60a4c99c9cbbf83",
+      "spend_txid": "0afe9b29f2ef867e5af4ab594331f81755bfb212f8f1dcc2f15801836001c5c3",
+      "status": "verified",
+      "date": "2026-03-23T04:00:00Z"
     }
   }
 }
