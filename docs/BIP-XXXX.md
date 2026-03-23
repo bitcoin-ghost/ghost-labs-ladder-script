@@ -1,14 +1,33 @@
 ```
-BIP: XXXX
-Layer: Consensus (soft fork)
-Title: Ladder Script: Typed Structured Transaction Conditions
-Author: Defenwycke <defenwycke@icloud.com>
+BIP: ?
+Title: Ladder Script: Typed Transaction Conditions
+Authors: Defenwycke <defenwycke@icloud.com>
 Status: Draft
-Type: Standards Track
-Created: 2026-03-16
+Type: Specification
+Layer: Consensus (soft fork)
+Assigned: ?
 License: MIT
 Requires: 119, 340, 341
+Discussion: 2026-03-16: https://groups.google.com/g/bitcoindev/c/0jEHXaQaeZw
 ```
+
+## How to Review This Document
+
+This BIP specifies a large system (61 block types). For efficient review:
+
+1. **Start with Motivation and Design Overview** (5 min) — understand why
+   typed blocks replace opcodes, how the ladder metaphor works, and what
+   `merkle_pub_key` does for anti-spam.
+2. **Read Rationale** (10 min) — every major design decision is explained
+   with the alternative considered and why it was rejected.
+3. **Skim Block Type Families** (5 min) — each family has a 1-2 sentence
+   motivation. You don't need to memorize 61 types; understand the 10
+   family purposes.
+4. **Study Wire Format + MLSC Merkle Tree** (15 min) — this is the core
+   protocol. The byte-level examples in Appendix B let you verify by hand.
+5. **Check Anti-Spam Properties** (5 min) — the key innovation that makes
+   this practical.
+6. **Try it** — live signet: `bitcoinghost.org/labs/ladder-engine.html`
 
 ## Abstract
 
@@ -1733,3 +1752,7 @@ The verifier:
 3. Computes `root = TaggedHash("LadderInternal", min(node_01, proof_hash[1])
    || max(node_01, proof_hash[1]))`
 4. Compares `root` against the UTXO's `conditions_root`
+
+## Copyright
+
+This document is licensed under the MIT License.
