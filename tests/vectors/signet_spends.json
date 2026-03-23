@@ -246,6 +246,30 @@
       "spend_txid": "dd61e02f4e2406b82dd6f6a38c7cc06bebe7e1b5b84c38a50c545caf747a9423",
       "status": "verified",
       "date": "2026-03-23T11:06:05Z"
+    },
+    "LATCH_SET": {
+      "fund_txid": "136a48add25e1ee37a344ac4ecc609a19b12362849aa73ec12d55a21f4611cf0",
+      "spend_txid": "a60d6f744ed953b52a512516eebc03bc9ff35cd88fca83c51ff441c278da0e7e",
+      "status": "verified",
+      "date": "2026-03-23T12:30:21Z"
+    },
+    "COUNTER_UP": {
+      "fund_txid": "81a4e4c808640172ee1446333da38a3dc09a013519561a5ac10834bb7d8f7f50",
+      "spend_txid": "007c7b511f14831cc09800b07ff14fce2e7570db3b38f19ef5edb73b25296035",
+      "status": "verified",
+      "date": "2026-03-23T12:30:36Z"
+    },
+    "ANCHOR_ORACLE": {
+      "fund_txid": "590e6503f0540714b90b0a27968fb6e2595d73a608b00748085ea7c893589a39",
+      "spend_txid": "c58177ad0ae6ae9989bcbcc9ccf5df7f732778c9fa4b7bf0dd1469893cc99b21",
+      "status": "verified",
+      "date": "2026-03-23T12:30:39Z"
+    },
+    "COUNTER_PRESET": {
+      "fund_txid": "c840b1f4fbea5c288879167716a825c692999f9e09ee228f8d6f5619c1392fbc",
+      "spend_txid": "db97c0e0a0357801ef657a1a84e26d2ebf3495a2ad3290aafeb7a2afbc8a32e7",
+      "status": "verified",
+      "date": "2026-03-23T12:30:43Z"
     }
   }
 }
