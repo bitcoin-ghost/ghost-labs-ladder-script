@@ -337,6 +337,18 @@
       "status": "verified",
       "date": "2026-03-23T13:00:00Z",
       "note": "Unspendable output (like OP_RETURN). Fund verified, spend is not possible by design."
+    },
+    "P2PKH_LEGACY": {
+      "fund_txid": "fe84df89df9509c4dfd3d66bbae30c87b93083de1d2f30f70666c9b535ab94b6",
+      "spend_txid": "217329456012a013878cef7e7a2485570d3e8209f23e232a94cda8204b2c2e22",
+      "status": "verified",
+      "date": "2026-03-23T14:00:00Z"
+    },
+    "P2WPKH_LEGACY": {
+      "fund_txid": "1ec2fbdea0b29d52da3a769a0873fe412ea1bf979d843874ca50761fa09e578e",
+      "spend_txid": "d3ef9ac3fe78fb880a3593401988fbbd5da5d07dd78b93fda96deb4cacef6bd2",
+      "status": "verified",
+      "date": "2026-03-23T14:00:00Z"
     }
   }
 }
