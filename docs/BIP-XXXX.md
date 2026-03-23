@@ -1162,7 +1162,7 @@ compare the computed root against the output's MLSC root.
 - **COUNTER_DOWN** -- decrement on signed event; SATISFIED at zero
 - **COUNTER_PRESET** -- approval accumulator; SATISFIED at preset
 - **COUNTER_UP** -- increment on signed event; SATISFIED at target
-- **COMPARE** -- compare amount against thresholds (EQ/NEQ/GT/LT/GTE/LTE/IN_RANGE)
+- **COMPARE** -- compare input amount against thresholds using operator byte (1=EQ, 2=NEQ, 3=GT, 4=LT, 5=GTE, 6=LTE, 7=IN_RANGE)
 - **SEQUENCER** -- step through total_steps; SATISFIED at final step
 - **ONE_SHOT** -- one-time activation; SATISFIED if state=0 and commitment matches
 - **RATE_LIMIT** -- spending rate cap: max_per_block, accumulation_cap, refill_blocks
