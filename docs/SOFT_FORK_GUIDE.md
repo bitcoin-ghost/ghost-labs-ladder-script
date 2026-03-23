@@ -1,14 +1,52 @@
 # Ladder Script Soft Fork Guide
 
-How Ladder Script activates as a soft fork. All 61 block types (61 active, 2 deprecated)
-activate together in a single deployment. Transactions use `RUNG_TX_VERSION = 4`.
+How Ladder Script activates as a soft fork on Bitcoin. All 63 block types (61 active, 2
+deprecated) activate together in a single deployment. Transactions use `RUNG_TX_VERSION = 4`.
 
-## Activation Summary
+## Phased Approach
+
+Ladder Script is not proposed as a direct mainnet deployment. The path to activation:
+
+### Phase 1: Signet Proof (CURRENT)
+
+Live signet at `85.9.213.194` with all 61 active block types verified end-to-end.
+Engine, descriptor notation, and RPC tooling operational. External review and testing
+invited. BIP-110 submitted for community feedback.
+
+**Status:** All 61 block types have fund+spend proof with recorded transaction IDs.
+The signet mines every 10 minutes with real wall-clock timestamps.
+
+### Phase 2: External Review
+
+Bitcoin Core developers and the broader community review:
+- The 197-line integration patch to existing Bitcoin Core code
+- The 11,318-line self-contained `src/rung/` library
+- The 10 TLA+ formal specifications (80+ properties, 3.3M model-checked states)
+- The anti-spam hardening and evaluation semantics
+
+Fuzz testing targets are being expanded. Third-party adversarial testing encouraged
+on the live signet.
+
+### Phase 3: BIP 9 Activation
+
+Once sufficient review and testing is complete:
+- BIP 9 version bits signaling with a defined start time and timeout
+- All 63 block types activate simultaneously at the activation height
+- No phased rollout of individual block types — single atomic deployment
+- `RUNG_VERIFY_MLSC_ONLY` flag enforced from activation
+
+### Why Single Deployment
+
+Individual block type activation would create combinatorial complexity in testing
+and validation. Each block type's evaluation is independent and self-contained.
+The anti-spam rules and wire format are designed as a coherent system. Activating
+subsets would require maintaining multiple validation codepaths.
+
+## Activation Mechanics
 
 Ladder Script introduces transaction version 4 (`RUNG_TX`). Pre-activation nodes treat v4
 transactions as anyone-can-spend (standard soft fork semantics). Post-activation nodes
-enforce the full Ladder Script validation rules. There is no phased rollout of individual
-block types.
+enforce the full Ladder Script validation rules.
 
 ## Output Format
 
@@ -137,7 +175,12 @@ The soft fork includes comprehensive anti-spam measures enforced at consensus:
 |-------|-------|---------|
 | Unit tests | 480 | All block evaluators, serialization, Merkle tree, sighash, anti-spam |
 | Functional tests | 60 | End-to-end regtest: create, sign, broadcast, verify v4 transactions |
+| Signet verification | 61/61 | All active block types: fund + mine + spend on live signet with recorded txids |
+| Documentation accuracy | 43 | types.h consistency, engine templates, block reference pages, markdown docs |
+| Proxy unit tests | 15 | BIP32 derivation, base58, RIPEMD-160, WIF encoding |
+| Engine smoke tests | 20 | 48 templates, 63 block types, getTypeHex coverage, dead code checks |
 | TLA+ formal specs | 10 specs, 80+ properties | Evaluation semantics, composition, anti-spam, wire format, Merkle, sighash, covenants, cross-input |
+| Fuzz targets | 1 (deserializer) | `rung_deserialize_fuzz.cpp` — needs evaluator + sighash targets |
 
 The 10 TLA+ specifications are:
 
