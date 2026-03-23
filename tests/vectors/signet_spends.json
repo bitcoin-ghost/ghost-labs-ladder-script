@@ -288,6 +288,30 @@
       "spend_txid": "130271ad5abf90837c573f7b544b4df7ea3e7454f60d3b59dac03b872df7add4",
       "status": "verified",
       "date": "2026-03-23T12:47:22Z"
+    },
+    "ANCHOR_POOL": {
+      "fund_txid": "78669e6b8927c1ae07cb453676438af2fce994dfce876b0fc62539c2de21a472",
+      "spend_txid": "27bbdd6bab09edd90cd208a089ef523cba2d9625f90e94049841ad83190482fd",
+      "status": "verified",
+      "date": "2026-03-23T12:58:46Z"
+    },
+    "ANCHOR_RESERVE": {
+      "fund_txid": "1c3c423578b95ddbe2b5335d74ddf37d09b0e23a045876cbefea6122ed5534f3",
+      "spend_txid": "a47cba63a9901d1d26b9bf01cb7973f7df5ae5deb346d4f497386e54beba7446",
+      "status": "verified",
+      "date": "2026-03-23T12:58:52Z"
+    },
+    "ANCHOR_SEAL": {
+      "fund_txid": "54ed266cde49a62f71e217d794974710fe419c67ae16f9c2da2317f1f64d41c6",
+      "spend_txid": "2c9e97353354e5420085c32fd0e1876695e143b64c84bb348c7c6219e4232fed",
+      "status": "verified",
+      "date": "2026-03-23T12:58:59Z"
+    },
+    "ANCHOR_CHANNEL": {
+      "fund_txid": "2edd5ff59746e52b69682a7847837f1f3c2bc06f6b783995c587bc0b8d1f50c3",
+      "spend_txid": "8b21c7bf8421aba175ecf97accc3a541bd08994a916b70273b0ffa0dcfc9e5a2",
+      "status": "verified",
+      "date": "2026-03-23T12:59:02Z"
     }
   }
 }
