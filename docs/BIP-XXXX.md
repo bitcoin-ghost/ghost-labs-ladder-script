@@ -619,67 +619,17 @@ CompactSize-encoded (no length prefix, variable 1-5 bytes on wire).
 
 #### Conditions Context Layouts
 
-| Block Type          | Fields                                                |
-|---------------------|-------------------------------------------------------|
-| SIG                 | SCHEME(1)                                             |
-| MULTISIG            | NUMERIC(var), SCHEME(1)                               |
-| ADAPTOR_SIG         | *(no layout -- 0 condition fields)*                   |
-| MUSIG_THRESHOLD     | NUMERIC(var), NUMERIC(var)                            |
-| KEY_REF_SIG         | NUMERIC(var), NUMERIC(var)                            |
-| CSV                 | NUMERIC(var)                                          |
-| CSV_TIME            | NUMERIC(var)                                          |
-| CLTV                | NUMERIC(var)                                          |
-| CLTV_TIME           | NUMERIC(var)                                          |
-| TAGGED_HASH         | HASH256(32), HASH256(32)                              |
-| HASH_GUARDED        | HASH256(32)                                           |
-| CTV                 | HASH256(32)                                           |
-| VAULT_LOCK          | NUMERIC(var)                                          |
-| AMOUNT_LOCK         | NUMERIC(var), NUMERIC(var)                            |
-| COSIGN              | HASH256(32)                                           |
-| TIMELOCKED_SIG      | SCHEME(1), NUMERIC(var)                               |
-| HTLC                | HASH256(32), NUMERIC(var), SCHEME(1)                  |
-| HASH_SIG            | HASH256(32), SCHEME(1)                                |
-| CLTV_SIG            | SCHEME(1), NUMERIC(var)                               |
-| PTLC                | NUMERIC(var)                                          |
-| TIMELOCKED_MULTISIG | NUMERIC(var), NUMERIC(var), SCHEME(1)                 |
-| EPOCH_GATE          | NUMERIC(var), NUMERIC(var)                            |
-| WEIGHT_LIMIT        | NUMERIC(var)                                          |
-| INPUT_COUNT         | NUMERIC(var), NUMERIC(var)                            |
-| OUTPUT_COUNT        | NUMERIC(var), NUMERIC(var)                            |
-| RELATIVE_VALUE      | NUMERIC(var), NUMERIC(var)                            |
-| ACCUMULATOR         | HASH256(32)                                           |
-| OUTPUT_CHECK        | NUMERIC(var), NUMERIC(var), NUMERIC(var), HASH256(32) |
-| COMPARE             | NUMERIC(var), NUMERIC(var), NUMERIC(var)              |
-| RECURSE_SAME        | NUMERIC(var)                                          |
-| RECURSE_UNTIL       | NUMERIC(var)                                          |
-| RECURSE_COUNT       | NUMERIC(var)                                          |
-| RECURSE_SPLIT       | NUMERIC(var), NUMERIC(var)                            |
-| ANCHOR              | NUMERIC(var)                                          |
-| ANCHOR_CHANNEL      | NUMERIC(var)                                          |
-| ANCHOR_POOL         | HASH256(32), NUMERIC(var)                             |
-| ANCHOR_RESERVE      | NUMERIC(var), NUMERIC(var), HASH256(32)               |
-| ANCHOR_SEAL         | HASH256(32), HASH256(32)                              |
-| ANCHOR_ORACLE       | NUMERIC(var)                                          |
-| DATA_RETURN         | DATA(var)                                             |
-| HYSTERESIS_FEE      | NUMERIC(var), NUMERIC(var)                            |
-| HYSTERESIS_VALUE    | NUMERIC(var), NUMERIC(var)                            |
-| TIMER_CONTINUOUS    | NUMERIC(var), NUMERIC(var)                            |
-| TIMER_OFF_DELAY     | NUMERIC(var)                                          |
-| LATCH_SET           | NUMERIC(var)                                          |
-| LATCH_RESET         | NUMERIC(var), NUMERIC(var)                            |
-| COUNTER_DOWN        | NUMERIC(var)                                          |
-| COUNTER_PRESET      | NUMERIC(var), NUMERIC(var)                            |
-| COUNTER_UP          | NUMERIC(var), NUMERIC(var)                            |
-| SEQUENCER           | NUMERIC(var), NUMERIC(var)                            |
-| ONE_SHOT            | NUMERIC(var), HASH256(32)                             |
-| RATE_LIMIT          | NUMERIC(var), NUMERIC(var), NUMERIC(var)              |
-| P2PK_LEGACY         | SCHEME(1)                                             |
-| P2PKH_LEGACY        | HASH160(20)                                           |
-| P2SH_LEGACY         | HASH160(20)                                           |
-| P2WPKH_LEGACY       | HASH160(20)                                           |
-| P2WSH_LEGACY        | HASH256(32)                                           |
-| P2TR_LEGACY         | SCHEME(1)                                             |
-| P2TR_SCRIPT_LEGACY  | HASH256(32)                                           |
+Each block type has an implicit field layout for the CONDITIONS context.
+The complete table is available in the reference implementation
+(`src/rung/types.h`, `GetImplicitLayout`). Representative examples:
+
+| Block Type     | Fields                                                |
+|----------------|-------------------------------------------------------|
+| SIG            | SCHEME(1)                                             |
+| CSV            | NUMERIC(var)                                          |
+| HTLC           | HASH256(32), NUMERIC(var), SCHEME(1)                  |
+| OUTPUT_CHECK   | NUMERIC(var), NUMERIC(var), NUMERIC(var), HASH256(32) |
+| RATE_LIMIT     | NUMERIC(var), NUMERIC(var), NUMERIC(var)              |
 
 ADAPTOR_SIG has 0 condition fields (no implicit layout; conditions are
 empty). RECURSE_MODIFIED and RECURSE_DECAY have variable field counts
@@ -688,26 +638,17 @@ protected by `IsDataEmbeddingType` rejection rather than implicit layouts.
 
 #### Witness Context Layouts
 
-| Block Type          | Fields                                                         |
-|---------------------|----------------------------------------------------------------|
-| SIG                 | PUBKEY(var), SIGNATURE(var)                                    |
-| MUSIG_THRESHOLD     | PUBKEY(var), SIGNATURE(var)                                    |
-| CSV                 | NUMERIC(var)                                                   |
-| CSV_TIME            | NUMERIC(var)                                                   |
-| CLTV                | NUMERIC(var)                                                   |
-| CLTV_TIME           | NUMERIC(var)                                                   |
-| TAGGED_HASH         | HASH256(32), HASH256(32), PREIMAGE(var)                        |
-| HASH_GUARDED        | PREIMAGE(var)                                                  |
-| CTV                 | HASH256(32)                                                    |
-| COSIGN              | HASH256(32)                                                    |
-| TIMELOCKED_SIG      | PUBKEY(var), SIGNATURE(var), NUMERIC(var)                      |
-| HTLC                | PUBKEY(var), SIGNATURE(var), PUBKEY(var), PREIMAGE(var), NUMERIC(var) |
-| HASH_SIG            | PUBKEY(var), SIGNATURE(var), PREIMAGE(var)                     |
-| CLTV_SIG            | PUBKEY(var), SIGNATURE(var), NUMERIC(var)                      |
-| P2PK_LEGACY         | PUBKEY(var), SIGNATURE(var)                                    |
-| P2PKH_LEGACY        | PUBKEY(var), SIGNATURE(var)                                    |
-| P2WPKH_LEGACY       | PUBKEY(var), SIGNATURE(var)                                    |
-| P2TR_LEGACY         | PUBKEY(var), SIGNATURE(var)                                    |
+Each block type optionally has an implicit field layout for the WITNESS
+context. The complete table is in `src/rung/types.h`. Representative
+examples:
+
+| Block Type     | Fields                                                         |
+|----------------|----------------------------------------------------------------|
+| SIG            | PUBKEY(var), SIGNATURE(var)                                    |
+| CSV            | NUMERIC(var)                                                   |
+| HTLC           | PUBKEY(var), SIGNATURE(var), PUBKEY(var), PREIMAGE(var), NUMERIC(var) |
+| HASH_GUARDED   | PREIMAGE(var)                                                  |
+| P2PKH_LEGACY   | PUBKEY(var), SIGNATURE(var)                                    |
 
 All other block types use explicit field encoding in the witness context
 (no implicit witness layout).
@@ -965,85 +906,24 @@ rung       = block | "and(" block { "," block } ")"
 block      = base_block | "!" base_block
 ```
 
-#### Complete Block Grammar (all 61 types)
+#### Block Grammar (one example per family)
 
-**Signature family:**
 ```
-sig(@alias) | sig(@alias, scheme)
-multisig(M, @pk1, @pk2, ...)
-adaptor_sig(@signer, @adaptor_point) | adaptor_sig(@signer, @adaptor_point, scheme)
-musig_threshold(M, @pk1, @pk2, ...)
-key_ref_sig(relay_idx, block_idx)
-```
-
-**Timelock family:**
-```
-csv(N) | csv_time(N) | cltv(N) | cltv_time(N)
-```
-
-**Hash family:**
-```
-tagged_hash(tag_hex, expected_hex)
-hash_guarded(hash_hex)
+sig(@alias)                                           # Signature
+csv(N)                                                # Timelock
+tagged_hash(tag_hex, expected_hex)                    # Hash
+ctv(template_hash_hex)                                # Covenant
+recurse_count(count)                                  # Recursion
+anchor()                                              # Anchor
+rate_limit(N, N, N)                                   # PLC
+htlc(@sender, @receiver, preimage_hex, csv_blocks)    # Compound
+output_check(idx, min, max, script_hash_hex)          # Governance
+p2pkh(@pk)                                            # Legacy
 ```
 
-**Covenant family:**
-```
-ctv(template_hash_hex)
-vault_lock(@recovery, @hot, delay)
-amount_lock(min, max)
-```
-
-**Recursion family:**
-```
-recurse_same(max_depth)
-recurse_modified(max_depth, block_idx, param_idx, delta)
-recurse_until(height)
-recurse_count(count)
-recurse_split(max_splits, min_sats)
-recurse_decay(max_depth, block_idx, param_idx, decay)
-```
-
-**Anchor family:**
-```
-anchor() | anchor_channel() | anchor_pool()
-anchor_reserve() | anchor_seal() | anchor_oracle()
-data_return(hex)
-```
-
-**PLC family:**
-```
-hysteresis_fee(N, N) | hysteresis_value(N, N)
-timer_continuous(N) | timer_off_delay(N, N)
-latch_set(@pk, N) | latch_reset(@pk, N)
-counter_down(@pk, N) | counter_preset(@pk, N) | counter_up(@pk, N)
-compare(op, value_b) | compare(op, value_b, value_c)
-sequencer(N) | one_shot(@pk, N) | rate_limit(N, N, N)
-cosign(conditions_hash_hex)
-```
-
-**Compound family:**
-```
-timelocked_sig(@pk, csv_blocks) | cltv_sig(@pk, height)
-htlc(@sender, @receiver, preimage_hex, csv_blocks)
-hash_sig(@pk, preimage_hex)
-ptlc(@pk, @adaptor_point, csv_blocks)
-timelocked_multisig(M, @pk1, @pk2, ..., csv_blocks)
-```
-
-**Governance family:**
-```
-epoch_gate(epoch_size, window_size) | weight_limit(max_weight)
-input_count(min, max) | output_count(min, max)
-relative_value(numerator, denominator) | accumulator(root_hex)
-output_check(idx, min, max, script_hash_hex)
-```
-
-**Legacy family:**
-```
-p2pk(@pk) | p2pkh(@pk) | p2wpkh(@pk) | p2tr(@pk)
-p2sh(inner_hex) | p2wsh(inner_hex) | p2tr_script(inner_hex)
-```
+The complete grammar covering all 61 block types is documented at
+`src/rung/descriptor.h` and at
+[bitcoinghost.org/labs/descriptor-notation.html](https://bitcoinghost.org/labs/descriptor-notation.html).
 
 #### Scheme Names
 
@@ -1521,19 +1401,15 @@ block types, grouped by family. All block types follow the dispatch in
 
 ### Timelock Family
 
-| Type      | Evaluation                                                    |
-|-----------|---------------------------------------------------------------|
-| CSV       | Read NUMERIC sequence value; call `CheckSequence` against the input's nSequence. SATISFIED if the relative timelock (block-height) is met. |
-| CSV_TIME  | Same as CSV but the sequence value is interpreted as median-time-past (BIP-68 time flag set). |
-| CLTV      | Read NUMERIC locktime value; call `CheckLockTime` against the transaction's nLockTime. SATISFIED if the absolute block-height is met. |
-| CLTV_TIME | Same as CLTV but the locktime is interpreted as median-time-past. |
+- **CSV** -- relative timelock (block-height) via `CheckSequence`
+- **CSV_TIME** -- relative timelock (median-time-past)
+- **CLTV** -- absolute timelock (block-height) via `CheckLockTime`
+- **CLTV_TIME** -- absolute timelock (median-time-past)
 
 ### Hash Family
 
-| Type          | Evaluation                                               |
-|---------------|----------------------------------------------------------|
-| TAGGED_HASH   | Two HASH256 fields (tag_hash, expected_hash) from conditions; one PREIMAGE from witness. Compute `SHA256(tag_hash \|\| tag_hash \|\| preimage)` and compare to expected_hash. Follows the BIP-340 tagged hash construction. |
-| HASH_GUARDED  | One HASH256 (committed hash) from conditions; one PREIMAGE from witness. Compute `SHA256(preimage)` and compare. Non-invertible (not in `IsInvertibleBlockType`). |
+- **TAGGED_HASH** -- BIP-340 tagged hash: `SHA256(tag_hash || tag_hash || preimage)` vs committed hash
+- **HASH_GUARDED** -- raw SHA-256 preimage verification; non-invertible
 
 ### Covenant Family
 
