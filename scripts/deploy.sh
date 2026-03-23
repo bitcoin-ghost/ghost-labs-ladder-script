@@ -173,7 +173,8 @@ deploy_web() {
 
     # Landing page and other tools
     for page in ladder-script.html ladder-engine.html get-started.html \
-                 rung-tx-anatomy.html patch-overview.html explorer.html; do
+                 rung-tx-anatomy.html patch-overview.html explorer.html \
+                 mainnet-checklist.html; do
         local src="$ROOT/tools/$page"
         if [ -f "$src" ]; then
             deploy_file_to_web "$src" "$WEB_ROOT/$page"

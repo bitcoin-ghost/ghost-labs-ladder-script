@@ -7874,6 +7874,86 @@ const EXAMPLES = [
     ],
     inputMap: [[0], [0]], outputMap: [0, 1],
   },
+  {
+    title: 'ANCHOR TAG',
+    desc: 'Simple data tagging with spend authentication. The ANCHOR block binds arbitrary 32-byte data to the UTXO; SIG ensures only the key holder can spend.\n\nTAG: SIG authenticates + ANCHOR commits data on-chain.',
+    tags: [['SIG', 'sig'], ['ANCHOR', 'anchor']],
+    rungs: [
+      { label: 'TAG', blocks: [
+        { type: 'SIG', values: { pubkey: FAKE.pk1 } },
+        { type: 'ANCHOR', values: { data: FAKE.hash1 } },
+      ], output: { name: 'TAGGED', type: 'standard' } },
+    ],
+    txInputs: [{ txid: FAKE.txid1, vout: 0 }],
+    txOutputs: [
+      { address: FAKE.addr1, amount: 10000 },
+    ],
+    inputMap: [[0]], outputMap: [0],
+  },
+  {
+    title: 'ANCHOR POOL (VTXO)',
+    desc: 'Pool anchor binding a VTXO tree root to a signed UTXO. The ANCHOR_POOL block commits the pool ID hash; SIG authorises the spend.\n\nPOOL: SIG + ANCHOR_POOL binds the VTXO tree root hash to this output.',
+    tags: [['SIG', 'sig'], ['A_POOL', 'anchor']],
+    rungs: [
+      { label: 'POOL', blocks: [
+        { type: 'SIG', values: { pubkey: FAKE.pk1 } },
+        { type: 'ANCHOR_POOL', values: { pool_id: FAKE.hash1 } },
+      ], output: { name: 'VTXO_ROOT', type: 'standard' } },
+    ],
+    txInputs: [{ txid: FAKE.txid1, vout: 0 }],
+    txOutputs: [
+      { address: FAKE.addr1, amount: 50000 },
+    ],
+    inputMap: [[0]], outputMap: [0],
+  },
+  {
+    title: 'ANCHOR RESERVE',
+    desc: 'N-of-M guardian reserve with threshold parameters and guardian set hash. SIG authenticates the spend; ANCHOR_RESERVE commits the guardian quorum.\n\nRESERVE: SIG + ANCHOR_RESERVE with 3-of-5 guardian threshold and guardian set hash.',
+    tags: [['SIG', 'sig'], ['A_RESV', 'anchor']],
+    rungs: [
+      { label: 'RESERVE', blocks: [
+        { type: 'SIG', values: { pubkey: FAKE.pk1 } },
+        { type: 'ANCHOR_RESERVE', values: { threshold_n: '3', threshold_m: '5', guardian_hash: FAKE.hash1 } },
+      ], output: { name: 'GUARDED', type: 'standard' } },
+    ],
+    txInputs: [{ txid: FAKE.txid1, vout: 0 }],
+    txOutputs: [
+      { address: FAKE.addr1, amount: 100000 },
+    ],
+    inputMap: [[0]], outputMap: [0],
+  },
+  {
+    title: 'ANCHOR SEAL',
+    desc: 'Permanent data commitment seal binding two hashes to a UTXO. ANCHOR_SEAL commits an asset ID and state hash; SIG authenticates the spend.\n\nSEAL: SIG + ANCHOR_SEAL with asset ID and state commitment hashes.',
+    tags: [['SIG', 'sig'], ['A_SEAL', 'anchor']],
+    rungs: [
+      { label: 'SEAL', blocks: [
+        { type: 'SIG', values: { pubkey: FAKE.pk1 } },
+        { type: 'ANCHOR_SEAL', values: { asset_id: FAKE.hash1, state_hash: FAKE.hash2 } },
+      ], output: { name: 'SEALED', type: 'standard' } },
+    ],
+    txInputs: [{ txid: FAKE.txid1, vout: 0 }],
+    txOutputs: [
+      { address: FAKE.addr1, amount: 20000 },
+    ],
+    inputMap: [[0]], outputMap: [0],
+  },
+  {
+    title: 'ANCHOR ORACLE',
+    desc: 'Oracle attestation anchor binding an oracle pubkey to a signed UTXO. ANCHOR_ORACLE commits the oracle identity; SIG authenticates the spend.\n\nATTEST: SIG + ANCHOR_ORACLE with oracle public key.',
+    tags: [['SIG', 'sig'], ['A_ORACLE', 'anchor']],
+    rungs: [
+      { label: 'ATTEST', blocks: [
+        { type: 'SIG', values: { pubkey: FAKE.pk1 } },
+        { type: 'ANCHOR_ORACLE', values: { oracle_pk: FAKE.oracle } },
+      ], output: { name: 'ORACLE_BOUND', type: 'standard' } },
+    ],
+    txInputs: [{ txid: FAKE.txid1, vout: 0 }],
+    txOutputs: [
+      { address: FAKE.addr1, amount: 15000 },
+    ],
+    inputMap: [[0]], outputMap: [0],
+  },
 ];
 
 function ExamplesModal({ onClose, onLoad }) {
@@ -11983,6 +12063,34 @@ function App() {
 
   const descriptorOutput = useMemo(() => rungsToDescriptor(rungs), [rungs]);
 
+  const signladderCommand = useMemo(() => {
+    // Extract unique 66-char hex pubkeys from all rung block values
+    const pubkeys = new Set();
+    const hexPkRe = /^(02|03)[0-9a-fA-F]{64}$/;
+    rungs.forEach(r => r.blocks.forEach(b => {
+      Object.values(b.values || {}).forEach(v => {
+        if (typeof v !== 'string') return;
+        // Check comma-separated lists (MULTISIG pubkeys field)
+        v.split(',').map(s => s.trim()).forEach(s => {
+          if (hexPkRe.test(s)) pubkeys.add(s);
+        });
+      });
+    }));
+    // Build key map with placeholder WIFs
+    const wifPrefixes = ['cVt4', 'cSr7', 'cPm2', 'cQk9', 'cWn5', 'cXj3', 'cYh8', 'cZf1'];
+    const keyEntries = [...pubkeys].map((pk, i) => {
+      const wif = (wifPrefixes[i % wifPrefixes.length]) + '...';
+      return `"${pk}":"${wif}"`;
+    });
+    const keyMap = keyEntries.length > 0 ? '{' + keyEntries.join(', ') + '}' : '{}';
+    // Build spent outputs from txInputs
+    const spentOutputs = (txInputs || []).filter(i => i.txid).map(() =>
+      '{"amount":0.001,"scriptPubKey":"c2..."}'
+    );
+    const spentStr = '[' + spentOutputs.join(', ') + ']';
+    return `ghost-cli -signet signladder \\\n  "<TX_HEX>" \\\n  "${descriptorOutput}" \\\n  '${keyMap}' \\\n  '${spentStr}'`;
+  }, [rungs, txInputs, descriptorOutput]);
+
   // Compute which output names and rung numbers are energized (for OUTPUT_REF cross-referencing)
   // Use simState + forcedBlocks (can't use fullSimState here --circular dependency)
   const [energizedOutputs, energizedRungNums] = useMemo(() => {
@@ -12500,11 +12608,18 @@ ${ladderRows.map(r => `
             {rightTab === 'descriptor' && (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontSize: 9, padding: '4px 8px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', letterSpacing: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>DESCRIPTOR NOTATION</span>
+                  <span>DESCRIPTOR</span>
                   <button style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 9, padding: '1px 6px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }} onClick={() => { navigator.clipboard?.writeText(descriptorOutput); }}>COPY</button>
                 </div>
-                <div style={{ flex: 1, overflow: 'auto', padding: '12px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
+                <div style={{ overflow: 'auto', padding: '12px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text-primary)', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border)' }}>
                   {descriptorOutput}
+                </div>
+                <div style={{ fontSize: 9, padding: '4px 8px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', letterSpacing: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>SIGNLADDER COMMAND</span>
+                  <button style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 9, padding: '1px 6px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }} onClick={() => { navigator.clipboard?.writeText(signladderCommand); }}>COPY</button>
+                </div>
+                <div style={{ flex: 1, overflow: 'auto', padding: '12px', fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
+                  {signladderCommand}
                 </div>
               </div>
             )}
