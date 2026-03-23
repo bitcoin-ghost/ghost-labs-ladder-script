@@ -2,7 +2,7 @@
 BIP: 110
 Layer: Consensus (soft fork)
 Title: Ladder Script: Typed Structured Transaction Conditions
-Author: Bitcoin Ghost <dev@bitcoinghost.org>
+Author: Defenwycke <defenwycke@icloud.com>
 Status: Draft
 Type: Standards Track
 Created: 2026-03-16
