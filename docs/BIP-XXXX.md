@@ -44,37 +44,81 @@ transactions use version 4 (`nVersion = 4`).
 
 ## Motivation
 
-### Arbitrary Data Embedding Is Unsolved
+### Bitcoin's Spending Conditions Are Too Limited
 
-Bitcoin Script permits arbitrary byte pushes in witness data, making every
-transaction a potential carrier for unvalidated payloads. Inscription
-protocols have demonstrated that the witness discount creates an economic
-incentive to embed large data blobs in witness fields, with no mechanism to
-distinguish intended cryptographic material from arbitrary content.
+There are things people need to build on Bitcoin that Bitcoin Script cannot
+express. Not "difficult to express" — impossible:
 
-Ladder Script addresses this structurally. Every witness byte must belong to
-one of 11 typed fields (PUBKEY, SIGNATURE, HASH256, NUMERIC, etc.), each
-with enforced minimum and maximum sizes. The `merkle_pub_key` design binds
-public keys into the Merkle leaf hash at fund time rather than carrying them
-in conditions, eliminating the 2048-byte PUBKEY field as a data embedding
-channel. PREIMAGE fields are capped at 2 per witness. The result is a
-residual embeddable surface of approximately 116 bytes per transaction --
-down from effectively unlimited in raw Script.
+- **Vaults with clawback.** A hot key for daily spending with a cold key
+  that can sweep immediately if the hot key is compromised. OP_VAULT
+  (BIP-345) proposes this but is not activated. There is no way to do this
+  with existing Script.
 
-**Before (raw Script):** Any `OP_PUSH` can embed arbitrary bytes. A single
-witness can carry megabytes of non-cryptographic data under the witness
-discount.
+- **Rate-limited wallets.** Cap how many satoshis can leave a wallet per
+  block, even if the signing key is stolen. No opcode inspects spending
+  rate across blocks.
 
-**After (Ladder Script):** Maximum user-chosen data per transaction:
-2 PREIMAGE fields (64 bytes) + 1 DATA_RETURN output (40 bytes) + NUMERIC
-field manipulation (~12 bytes) = ~116 bytes.
+- **Recursive covenants.** A UTXO that enforces conditions on its own
+  spending outputs — DCA schedules, graduated vesting, binary splits. This
+  requires introspecting the spending transaction's outputs, which Script
+  cannot do without proposed opcodes (CTV, OP_CAT) that are not activated.
 
-### Script Complexity Is a Barrier
+- **Transaction-level governance.** Enforce that a treasury spend routes
+  funds to a specific address, or that transaction weight stays under a
+  limit, or that spending is only permitted during certain block-height
+  windows. Script has no output introspection beyond signature checks.
 
-Expressing even simple contracts in raw Bitcoin Script requires deep knowledge
-of stack manipulation, opcode sequencing, and subtle failure modes.
+- **Composable conditions.** A vault with rate-limiting AND a multisig
+  recovery path AND a time-locked heir clause — all in one UTXO. Each
+  proposed opcode (CTV, APO, OP_VAULT) addresses one use case. They were
+  not designed to compose.
 
-**Before (raw Script HTLC -- 11 opcodes):**
+Ladder Script makes all of these possible as native block types, composable
+with AND/OR logic:
+
+```
+ladder(or(
+    and(sig(@hot_key), csv(144), amount_lock(0, 1000000), rate_limit(1, 10, 6)),
+    multisig(2, @cold_a, @cold_b, @cold_c)
+))
+```
+
+This UTXO requires a signature AND a 144-block delay AND an amount cap AND
+a rate limit on rung 0 — or a 2-of-3 multisig recovery on rung 1.
+
+Ladder Script activates all 61 block types in a single soft fork. After
+activation, no further Script changes are needed. The type system is fixed.
+This is the final upgrade to Bitcoin's spending condition model.
+
+### Additional Design Properties
+
+Beyond capability, Ladder Script's typed block architecture provides three
+properties that raw Script does not:
+
+**Bounded data embedding.** Every witness byte must belong to a typed field
+with enforced size constraints. The `merkle_pub_key` design binds public
+keys into the Merkle leaf hash rather than carrying them in conditions,
+eliminating the 2048-byte PUBKEY field as an embedding channel. PREIMAGE
+fields are capped at 2 per witness. The residual embeddable surface is
+approximately 116 bytes per transaction — down from effectively unlimited
+in raw Script.
+
+**Post-quantum readiness.** A 1-byte SCHEME field routes signature
+verification to classical (Schnorr, ECDSA) or post-quantum algorithms
+(FALCON-512, FALCON-1024, Dilithium3, SPHINCS+). No wire format changes,
+no new block types, and no hard fork required. The same SIG block that
+verifies a 64-byte Schnorr signature also verifies a 49,216-byte SPHINCS+
+signature.
+
+**Deterministic execution.** Each block type has a fixed evaluation function
+with known computational cost. No loops, no stack manipulation, no unbounded
+recursion. Evaluation terminates in O(blocks × fields) time, making formal
+verification practical — the reference implementation includes 10 TLA+
+specifications covering evaluation semantics, anti-spam, and Merkle proofs.
+
+### Before and After
+
+**HTLC — Before (raw Script, 11 opcodes):**
 
 ```
 OP_IF
@@ -86,60 +130,16 @@ OP_ELSE
 OP_ENDIF
 ```
 
-**After (Ladder Script descriptor):**
+**HTLC — After (Ladder Script descriptor):**
 
 ```
-ladder(or(
-    htlc(@sender, @receiver, <preimage>, 144)
-))
+ladder(htlc(@sender, @receiver, <preimage>, 144))
 ```
 
-The HTLC block is a single typed construct with fixed field layout, static
-analysis support, and deterministic resource bounds. No stack manipulation,
-no opcode ordering errors, no untyped byte arrays.
-
-### Post-Quantum Readiness
-
-Current Bitcoin transactions are bound to ECDSA and Schnorr signature
-schemes. Adding post-quantum signature support requires either new opcodes
-or a hard fork.
-
-Ladder Script routes signature verification through a 1-byte SCHEME field:
-
-| Code   | Scheme        |
-|--------|---------------|
-| `0x01` | Schnorr (BIP-340) |
-| `0x02` | ECDSA         |
-| `0x10` | FALCON-512    |
-| `0x11` | FALCON-1024   |
-| `0x12` | Dilithium3    |
-| `0x13` | SPHINCS+-SHA2-256f |
-
-Transitioning to post-quantum signatures requires no wire format changes, no
-new block types, and no hard fork. The same SIG block that verifies a 64-byte
-Schnorr signature also verifies a 49,216-byte SPHINCS+ signature -- the
-SCHEME byte selects the algorithm, and the SIGNATURE field accommodates up
-to 50,000 bytes.
-
-### Covenants Lack a Unified Framework
-
-Bitcoin covenant proposals (CTV, OP_VAULT, APO, OP_CAT) each address one
-use case with a dedicated opcode. They cannot be composed: a vault with
-rate-limiting requires combining proposals that were not designed to
-interoperate.
-
-Ladder Script provides CTV (BIP-119 template hash verification), vaults
-(VAULT_LOCK with two-path recovery/hot spend), amount constraints
-(AMOUNT_LOCK), recursive covenants (6 RECURSE_ block types), and
-transaction-level governance (EPOCH_GATE, INPUT_COUNT, OUTPUT_COUNT,
-WEIGHT_LIMIT, RELATIVE_VALUE, OUTPUT_CHECK) -- all composable within a
-single rung via AND logic:
-
-```
-ladder(or(
-    and(sig(@hot_key), csv(144), amount_lock(0, 1000000), rate_limit(1, 10, 6))
-))
-```
+One typed block. Fixed field layout. Static analysis. Deterministic cost.
+Only the spending path revealed on-chain (the refund path stays private via
+MLSC). No stack manipulation, no opcode ordering errors, no untyped byte
+arrays.
 
 This rung requires a signature AND a 144-block delay AND an amount cap AND
 a rate limiter -- four conditions that compose without custom opcodes.
