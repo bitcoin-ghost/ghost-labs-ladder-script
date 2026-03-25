@@ -912,7 +912,7 @@ static RPCHelpMan createrungtx()
                                     {"address", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, "Destination scriptPubKey hex"},
                                 },
                             },
-                            {"mlsc", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED, "Create MLSC output (0xC2 + Merkle root) instead of inline conditions"},
+                            {"mlsc", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED, "Create MLSC output (0xDF + Merkle root) instead of inline conditions"},
                         },
                     },
                 },
@@ -1003,7 +1003,7 @@ static RPCHelpMan createrungtx()
         CTxOut txout;
         txout.nValue = amount;
 
-        // Always MLSC: compute Merkle root and create 0xC2 output
+        // Always MLSC: compute Merkle root and create 0xDF output
         uint256 root = rung::ComputeConditionsRoot(conditions, rung_pubkeys, relay_pubkeys);
 
         // DATA_RETURN: append data payload to MLSC scriptPubKey
@@ -3156,7 +3156,7 @@ static RPCHelpMan createtxmlsc()
 
     // Inflate outputs with shared scriptPubKey (for UTXO compatibility)
     CScript mlsc_spk;
-    mlsc_spk.push_back(0xC2);
+    mlsc_spk.push_back(0xDF);
     mlsc_spk.insert(mlsc_spk.end(), mtx.conditions_root.begin(), mtx.conditions_root.end());
     for (auto& out : mtx.vout) {
         out.scriptPubKey = mlsc_spk;

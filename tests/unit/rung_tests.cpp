@@ -8310,7 +8310,7 @@ BOOST_AUTO_TEST_CASE(mlsc_script_creation_and_detection)
     // Detection
     BOOST_CHECK(IsMLSCScript(script));
     BOOST_CHECK(IsLadderScript(script));
-    BOOST_CHECK(!IsRungConditionsScript(script)); // 0xC2 is not 0xC1
+    BOOST_CHECK(!IsRungConditionsScript(script)); // 0xDF is not 0xC1
 
     // No DATA_RETURN payload
     BOOST_CHECK(!HasMLSCData(script));

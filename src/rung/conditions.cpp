@@ -36,7 +36,7 @@ bool IsConditionDataType(RungDataType type)
     return false;
 }
 
-// Inline conditions (0xC1) removed — all outputs must use MLSC (0xC2).
+// Inline conditions (0xC1) removed — all outputs must use MLSC (0xDF).
 // These functions are retained for backward compatibility but always reject.
 
 bool IsRungConditionsScript(const CScript&)
@@ -46,7 +46,7 @@ bool IsRungConditionsScript(const CScript&)
 
 bool DeserializeRungConditions(const CScript&, RungConditions&, std::string& error)
 {
-    error = "inline conditions (0xC1) removed — use MLSC (0xC2)";
+    error = "inline conditions (0xC1) removed — use MLSC (0xDF)";
     return false;
 }
 
@@ -175,7 +175,7 @@ const uint256 MLSC_EMPTY_LEAF = ComputeEmptyLeaf();
 
 bool IsMLSCScript(const CScript& scriptPubKey)
 {
-    // 33 bytes = standard MLSC (0xC2 + 32-byte root)
+    // 33 bytes = standard MLSC (0xDF + 32-byte root)
     // 34-73 bytes = MLSC with DATA_RETURN payload (max 40 bytes data)
     return scriptPubKey.size() >= 33 && scriptPubKey.size() <= 73 &&
            scriptPubKey[0] == RUNG_MLSC_PREFIX;

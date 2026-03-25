@@ -3257,7 +3257,7 @@ bool ValidateRungOutputs(const CTransaction& tx, unsigned int flags, std::string
     for (size_t i = 0; i < tx.vout.size(); ++i) {
         const auto& spk = tx.vout[i].scriptPubKey;
 
-        // MLSC output: 0xC2 + 32 bytes (+ optional DATA_RETURN payload)
+        // MLSC output: 0xDF + 32 bytes (+ optional DATA_RETURN payload)
         if (IsMLSCScript(spk)) {
             // MLSC with DATA_RETURN payload (> 33 bytes)
             if (HasMLSCData(spk)) {
@@ -3410,7 +3410,7 @@ bool VerifyRungTx(const CTransaction& tx,
     const auto& witness = tx.vin[nIn].scriptWitness;
 
     // Exact witness stack size enforcement (prevents data stuffing via extra elements).
-    // MLSC (0xC2): exactly 2 elements (LadderWitness + MLSCProof).
+    // MLSC (0xDF): exactly 2 elements (LadderWitness + MLSCProof).
     if (witness.stack.size() != 2) {
         if (serror) *serror = SCRIPT_ERR_WITNESS_PROGRAM_WITNESS_EMPTY;
         return false;
@@ -3435,7 +3435,7 @@ bool VerifyRungTx(const CTransaction& tx,
         }
     }
 
-    // Only MLSC (0xC2) outputs accepted. Inline (0xC1) removed.
+    // Only MLSC (0xDF) outputs accepted. Inline (0xC1) removed.
     if (!IsMLSCScript(spent_output.scriptPubKey)) {
         if (serror) *serror = SCRIPT_ERR_UNKNOWN_ERROR;
         return false;

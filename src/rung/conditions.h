@@ -21,10 +21,10 @@ namespace rung {
 static constexpr uint8_t RUNG_CONDITIONS_PREFIX = 0xc1;
 
 /** Magic prefix byte identifying a scriptPubKey as MLSC (Merkelised Ladder Script Conditions).
- *  Output format: 0xC2 + conditions_root(32 bytes) = 33-byte scriptPubKey.
+ *  Output format: 0xDF + conditions_root(32 bytes) = 33-byte scriptPubKey.
  *  Full conditions are revealed only at spend time in the witness.
  *  This is the ONLY accepted output format. Inline conditions (0xC1) are removed. */
-static constexpr uint8_t RUNG_MLSC_PREFIX = 0xc2;
+static constexpr uint8_t RUNG_MLSC_PREFIX = 0xdf;
 
 /** Nothing-up-my-sleeve constant for empty Merkle tree leaf padding.
  *  = SHA256("LADDER_EMPTY_LEAF"). Cannot collide with valid serialized rung/coil/relay data. */
@@ -60,7 +60,7 @@ struct RungConditions {
     RungCoil coil;               //!< Output coil (per-output, serialized with conditions)
     std::vector<Relay> relays;   //!< Relay definitions (shared condition sets)
     std::optional<TemplateReference> template_ref; //!< Template inheritance reference (if set, rungs are empty until resolved)
-    std::optional<uint256> conditions_root; //!< MLSC: Merkle root from UTXO (set for 0xC2 outputs)
+    std::optional<uint256> conditions_root; //!< MLSC: Merkle root from UTXO (set for 0xDF outputs)
 
     bool IsEmpty() const { return rungs.empty() && !template_ref.has_value() && !conditions_root.has_value(); }
     bool IsTemplateRef() const { return template_ref.has_value(); }
@@ -95,11 +95,11 @@ inline bool IsConditionFieldType(RungDataType type) { return IsConditionDataType
 // MLSC (Merkelized Ladder Script Conditions)
 // ============================================================================
 
-/** Check if scriptPubKey is an MLSC output (0xC2 + 32-byte root + optional DATA_RETURN payload).
+/** Check if scriptPubKey is an MLSC output (0xDF + 32-byte root + optional DATA_RETURN payload).
  *  Valid sizes: 33 bytes (standard) or 34-73 bytes (with DATA_RETURN, max 40 bytes data). */
 bool IsMLSCScript(const CScript& scriptPubKey);
 
-/** Check if scriptPubKey is a Ladder Script output (MLSC 0xC2). */
+/** Check if scriptPubKey is a Ladder Script output (MLSC 0xDF). */
 bool IsLadderScript(const CScript& scriptPubKey);
 
 /** Extract the 32-byte conditions root from an MLSC scriptPubKey. */
@@ -112,10 +112,10 @@ std::vector<uint8_t> GetMLSCData(const CScript& scriptPubKey);
 /** Check if an MLSC scriptPubKey has a DATA_RETURN payload appended. */
 bool HasMLSCData(const CScript& scriptPubKey);
 
-/** Create an MLSC scriptPubKey: 0xC2 + conditions_root. */
+/** Create an MLSC scriptPubKey: 0xDF + conditions_root. */
 CScript CreateMLSCScript(const uint256& conditions_root);
 
-/** Create an MLSC scriptPubKey with DATA_RETURN payload: 0xC2 + conditions_root + data.
+/** Create an MLSC scriptPubKey with DATA_RETURN payload: 0xDF + conditions_root + data.
  *  Data must be 1-80 bytes. */
 CScript CreateMLSCScript(const uint256& conditions_root, const std::vector<uint8_t>& data);
 
@@ -159,7 +159,7 @@ struct MLSCVerifiedLeaves {
 };
 
 /** MLSC spending proof — revealed conditions + Merkle proof hashes.
- *  Carried in witness stack[1] when spending an MLSC (0xC2) output. */
+ *  Carried in witness stack[1] when spending an MLSC (0xDF) output. */
 struct MLSCProof {
     uint16_t total_rungs;      //!< Total number of rungs in the original conditions
     uint16_t total_relays;     //!< Total number of relays in the original conditions
