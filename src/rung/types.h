@@ -543,6 +543,7 @@ struct RungCoil {
     RungScheme scheme{RungScheme::SCHNORR};
     std::vector<uint8_t> address_hash;         //!< SHA256(destination address) — raw address never on-chain. Empty if none.
     std::vector<std::pair<uint16_t, std::vector<uint8_t>>> rung_destinations; //!< Per-rung destination overrides: (rung_index, address_hash). Bounded by MAX_RUNGS.
+    uint8_t output_index{0};                   //!< TX_MLSC: which output this rung governs. Committed in Merkle leaf.
 };
 
 /** A single typed field within a block. Type constrains the allowed data size. */

@@ -197,6 +197,63 @@ bool VerifyMLSCProof(const MLSCProof& proof,
                      MLSCVerifiedLeaves* verified_out = nullptr,
                      const std::vector<std::vector<std::vector<uint8_t>>>& mutation_target_pubkeys = {});
 
+// ============================================================================
+// TX_MLSC (Transaction-Level Merkelised Ladder Script Conditions)
+// ============================================================================
+
+/** A single rung in the creation proof — structural template + opaque value commitment.
+ *  The structural template (block types, inverted flags, coil) is validated at block
+ *  acceptance. The value_commitment = SHA256(field_values || pubkeys) is opaque —
+ *  a hash output, not attacker-chosen data.
+ *
+ *  Together they form the leaf: TaggedHash("LadderLeaf", template || value_commitment). */
+struct CreationProofRung {
+    std::vector<std::pair<uint16_t, uint8_t>> blocks;  //!< Per-block: (block_type, inverted)
+    RungCoil coil;                                      //!< Coil including output_index
+    uint256 value_commitment;                           //!< SHA256(field_values || pubkeys)
+};
+
+/** TX_MLSC creation proof — one per transaction, carried in the witness.
+ *  Proves the conditions_root was derived from validated, typed structure.
+ *  Validated at block acceptance; prunable afterward (witness data). */
+struct CreationProof {
+    std::vector<CreationProofRung> rungs;
+};
+
+/** Serialize a structural template (block types + inverted flags + coil) for leaf hashing.
+ *  This is the public half of the rung leaf — validated at creation time. */
+std::vector<uint8_t> SerializeStructuralTemplate(const CreationProofRung& rung);
+
+/** Compute a TX_MLSC leaf from a creation proof rung.
+ *  leaf = TaggedHash("LadderLeaf", structural_template || value_commitment) */
+uint256 ComputeTxMLSCLeaf(const CreationProofRung& rung);
+
+/** Compute the TX_MLSC conditions root from a creation proof.
+ *  Builds a Merkle tree from all rung leaves using sorted interior nodes. */
+uint256 ComputeTxMLSCRoot(const CreationProof& proof);
+
+/** Compute a value_commitment for a rung: SHA256(field_values || pubkeys).
+ *  Used by RPC commands when building creation proofs from full conditions. */
+uint256 ComputeValueCommitment(const Rung& rung,
+                                const std::vector<std::vector<uint8_t>>& pubkeys);
+
+/** Deserialize a creation proof from witness bytes. */
+bool DeserializeCreationProof(const std::vector<uint8_t>& data,
+                               CreationProof& proof,
+                               std::string& error);
+
+/** Serialize a creation proof to witness bytes. */
+std::vector<uint8_t> SerializeCreationProof(const CreationProof& proof);
+
+/** Validate a creation proof against a conditions_root and output count.
+ *  Checks: known block types, valid inversion, valid coils, output_index < n_outputs,
+ *  every output has at least one rung, computed root matches expected root.
+ *  @return true if all checks pass. */
+bool ValidateCreationProof(const CreationProof& proof,
+                            const uint256& expected_root,
+                            size_t n_outputs,
+                            std::string& error);
+
 } // namespace rung
 
 #endif // BITCOIN_RUNG_CONDITIONS_H
