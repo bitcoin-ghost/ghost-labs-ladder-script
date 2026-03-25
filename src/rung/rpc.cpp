@@ -3087,7 +3087,7 @@ static RPCHelpMan createtxmlsc()
             if (coil_obj.exists("type")) {
                 std::string ct = coil_obj["type"].get_str();
                 if (ct == "UNLOCK_TO") cp_rung.coil.coil_type = rung::RungCoilType::UNLOCK_TO;
-                else if (ct == "COVENANT") cp_rung.coil.coil_type = rung::RungCoilType::COVENANT;
+                // COVENANT coil type removed — only UNLOCK and UNLOCK_TO
             }
         }
 

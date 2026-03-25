@@ -658,7 +658,7 @@ BOOST_AUTO_TEST_CASE(eval_hash_preimage_sha256_satisfied)
     CSHA256().Write(preimage.data(), preimage.size()).Finalize(hash);
 
     RungBlock block;
-    block.type = RungBlockType::RESERVED_0201;
+    block.type = RungBlockType::HASH_PREIMAGE;
     block.fields.push_back({RungDataType::HASH256, std::vector<uint8_t>(hash, hash + 32)});
     block.fields.push_back({RungDataType::PREIMAGE, preimage});
 
@@ -674,7 +674,7 @@ BOOST_AUTO_TEST_CASE(eval_hash_preimage_sha256_wrong)
     std::vector<uint8_t> wrong_preimage{0x05, 0x06, 0x07, 0x08};
 
     RungBlock block;
-    block.type = RungBlockType::RESERVED_0201;
+    block.type = RungBlockType::HASH_PREIMAGE;
     block.fields.push_back({RungDataType::HASH256, std::vector<uint8_t>(hash, hash + 32)});
     block.fields.push_back({RungDataType::PREIMAGE, wrong_preimage});
 
@@ -688,7 +688,7 @@ BOOST_AUTO_TEST_CASE(eval_hash160_preimage_satisfied)
     CHash160().Write(preimage).Finalize(hash);
 
     RungBlock block;
-    block.type = RungBlockType::RESERVED_0202;
+    block.type = RungBlockType::HASH160_PREIMAGE;
     block.fields.push_back({RungDataType::HASH160, std::vector<uint8_t>(hash, hash + 20)});
     block.fields.push_back({RungDataType::PREIMAGE, preimage});
 
@@ -845,7 +845,7 @@ BOOST_AUTO_TEST_CASE(inversion_hash_preimage)
     CSHA256().Write(preimage.data(), preimage.size()).Finalize(hash);
 
     RungBlock block;
-    block.type = RungBlockType::RESERVED_0201;
+    block.type = RungBlockType::HASH_PREIMAGE;
     block.fields.push_back({RungDataType::HASH256, std::vector<uint8_t>(hash, hash + 32)});
     block.fields.push_back({RungDataType::PREIMAGE, preimage});
 
@@ -3992,7 +3992,7 @@ BOOST_AUTO_TEST_CASE(eval_hash160_preimage_wrong)
     std::vector<uint8_t> wrong_preimage{0xAA, 0xBB, 0xCC, 0xDD};
 
     RungBlock block;
-    block.type = RungBlockType::RESERVED_0202;
+    block.type = RungBlockType::HASH160_PREIMAGE;
     block.fields.push_back({RungDataType::HASH160, std::vector<uint8_t>(hash, hash + 20)});
     block.fields.push_back({RungDataType::PREIMAGE, wrong_preimage});
 
@@ -5926,7 +5926,7 @@ BOOST_AUTO_TEST_CASE(relay_eval_unsatisfied_blocks_rung)
     // Rung requires relay 0, but has a hash preimage block that would pass on its own
     Rung rung;
     RungBlock b;
-    b.type = RungBlockType::RESERVED_0201;
+    b.type = RungBlockType::HASH_PREIMAGE;
     auto preimage = std::vector<uint8_t>(32, 0xDD);
     CSHA256 hasher;
     hasher.Write(preimage.data(), preimage.size());
@@ -7304,8 +7304,8 @@ BOOST_AUTO_TEST_CASE(micro_header_lookup_all_known_types)
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::CLTV) >= 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::CLTV_TIME) >= 0);
     // HASH_PREIMAGE and HASH160_PREIMAGE deprecated — slots set to 0xFFFF
-    BOOST_CHECK(MicroHeaderSlot(RungBlockType::RESERVED_0201) < 0);
-    BOOST_CHECK(MicroHeaderSlot(RungBlockType::RESERVED_0202) < 0);
+    BOOST_CHECK(MicroHeaderSlot(RungBlockType::HASH_PREIMAGE) < 0);
+    BOOST_CHECK(MicroHeaderSlot(RungBlockType::HASH160_PREIMAGE) < 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::TAGGED_HASH) >= 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::CTV) >= 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::VAULT_LOCK) >= 0);
@@ -7410,7 +7410,7 @@ BOOST_AUTO_TEST_CASE(micro_header_hash_preimage_rejected)
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::RESERVED_0201;
+    block.type = RungBlockType::HASH_PREIMAGE;
     block.fields.push_back({RungDataType::HASH256, MakeHash256()});
     block.fields.push_back({RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0xEE)});
     rung.blocks.push_back(block);
@@ -10959,7 +10959,7 @@ BOOST_AUTO_TEST_CASE(block_descriptor_table_consistency)
         auto bt = static_cast<RungBlockType>(tc);
 
         // Skip deprecated types
-        if (bt == RungBlockType::RESERVED_0201 || bt == RungBlockType::RESERVED_0202) continue;
+        if (bt == RungBlockType::HASH_PREIMAGE || bt == RungBlockType::HASH160_PREIMAGE) continue;
 
         const auto* desc = rung::LookupBlockDescriptor(bt);
         BOOST_CHECK_MESSAGE(desc != nullptr, "Missing descriptor for " + BlockTypeName(bt));
@@ -11001,6 +11001,322 @@ BOOST_AUTO_TEST_CASE(batch_verifier_find_failure_empty)
     rung::BatchVerifier bv;
     // No entries, no failure
     BOOST_CHECK_EQUAL(bv.FindFailure(), -1);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+// ============================================================================
+// TX_MLSC tests
+// ============================================================================
+
+BOOST_AUTO_TEST_SUITE(tx_mlsc_tests)
+
+// Helper: build a CreationProofRung from block type + output index
+static CreationProofRung MakeCreationRung(RungBlockType type, uint8_t output_index, bool inverted = false)
+{
+    CreationProofRung rung;
+    rung.blocks.push_back({static_cast<uint16_t>(type), static_cast<uint8_t>(inverted ? 1 : 0)});
+    rung.coil.coil_type = RungCoilType::UNLOCK;
+    rung.coil.attestation = RungAttestationMode::INLINE;
+    rung.coil.scheme = RungScheme::SCHNORR;
+    rung.coil.output_index = output_index;
+    // Fake value_commitment
+    CSHA256().Write(reinterpret_cast<const uint8_t*>(&output_index), 1).Finalize(rung.value_commitment.data());
+    return rung;
+}
+
+// 1. Leaf computation is deterministic
+BOOST_AUTO_TEST_CASE(tx_mlsc_leaf_deterministic)
+{
+    auto rung = MakeCreationRung(RungBlockType::SIG, 0);
+    uint256 leaf1 = ComputeTxMLSCLeaf(rung);
+    uint256 leaf2 = ComputeTxMLSCLeaf(rung);
+    BOOST_CHECK_EQUAL(leaf1, leaf2);
+    BOOST_CHECK(!leaf1.IsNull());
+}
+
+// 2. Different output_index produces different leaf
+BOOST_AUTO_TEST_CASE(tx_mlsc_leaf_output_index_matters)
+{
+    auto rung0 = MakeCreationRung(RungBlockType::SIG, 0);
+    auto rung1 = MakeCreationRung(RungBlockType::SIG, 1);
+    // Same block type, different output_index → different leaf
+    // (output_index is in the structural template which is in the leaf hash)
+    uint256 leaf0 = ComputeTxMLSCLeaf(rung0);
+    uint256 leaf1 = ComputeTxMLSCLeaf(rung1);
+    BOOST_CHECK(leaf0 != leaf1);
+}
+
+// 3. Different block type produces different leaf
+BOOST_AUTO_TEST_CASE(tx_mlsc_leaf_block_type_matters)
+{
+    auto rung_sig = MakeCreationRung(RungBlockType::SIG, 0);
+    auto rung_csv = MakeCreationRung(RungBlockType::CSV, 0);
+    uint256 leaf_sig = ComputeTxMLSCLeaf(rung_sig);
+    uint256 leaf_csv = ComputeTxMLSCLeaf(rung_csv);
+    BOOST_CHECK(leaf_sig != leaf_csv);
+}
+
+// 4. Root computation from creation proof
+BOOST_AUTO_TEST_CASE(tx_mlsc_root_computation)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 0));
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 1));
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    BOOST_CHECK(!root.IsNull());
+
+    // Same proof → same root
+    uint256 root2 = ComputeTxMLSCRoot(proof);
+    BOOST_CHECK_EQUAL(root, root2);
+}
+
+// 5. Single rung: root == leaf (degenerate tree)
+BOOST_AUTO_TEST_CASE(tx_mlsc_single_rung_root_equals_leaf)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 0));
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    uint256 leaf = ComputeTxMLSCLeaf(proof.rungs[0]);
+    BOOST_CHECK_EQUAL(root, leaf);
+}
+
+// 6. Creation proof serialization round-trip
+BOOST_AUTO_TEST_CASE(tx_mlsc_creation_proof_serde)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 0));
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::MULTISIG, 0));
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 1));
+
+    auto bytes = SerializeCreationProof(proof);
+    BOOST_CHECK(!bytes.empty());
+
+    CreationProof proof2;
+    std::string error;
+    BOOST_CHECK(DeserializeCreationProof(bytes, proof2, error));
+    BOOST_CHECK_EQUAL(proof.rungs.size(), proof2.rungs.size());
+
+    // Roots must match after round-trip
+    BOOST_CHECK_EQUAL(ComputeTxMLSCRoot(proof), ComputeTxMLSCRoot(proof2));
+}
+
+// 7. Creation proof validation accepts valid proof
+BOOST_AUTO_TEST_CASE(tx_mlsc_validate_creation_proof_valid)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 0));
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 1));
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    std::string error;
+    BOOST_CHECK(ValidateCreationProof(proof, root, 2, error));
+}
+
+// 8. Creation proof validation rejects root mismatch
+BOOST_AUTO_TEST_CASE(tx_mlsc_validate_creation_proof_root_mismatch)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 0));
+
+    uint256 wrong_root;
+    wrong_root.SetNull();
+    std::string error;
+    BOOST_CHECK(!ValidateCreationProof(proof, wrong_root, 1, error));
+    BOOST_CHECK(error.find("root mismatch") != std::string::npos);
+}
+
+// 9. Creation proof validation rejects unknown block type
+BOOST_AUTO_TEST_CASE(tx_mlsc_validate_creation_proof_unknown_type)
+{
+    CreationProof proof;
+    CreationProofRung rung;
+    rung.blocks.push_back({0xFFFF, 0}); // unknown type
+    rung.coil.output_index = 0;
+    CSHA256().Finalize(rung.value_commitment.data());
+    proof.rungs.push_back(rung);
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    std::string error;
+    BOOST_CHECK(!ValidateCreationProof(proof, root, 1, error));
+    BOOST_CHECK(error.find("unknown block type") != std::string::npos);
+}
+
+// 10. Creation proof validation rejects invalid inversion
+BOOST_AUTO_TEST_CASE(tx_mlsc_validate_creation_proof_bad_inversion)
+{
+    CreationProof proof;
+    CreationProofRung rung;
+    // SIG is NOT invertible — inverted=1 should fail
+    rung.blocks.push_back({static_cast<uint16_t>(RungBlockType::SIG), 1});
+    rung.coil.output_index = 0;
+    CSHA256().Finalize(rung.value_commitment.data());
+    proof.rungs.push_back(rung);
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    std::string error;
+    BOOST_CHECK(!ValidateCreationProof(proof, root, 1, error));
+    BOOST_CHECK(error.find("non-invertible") != std::string::npos);
+}
+
+// 11. Creation proof validation rejects output_index out of range
+BOOST_AUTO_TEST_CASE(tx_mlsc_validate_creation_proof_output_out_of_range)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 5)); // only 2 outputs
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    std::string error;
+    BOOST_CHECK(!ValidateCreationProof(proof, root, 2, error));
+    BOOST_CHECK(error.find("output_index") != std::string::npos);
+}
+
+// 12. Creation proof validation rejects output with no rung
+BOOST_AUTO_TEST_CASE(tx_mlsc_validate_creation_proof_uncovered_output)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 0));
+    // Output 1 has no rung assigned
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    std::string error;
+    BOOST_CHECK(!ValidateCreationProof(proof, root, 2, error));
+    BOOST_CHECK(error.find("no rung assigned") != std::string::npos);
+}
+
+// 13. Creation proof rejects empty proof
+BOOST_AUTO_TEST_CASE(tx_mlsc_validate_creation_proof_empty)
+{
+    CreationProof proof; // no rungs
+    uint256 root;
+    root.SetNull();
+    std::string error;
+    BOOST_CHECK(!ValidateCreationProof(proof, root, 1, error));
+    BOOST_CHECK(error.find("no rungs") != std::string::npos);
+}
+
+// 14. Value commitment is deterministic
+BOOST_AUTO_TEST_CASE(tx_mlsc_value_commitment_deterministic)
+{
+    Rung rung;
+    RungBlock block;
+    block.type = RungBlockType::SIG;
+    RungField scheme_field;
+    scheme_field.type = RungDataType::SCHEME;
+    scheme_field.data = {0x01}; // SCHNORR
+    block.fields.push_back(scheme_field);
+    rung.blocks.push_back(block);
+
+    auto pk = MakePubkey();
+    std::vector<std::vector<uint8_t>> pubkeys = {pk};
+
+    uint256 vc1 = ComputeValueCommitment(rung, pubkeys);
+    uint256 vc2 = ComputeValueCommitment(rung, pubkeys);
+    BOOST_CHECK_EQUAL(vc1, vc2);
+    BOOST_CHECK(!vc1.IsNull());
+}
+
+// 15. Different pubkeys produce different value commitment
+BOOST_AUTO_TEST_CASE(tx_mlsc_value_commitment_pubkey_matters)
+{
+    Rung rung;
+    RungBlock block;
+    block.type = RungBlockType::SIG;
+    RungField scheme_field;
+    scheme_field.type = RungDataType::SCHEME;
+    scheme_field.data = {0x01};
+    block.fields.push_back(scheme_field);
+    rung.blocks.push_back(block);
+
+    auto pk1 = MakePubkey();
+    auto pk2 = MakePubkey();
+    pk2[1] = 0xBB; // different
+
+    uint256 vc1 = ComputeValueCommitment(rung, {pk1});
+    uint256 vc2 = ComputeValueCommitment(rung, {pk2});
+    BOOST_CHECK(vc1 != vc2);
+}
+
+// 16. Structural template serialization round-trip
+BOOST_AUTO_TEST_CASE(tx_mlsc_structural_template_serde)
+{
+    auto rung = MakeCreationRung(RungBlockType::CSV, 3);
+    auto tmpl = SerializeStructuralTemplate(rung);
+    BOOST_CHECK(!tmpl.empty());
+    // Should contain: n_blocks(1) + block_type(2) + inverted(1) + coil(5) = 9 bytes
+    BOOST_CHECK_EQUAL(tmpl.size(), 9u);
+}
+
+// 17. Deserialization rejects trailing bytes
+BOOST_AUTO_TEST_CASE(tx_mlsc_creation_proof_rejects_trailing)
+{
+    CreationProof proof;
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::SIG, 0));
+    auto bytes = SerializeCreationProof(proof);
+    bytes.push_back(0xFF); // trailing garbage
+
+    CreationProof proof2;
+    std::string error;
+    BOOST_CHECK(!DeserializeCreationProof(bytes, proof2, error));
+    BOOST_CHECK(error.find("trailing") != std::string::npos);
+}
+
+// 18. Invertible block type accepted when inverted
+BOOST_AUTO_TEST_CASE(tx_mlsc_invertible_block_accepted)
+{
+    CreationProof proof;
+    // CSV IS invertible
+    proof.rungs.push_back(MakeCreationRung(RungBlockType::CSV, 0, /*inverted=*/true));
+
+    uint256 root = ComputeTxMLSCRoot(proof);
+    std::string error;
+    BOOST_CHECK(ValidateCreationProof(proof, root, 1, error));
+}
+
+// 19. TX_MLSC descriptor parse round-trip
+BOOST_AUTO_TEST_CASE(tx_mlsc_descriptor_parse)
+{
+    std::string desc = "ladder(output(0, sig(@alice)), output(1, sig(@bob)))";
+
+    auto pk_alice = MakePubkey();
+    auto pk_bob = MakePubkey();
+    pk_bob[1] = 0xBB;
+
+    std::map<std::string, std::vector<uint8_t>> keys = {
+        {"alice", pk_alice},
+        {"bob", pk_bob},
+    };
+
+    TxMLSCDescriptor parsed;
+    std::string error;
+    BOOST_CHECK(ParseTxMLSCDescriptor(desc, keys, parsed, error));
+    BOOST_CHECK_EQUAL(parsed.outputs.size(), 2u);
+    BOOST_CHECK_EQUAL(parsed.outputs[0].rungs.size(), 1u);
+    BOOST_CHECK_EQUAL(parsed.outputs[1].rungs.size(), 1u);
+}
+
+// 20. TX_MLSC descriptor with multiple rungs per output
+BOOST_AUTO_TEST_CASE(tx_mlsc_descriptor_multi_rung)
+{
+    std::string desc = "ladder(output(0, or(sig(@alice), csv(144))), output(1, sig(@bob)))";
+
+    auto pk_alice = MakePubkey();
+    auto pk_bob = MakePubkey();
+    pk_bob[1] = 0xBB;
+
+    std::map<std::string, std::vector<uint8_t>> keys = {
+        {"alice", pk_alice},
+        {"bob", pk_bob},
+    };
+
+    TxMLSCDescriptor parsed;
+    std::string error;
+    BOOST_CHECK(ParseTxMLSCDescriptor(desc, keys, parsed, error));
+    BOOST_CHECK_EQUAL(parsed.outputs.size(), 2u);
+    BOOST_CHECK_EQUAL(parsed.outputs[0].rungs.size(), 2u); // sig + csv
+    BOOST_CHECK_EQUAL(parsed.outputs[1].rungs.size(), 1u); // sig
 }
 
 BOOST_AUTO_TEST_SUITE_END()

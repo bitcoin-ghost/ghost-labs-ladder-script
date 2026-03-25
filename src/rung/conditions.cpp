@@ -840,7 +840,7 @@ bool ValidateCreationProof(const CreationProof& proof,
             const auto& [block_type, inverted] = rung.blocks[b];
             auto bt = static_cast<RungBlockType>(block_type);
 
-            if (!IsKnownBlockType(bt)) {
+            if (!IsKnownBlockType(block_type)) {
                 error = "creation proof rung " + std::to_string(r) +
                         " block " + std::to_string(b) +
                         ": unknown block type 0x" +
