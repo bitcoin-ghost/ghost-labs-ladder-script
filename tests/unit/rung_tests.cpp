@@ -212,13 +212,17 @@ BOOST_AUTO_TEST_CASE(field_validation_numeric_valid)
 
 BOOST_AUTO_TEST_CASE(field_validation_preimage_valid_range)
 {
-    // Exactly 32 bytes (FieldMinSize == FieldMaxSize == 32)
+    // 32 bytes valid (within 1..32 range)
     RungField valid{RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0x42)};
     std::string reason;
     BOOST_CHECK(valid.IsValid(reason));
 
-    // 31 bytes rejected (too small)
-    RungField too_small{RungDataType::PREIMAGE, std::vector<uint8_t>(31, 0x42)};
+    // 1 byte valid (FieldMinSize = 1 for P2SH inner conditions)
+    RungField one_byte{RungDataType::PREIMAGE, std::vector<uint8_t>(1, 0x42)};
+    BOOST_CHECK(one_byte.IsValid(reason));
+
+    // 0 bytes rejected (too small)
+    RungField too_small{RungDataType::PREIMAGE, std::vector<uint8_t>()};
     BOOST_CHECK(!too_small.IsValid(reason));
 
     // 33 bytes rejected (too large)
@@ -658,7 +662,7 @@ BOOST_AUTO_TEST_CASE(eval_hash_preimage_sha256_satisfied)
     CSHA256().Write(preimage.data(), preimage.size()).Finalize(hash);
 
     RungBlock block;
-    block.type = RungBlockType::HASH_PREIMAGE;
+    block.type = RungBlockType::RESERVED_0201;
     block.fields.push_back({RungDataType::HASH256, std::vector<uint8_t>(hash, hash + 32)});
     block.fields.push_back({RungDataType::PREIMAGE, preimage});
 
@@ -674,7 +678,7 @@ BOOST_AUTO_TEST_CASE(eval_hash_preimage_sha256_wrong)
     std::vector<uint8_t> wrong_preimage{0x05, 0x06, 0x07, 0x08};
 
     RungBlock block;
-    block.type = RungBlockType::HASH_PREIMAGE;
+    block.type = RungBlockType::RESERVED_0201;
     block.fields.push_back({RungDataType::HASH256, std::vector<uint8_t>(hash, hash + 32)});
     block.fields.push_back({RungDataType::PREIMAGE, wrong_preimage});
 
@@ -688,7 +692,7 @@ BOOST_AUTO_TEST_CASE(eval_hash160_preimage_satisfied)
     CHash160().Write(preimage).Finalize(hash);
 
     RungBlock block;
-    block.type = RungBlockType::HASH160_PREIMAGE;
+    block.type = RungBlockType::RESERVED_0202;
     block.fields.push_back({RungDataType::HASH160, std::vector<uint8_t>(hash, hash + 20)});
     block.fields.push_back({RungDataType::PREIMAGE, preimage});
 
@@ -840,20 +844,18 @@ BOOST_AUTO_TEST_CASE(inversion_csv)
 
 BOOST_AUTO_TEST_CASE(inversion_hash_preimage)
 {
-    std::vector<uint8_t> preimage{0x01, 0x02, 0x03, 0x04};
-    unsigned char hash[CSHA256::OUTPUT_SIZE];
-    CSHA256().Write(preimage.data(), preimage.size()).Finalize(hash);
-
+    // RESERVED_0201 (former HASH_PREIMAGE) — deprecated, rejected at deserialization.
+    // If somehow evaluated: returns UNKNOWN_BLOCK_TYPE (not inverted) or ERROR (inverted,
+    // because RESERVED types are not in IsInvertibleBlockType).
     RungBlock block;
-    block.type = RungBlockType::HASH_PREIMAGE;
-    block.fields.push_back({RungDataType::HASH256, std::vector<uint8_t>(hash, hash + 32)});
-    block.fields.push_back({RungDataType::PREIMAGE, preimage});
+    block.type = RungBlockType::RESERVED_0201;
 
     MockSignatureChecker checker;
     ScriptExecutionData execdata;
     block.inverted = false;
-    BOOST_CHECK(EvalBlock(block, checker, SigVersion::LADDER, execdata) == EvalResult::ERROR);
+    BOOST_CHECK(EvalBlock(block, checker, SigVersion::LADDER, execdata) == EvalResult::UNKNOWN_BLOCK_TYPE);
     block.inverted = true;
+    // Non-invertible block with inverted flag → ERROR (defense in depth)
     BOOST_CHECK(EvalBlock(block, checker, SigVersion::LADDER, execdata) == EvalResult::ERROR);
 }
 
@@ -1963,8 +1965,8 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_59_types_conditions)
         // === Signature family ===
         // SIG conditions: [SCHEME(1)]
         {RungBlockType::SIG, {{RungDataType::SCHEME, scheme_schnorr}}},
-        // MULTISIG conditions: [NUMERIC(M)]
-        {RungBlockType::MULTISIG, {{RungDataType::NUMERIC, num2}}},
+        // MULTISIG conditions: [NUMERIC(M), SCHEME]
+        {RungBlockType::MULTISIG, {{RungDataType::NUMERIC, num2}, {RungDataType::SCHEME, scheme_schnorr}}},
         // ADAPTOR_SIG: no condition fields (pubkeys in Merkle leaf)
         {RungBlockType::ADAPTOR_SIG, {}},
         // MUSIG_THRESHOLD conditions: [NUMERIC(M), NUMERIC(N)]
@@ -2044,16 +2046,16 @@ BOOST_AUTO_TEST_CASE(serialize_roundtrip_all_59_types_conditions)
         // === Compound family ===
         // TIMELOCKED_SIG conditions: [SCHEME, NUMERIC]
         {RungBlockType::TIMELOCKED_SIG, {{RungDataType::SCHEME, scheme_schnorr}, {RungDataType::NUMERIC, num10}}},
-        // HTLC conditions: [HASH256, NUMERIC]
-        {RungBlockType::HTLC, {{RungDataType::HASH256, h256}, {RungDataType::NUMERIC, num10}}},
+        // HTLC conditions: [HASH256, NUMERIC, SCHEME]
+        {RungBlockType::HTLC, {{RungDataType::HASH256, h256}, {RungDataType::NUMERIC, num10}, {RungDataType::SCHEME, scheme_schnorr}}},
         // HASH_SIG conditions: [HASH256, SCHEME]
         {RungBlockType::HASH_SIG, {{RungDataType::HASH256, h256}, {RungDataType::SCHEME, scheme_schnorr}}},
         // PTLC conditions: [NUMERIC(CSV)]
         {RungBlockType::PTLC, {{RungDataType::NUMERIC, num10}}},
         // CLTV_SIG conditions: [SCHEME, NUMERIC]
         {RungBlockType::CLTV_SIG, {{RungDataType::SCHEME, scheme_schnorr}, {RungDataType::NUMERIC, num100}}},
-        // TIMELOCKED_MULTISIG conditions: [NUMERIC(M), NUMERIC(CSV)]
-        {RungBlockType::TIMELOCKED_MULTISIG, {{RungDataType::NUMERIC, num2}, {RungDataType::NUMERIC, num10}}},
+        // TIMELOCKED_MULTISIG conditions: [NUMERIC(M), NUMERIC(CSV), SCHEME]
+        {RungBlockType::TIMELOCKED_MULTISIG, {{RungDataType::NUMERIC, num2}, {RungDataType::NUMERIC, num10}, {RungDataType::SCHEME, scheme_schnorr}}},
 
         // === Governance family ===
         // EPOCH_GATE conditions: [NUMERIC, NUMERIC] (= AMOUNT_LOCK_CONDITIONS)
@@ -2478,9 +2480,10 @@ BOOST_AUTO_TEST_CASE(policy_too_many_rungs)
     auto mtx = MakeRungTx(ladder);
     CTransaction tx(mtx);
 
+    // TX_MLSC: witness structure enforced at consensus, not policy.
+    // Policy only checks output format — valid MLSC outputs pass.
     std::string reason;
-    BOOST_CHECK(!IsStandardRungTx(tx, reason));
-    BOOST_CHECK(reason.find("too many rungs") != std::string::npos);
+    BOOST_CHECK(IsStandardRungTx(tx, reason));
 }
 
 BOOST_AUTO_TEST_CASE(policy_too_many_blocks)
@@ -2499,13 +2502,14 @@ BOOST_AUTO_TEST_CASE(policy_too_many_blocks)
     auto mtx = MakeRungTx(ladder);
     CTransaction tx(mtx);
 
+    // TX_MLSC: witness structure enforced at consensus, not policy.
     std::string reason;
-    BOOST_CHECK(!IsStandardRungTx(tx, reason));
-    BOOST_CHECK(reason.find("too many blocks") != std::string::npos);
+    BOOST_CHECK(IsStandardRungTx(tx, reason));
 }
 
 BOOST_AUTO_TEST_CASE(policy_missing_witness)
 {
+    // A v4 tx with a non-MLSC output (OP_RETURN) is rejected by policy
     CMutableTransaction mtx;
     mtx.version = CTransaction::RUNG_TX_VERSION;
     CTxIn input;
@@ -2516,7 +2520,7 @@ BOOST_AUTO_TEST_CASE(policy_missing_witness)
     CTransaction tx(mtx);
     std::string reason;
     BOOST_CHECK(!IsStandardRungTx(tx, reason));
-    BOOST_CHECK(reason.find("missing-witness") != std::string::npos);
+    BOOST_CHECK(reason.find("rung-non-mlsc-output") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(policy_all_phases_standard)
@@ -2541,7 +2545,8 @@ BOOST_AUTO_TEST_CASE(policy_all_phases_standard)
         BOOST_CHECK(reason.find("unknown-block-type") == std::string::npos);
     }
 
-    // Unknown block type 0xFFFF should be rejected
+    // TX_MLSC: unknown block types are rejected at consensus (creation proof validation),
+    // not at policy level. Policy only checks output format (MLSC scriptPubKey).
     LadderWitness ladder2;
     Rung rung2;
     RungBlock block2;
@@ -2551,12 +2556,8 @@ BOOST_AUTO_TEST_CASE(policy_all_phases_standard)
     auto mtx2 = MakeRungTx(ladder2);
     CTransaction tx2(mtx2);
     std::string reason2;
-    BOOST_CHECK(!IsStandardRungTx(tx2, reason2));
-    // Policy rejects unknown block types via deserialization or block type check
-    BOOST_CHECK_MESSAGE(reason2.find("unknown block type") != std::string::npos ||
-                        reason2.find("unknown-block-type") != std::string::npos ||
-                        reason2.find("rung-invalid-witness") != std::string::npos,
-                        "Expected unknown block type rejection, got: " + reason2);
+    // Policy passes (valid MLSC output), consensus would reject (unknown block type)
+    BOOST_CHECK(IsStandardRungTx(tx2, reason2));
 }
 
 // ============================================================================
@@ -3691,8 +3692,9 @@ BOOST_AUTO_TEST_CASE(boundary_max_rungs_exceeded_policy)
     auto mtx = MakeRungTx(ladder);
     CTransaction tx(mtx);
     std::string reason;
-    BOOST_CHECK(!IsStandardRungTx(tx, reason));
-    BOOST_CHECK(reason.find("too many rungs") != std::string::npos);
+    // TX_MLSC: witness structure enforced at consensus, policy only checks outputs.
+    BOOST_CHECK(IsStandardRungTx(tx, reason));
+    // BOOST_CHECK(reason.find("too many rungs") != std::string::npos);
 }
 
 // --- MAX_BLOCKS_PER_RUNG boundary (8) ---
@@ -3754,8 +3756,9 @@ BOOST_AUTO_TEST_CASE(boundary_max_blocks_exceeded_policy)
     auto mtx = MakeRungTx(ladder);
     CTransaction tx(mtx);
     std::string reason;
-    BOOST_CHECK(!IsStandardRungTx(tx, reason));
-    BOOST_CHECK(reason.find("too many blocks") != std::string::npos);
+    // TX_MLSC: witness structure enforced at consensus, policy only checks outputs.
+    BOOST_CHECK(IsStandardRungTx(tx, reason));
+    // BOOST_CHECK(reason.find("too many blocks") != std::string::npos);
 }
 
 // --- MAX_FIELDS_PER_BLOCK boundary (16) ---
@@ -3921,9 +3924,8 @@ BOOST_AUTO_TEST_CASE(boundary_max_relays_exceeded_policy)
     auto mtx = MakeRungTx(ladder);
     CTransaction tx(mtx);
     std::string reason;
-    BOOST_CHECK(!IsStandardRungTx(tx, reason));
-    // Relay limit enforced at deserialization level (before policy check)
-    BOOST_CHECK(reason.find("too many relays") != std::string::npos);
+    // TX_MLSC: witness/relay structure enforced at consensus, policy only checks outputs.
+    BOOST_CHECK(IsStandardRungTx(tx, reason));
 }
 
 // --- Combined: maximum structure (all limits at boundary) ---
@@ -3992,7 +3994,7 @@ BOOST_AUTO_TEST_CASE(eval_hash160_preimage_wrong)
     std::vector<uint8_t> wrong_preimage{0xAA, 0xBB, 0xCC, 0xDD};
 
     RungBlock block;
-    block.type = RungBlockType::HASH160_PREIMAGE;
+    block.type = RungBlockType::RESERVED_0202;
     block.fields.push_back({RungDataType::HASH160, std::vector<uint8_t>(hash, hash + 20)});
     block.fields.push_back({RungDataType::PREIMAGE, wrong_preimage});
 
@@ -5589,8 +5591,9 @@ BOOST_AUTO_TEST_CASE(policy_preimage_block_limit)
 
     CTransaction tx(mtx);
     std::string reason;
-    BOOST_CHECK(!rung::IsStandardRungTx(tx, reason));
-    BOOST_CHECK(!reason.empty());
+    // TX_MLSC: witness structure enforced at consensus, policy only checks outputs.
+    BOOST_CHECK(rung::IsStandardRungTx(tx, reason));
+    // BOOST_CHECK(!reason.empty());
 }
 
 BOOST_AUTO_TEST_CASE(policy_preimage_block_limit_at_max)
@@ -5622,8 +5625,9 @@ BOOST_AUTO_TEST_CASE(policy_preimage_block_limit_at_max)
 
     CTransaction tx(mtx);
     std::string reason;
-    BOOST_CHECK(!rung::IsStandardRungTx(tx, reason));
-    BOOST_CHECK(!reason.empty());
+    // TX_MLSC: witness structure enforced at consensus, policy only checks outputs.
+    BOOST_CHECK(rung::IsStandardRungTx(tx, reason));
+    // BOOST_CHECK(!reason.empty());
 }
 
 BOOST_AUTO_TEST_CASE(policy_preimage_block_limit_mixed_types)
@@ -5655,8 +5659,9 @@ BOOST_AUTO_TEST_CASE(policy_preimage_block_limit_mixed_types)
 
     CTransaction tx(mtx);
     std::string reason;
-    BOOST_CHECK(!rung::IsStandardRungTx(tx, reason));
-    BOOST_CHECK(!reason.empty());
+    // TX_MLSC: witness structure enforced at consensus, policy only checks outputs.
+    BOOST_CHECK(rung::IsStandardRungTx(tx, reason));
+    // BOOST_CHECK(!reason.empty());
 }
 
 BOOST_AUTO_TEST_CASE(spam_embed_fake_pubkey_in_conditions_rejected)
@@ -5926,7 +5931,7 @@ BOOST_AUTO_TEST_CASE(relay_eval_unsatisfied_blocks_rung)
     // Rung requires relay 0, but has a hash preimage block that would pass on its own
     Rung rung;
     RungBlock b;
-    b.type = RungBlockType::HASH_PREIMAGE;
+    b.type = RungBlockType::RESERVED_0201;
     auto preimage = std::vector<uint8_t>(32, 0xDD);
     CSHA256 hasher;
     hasher.Write(preimage.data(), preimage.size());
@@ -7304,8 +7309,8 @@ BOOST_AUTO_TEST_CASE(micro_header_lookup_all_known_types)
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::CLTV) >= 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::CLTV_TIME) >= 0);
     // HASH_PREIMAGE and HASH160_PREIMAGE deprecated — slots set to 0xFFFF
-    BOOST_CHECK(MicroHeaderSlot(RungBlockType::HASH_PREIMAGE) < 0);
-    BOOST_CHECK(MicroHeaderSlot(RungBlockType::HASH160_PREIMAGE) < 0);
+    BOOST_CHECK(MicroHeaderSlot(RungBlockType::RESERVED_0201) < 0);
+    BOOST_CHECK(MicroHeaderSlot(RungBlockType::RESERVED_0202) < 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::TAGGED_HASH) >= 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::CTV) >= 0);
     BOOST_CHECK(MicroHeaderSlot(RungBlockType::VAULT_LOCK) >= 0);
@@ -7410,7 +7415,7 @@ BOOST_AUTO_TEST_CASE(micro_header_hash_preimage_rejected)
     LadderWitness ladder;
     Rung rung;
     RungBlock block;
-    block.type = RungBlockType::HASH_PREIMAGE;
+    block.type = RungBlockType::RESERVED_0201;
     block.fields.push_back({RungDataType::HASH256, MakeHash256()});
     block.fields.push_back({RungDataType::PREIMAGE, std::vector<uint8_t>(32, 0xEE)});
     rung.blocks.push_back(block);
@@ -9010,10 +9015,8 @@ BOOST_AUTO_TEST_CASE(gap_max_relays_exceeded_policy)
     auto mtx = MakeRungTx(ladder);
     CTransaction tx(mtx);
     std::string reason;
-    BOOST_CHECK(!IsStandardRungTx(tx, reason));
-    // Relay limit enforced at deserialization level (before policy)
-    BOOST_CHECK_MESSAGE(reason.find("too many relays") != std::string::npos,
-        "Expected relay limit rejection but got: " + reason);
+    // TX_MLSC: witness/relay structure enforced at consensus, policy only checks outputs.
+    BOOST_CHECK(IsStandardRungTx(tx, reason));
 }
 
 // Gap 4: RECURSE_SAME carry-forward with mixed PQ (FALCON512) + Schnorr blocks in same rung
@@ -10959,7 +10962,7 @@ BOOST_AUTO_TEST_CASE(block_descriptor_table_consistency)
         auto bt = static_cast<RungBlockType>(tc);
 
         // Skip deprecated types
-        if (bt == RungBlockType::HASH_PREIMAGE || bt == RungBlockType::HASH160_PREIMAGE) continue;
+        if (bt == RungBlockType::RESERVED_0201 || bt == RungBlockType::RESERVED_0202) continue;
 
         const auto* desc = rung::LookupBlockDescriptor(bt);
         BOOST_CHECK_MESSAGE(desc != nullptr, "Missing descriptor for " + BlockTypeName(bt));
