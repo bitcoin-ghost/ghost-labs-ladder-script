@@ -13,6 +13,10 @@
 #include <rung/types.h>
 
 #include <core_io.h>
+#include <node/context.h>
+#include <node/transaction.h>
+#include <rpc/server_util.h>
+#include <validation.h>
 #include <crypto/sha256.h>
 #include <hash.h>
 #include <key.h>
@@ -2884,34 +2888,119 @@ static RPCHelpMan signladder()
         // 9. Build MLSC proof
         if (is_mlsc) {
             rung::MLSCProof mlsc_proof;
-            mlsc_proof.total_rungs = static_cast<uint16_t>(conditions.rungs.size());
-            mlsc_proof.total_relays = static_cast<uint16_t>(conditions.relays.size());
             mlsc_proof.rung_index = static_cast<uint16_t>(target_rung);
             mlsc_proof.revealed_rung = conditions.rungs[target_rung];
 
-            // Reveal relays referenced by target rung
-            for (uint16_t ref : conditions.rungs[target_rung].relay_refs) {
-                if (ref < conditions.relays.size()) {
-                    mlsc_proof.revealed_relays.push_back({ref, conditions.relays[ref]});
+            // TX_MLSC: the funding tx's creation proof defines the full shared tree.
+            // If the spending tx carries a creation_proof from the funding tx (via
+            // the "creation_proof" field on the spending input), use it to rebuild the
+            // tree and extract sibling hashes. Otherwise fall back to the descriptor's
+            // conditions for proof hash computation.
+            //
+            // The spending tx itself has creation_proof for its OWN outputs. The
+            // funding tx's creation proof must be looked up from the funding tx.
+            // For now: if the descriptor has more rungs than just the target, compute
+            // siblings from the descriptor. Otherwise: check if the spending tx has
+            // funding_creation_proof data passed via the spent_outputs parameter.
+
+            // Check if the funding tx's creation proof was deserialized into the mtx
+            // (happens when the tx was created by createtxmlsc which sets conditions_root).
+            // Look up the funding tx's creation proof from the prevout.
+            bool used_funding_proof = false;
+
+            // Try to read the funding transaction's creation proof from the block database
+            // via the node's RPC interface (getrawtransaction).
+            {
+                const auto& prevout = mtx.vin[input_idx].prevout;
+                // Use the node context to look up the funding tx
+                auto& node = EnsureAnyNodeContext(request.context);
+                uint256 hashBlock;
+                const CTransactionRef funding_tx = node::GetTransaction(
+                    /* block_index */ nullptr,
+                    /* mempool */ node.mempool.get(),
+                    prevout.hash,
+                    hashBlock,
+                    node.chainman->m_blockman);
+
+                if (funding_tx && !funding_tx->creation_proof.empty()) {
+                    rung::CreationProof funding_proof;
+                    std::string cp_error;
+                    if (rung::DeserializeCreationProof(funding_tx->creation_proof, funding_proof, cp_error)) {
+                        // Rebuild all leaves from the funding tx's creation proof
+                        std::vector<uint256> all_leaves;
+                        for (const auto& cp_rung : funding_proof.rungs) {
+                            all_leaves.push_back(rung::ComputeTxMLSCLeaf(cp_rung));
+                        }
+
+                        // Find which rung in the funding proof matches our target rung
+                        // by computing our leaf and comparing
+                        rung::CreationProofRung our_cp_rung;
+                        for (const auto& block : conditions.rungs[target_rung].blocks) {
+                            our_cp_rung.blocks.push_back({
+                                static_cast<uint16_t>(block.type),
+                                static_cast<uint8_t>(block.inverted ? 1 : 0)
+                            });
+                        }
+                        our_cp_rung.coil = conditions.coil;
+                        std::vector<std::vector<uint8_t>> target_pks;
+                        if (target_rung < rung_pubkeys.size()) target_pks = rung_pubkeys[target_rung];
+                        our_cp_rung.value_commitment = rung::ComputeValueCommitment(
+                            conditions.rungs[target_rung], target_pks);
+                        uint256 our_leaf = rung::ComputeTxMLSCLeaf(our_cp_rung);
+
+                        // Find our leaf in the funding tree
+                        int found_idx = -1;
+                        for (size_t i = 0; i < all_leaves.size(); ++i) {
+                            if (all_leaves[i] == our_leaf) {
+                                found_idx = static_cast<int>(i);
+                                break;
+                            }
+                        }
+
+                        if (found_idx >= 0) {
+                            mlsc_proof.total_rungs = static_cast<uint16_t>(all_leaves.size());
+                            mlsc_proof.total_relays = 0;
+                            mlsc_proof.rung_index = static_cast<uint16_t>(found_idx);
+                            // Add all OTHER leaves as proof hashes
+                            for (size_t i = 0; i < all_leaves.size(); ++i) {
+                                if (static_cast<int>(i) != found_idx) {
+                                    mlsc_proof.proof_hashes.push_back(all_leaves[i]);
+                                }
+                            }
+                            used_funding_proof = true;
+                        }
+                    }
                 }
             }
 
-            // TX_MLSC: compute leaf hashes for unrevealed rungs using template + value_commitment
-            for (uint16_t r = 0; r < conditions.rungs.size(); ++r) {
-                if (r == target_rung) continue;
-                rung::CreationProofRung cp_rung;
-                for (const auto& block : conditions.rungs[r].blocks) {
-                    cp_rung.blocks.push_back({
-                        static_cast<uint16_t>(block.type),
-                        static_cast<uint8_t>(block.inverted ? 1 : 0)
-                    });
+            if (!used_funding_proof) {
+                // Fallback: use the descriptor's conditions (works for single-rung trees)
+                mlsc_proof.total_rungs = static_cast<uint16_t>(conditions.rungs.size());
+                mlsc_proof.total_relays = static_cast<uint16_t>(conditions.relays.size());
+
+                // Reveal relays referenced by target rung
+                for (uint16_t ref : conditions.rungs[target_rung].relay_refs) {
+                    if (ref < conditions.relays.size()) {
+                        mlsc_proof.revealed_relays.push_back({ref, conditions.relays[ref]});
+                    }
                 }
-                cp_rung.coil = conditions.coil;
-                cp_rung.coil.output_index = 0;
-                std::vector<std::vector<uint8_t>> rpks;
-                if (r < rung_pubkeys.size()) rpks = rung_pubkeys[r];
-                cp_rung.value_commitment = rung::ComputeValueCommitment(conditions.rungs[r], rpks);
-                mlsc_proof.proof_hashes.push_back(rung::ComputeTxMLSCLeaf(cp_rung));
+
+                for (uint16_t r = 0; r < conditions.rungs.size(); ++r) {
+                    if (r == target_rung) continue;
+                    rung::CreationProofRung cp_rung;
+                    for (const auto& block : conditions.rungs[r].blocks) {
+                        cp_rung.blocks.push_back({
+                            static_cast<uint16_t>(block.type),
+                            static_cast<uint8_t>(block.inverted ? 1 : 0)
+                        });
+                    }
+                    cp_rung.coil = conditions.coil;
+                    cp_rung.coil.output_index = 0;
+                    std::vector<std::vector<uint8_t>> rpks;
+                    if (r < rung_pubkeys.size()) rpks = rung_pubkeys[r];
+                    cp_rung.value_commitment = rung::ComputeValueCommitment(conditions.rungs[r], rpks);
+                    mlsc_proof.proof_hashes.push_back(rung::ComputeTxMLSCLeaf(cp_rung));
+                }
             }
 
             auto proof_bytes = rung::SerializeMLSCProof(mlsc_proof);
@@ -3065,6 +3154,16 @@ static RPCHelpMan createtxmlsc()
         for (size_t b = 0; b < blocks_arr.size(); ++b) {
             rung.blocks.push_back(ParseBlockSpec(blocks_arr[b], /*conditions_only=*/false, &rung_pks));
         }
+
+        // TX_MLSC: pubkeys for merkle_pub_key binding (folded into value_commitment).
+        // Provided separately since they're witness-side, not in conditions fields.
+        if (rung_obj.exists("pubkeys")) {
+            const UniValue& pks_arr = rung_obj["pubkeys"].get_array();
+            for (size_t p = 0; p < pks_arr.size(); ++p) {
+                rung_pks.push_back(ParseHex(pks_arr[p].get_str()));
+            }
+        }
+
         all_rungs.push_back(rung);
         all_rung_pubkeys.push_back(rung_pks);
 
