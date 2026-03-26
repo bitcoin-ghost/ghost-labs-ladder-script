@@ -276,8 +276,8 @@ const S = [
 
 // === ACT 1: CREATION ===
 
-{act:1,t:"TRANSACTION SHELL",s:"createrungtx · version 4 · MLSC flag",h:`
-<div class="desc">The user calls <code>createrungtx</code>. The system creates a <code>CMutableTransaction</code> with <strong>version = 4</strong> (RUNG_TX_VERSION). Inputs are outpoints to spend. Outputs specify conditions and amounts. The <code>mlsc: true</code> flag triggers Merkle output format.</div>
+{act:1,t:"TRANSACTION SHELL",s:"createtxmlsc · version 4 · MLSC flag",h:`
+<div class="desc">The user calls <code>createtxmlsc</code>. The system creates a <code>CMutableTransaction</code> with <strong>version = 4</strong> (RUNG_TX_VERSION). Inputs are outpoints to spend. Outputs are values only (8 bytes each). Rungs specify conditions with output_index. TX_MLSC format uses flag byte 0x02. One shared conditions_root per transaction. Creation proof validated at block acceptance.</div>
 <div class="sv">
 <span class="lbl">Transaction skeleton</span>
 <span class="b s">version</span><span class="bn">= 4 (RUNG_TX_VERSION)</span><br>
@@ -598,12 +598,12 @@ const S = [
 </div>
 `},
 
-{act:1,t:"OUTPUT CREATION",s:"0xDF ‖ root → 33 bytes on-chain",h:`
+{act:1,t:"OUTPUT CREATION",s:"TX_MLSC: 8 bytes per output + shared root",h:`
 <div class="desc"><code>CreateMLSCScript(root)</code> — push prefix byte 0xDF (RUNG_MLSC_PREFIX), append 32-byte root.</div>
 <div class="out">
-<div class="pre">scriptPubKey</div>
+<div class="pre">TX_MLSC output (value only)</div>
 <div class="val">0xDF ‖ conditions_root</div>
-<div class="sz">33 bytes: prefix (1) + Merkle root (32)</div>
+<div class="sz">8 bytes per output (value). One shared conditions_root (0xDF + 32 bytes) per transaction.</div>
 <div class="msg">
 This is <strong>everything</strong> on-chain at creation.<br>
 Zero conditions. Zero public keys. Zero block types. Zero timelocks.<br>

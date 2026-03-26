@@ -1639,12 +1639,12 @@ function buildPhaseJSON(phase) {
 function buildAllPhasesJSON() {
   if (state.phases.length === 1) {
     const result = buildPhaseJSON(state.phases[0]);
-    // Add signrungtx hint with diff witness info
+    // Add signladder hint with diff witness info
     const dwHints = state.phases[0].inputs
       .map((inp, i) => ({ idx: i, dw: inp.diffWitness, src: inp.sourceInput }))
       .filter(h => h.dw);
     if (dwHints.length > 0) {
-      result._signrungtx_hint = {
+      result._signladder_hint = {
         note: 'Use diff_witness signer format for these inputs',
         diff_witness_inputs: dwHints.map(h => ({
           input: h.idx,
@@ -1767,11 +1767,11 @@ async function broadcastTx() {
     const tx = buildPhaseJSON(P());
     toast('Creating transaction...', 'success');
 
-    // Build createrungtx params
+    // Build createtxmlsc params
     const inputs = tx.inputs.map(i => ({ txid: i.txid, vout: i.vout, ...(i.sequence !== undefined ? { sequence: i.sequence } : {}) }));
     const outputs = tx.outputs.map(o => ({ amount: o.amount, conditions: o.conditions, ...(o.coil ? { coil: o.coil } : {}) }));
 
-    const result = await rpcCall('createrungtx', [inputs, outputs]);
+    const result = await rpcCall('createtxmlsc', [inputs, outputs]);
     toast(`Created unsigned tx: ${result.hex.length / 2} bytes`, 'success');
 
     // For now, just show the hex — signing requires private keys
@@ -1779,9 +1779,9 @@ async function broadcastTx() {
     toast(`Unsigned hex: ${hexPreview}`, 'success');
     const dwInputs = P().inputs.filter((inp, i) => i > 0 && inp.diffWitness);
     if (dwInputs.length > 0) {
-      toast(`${dwInputs.length} input(s) use diff witness — signrungtx will use diff_witness signer format`, 'success');
+      toast(`${dwInputs.length} input(s) use diff witness — signladder will use diff_witness signer format`, 'success');
     }
-    toast('Sign with signrungtx RPC to complete', 'success');
+    toast('Sign with signladder RPC to complete', 'success');
 
   } catch (e) {
     toast(`Broadcast failed: ${e.message}`, 'error');

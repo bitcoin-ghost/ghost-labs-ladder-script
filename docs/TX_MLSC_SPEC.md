@@ -147,7 +147,7 @@ per rung:
       inverted:    uint8   (0x00 or 0x01, validated per block type)
     coil:
       coil_type:     uint8 (UNLOCK=0x01, UNLOCK_TO=0x02, COVENANT=0x03)
-      attestation:   uint8 (INLINE=0x01, AGGREGATE=0x02, DEFERRED=0x03)
+      attestation:   uint8 (INLINE=0x01; AGGREGATE/DEFERRED reserved)
       scheme:        uint8
       output_index:  uint8 (which output this rung governs — must be < vout_count)
       has_address:   uint8 (0 or 1)
@@ -409,7 +409,7 @@ non-DATA_RETURN output to have at least one rung assigned. **Blocked.**
 |------|---------|---------|
 | Block types per rung | Yes | SIG, CSV, MULTISIG, CTV, etc. |
 | Inverted flags | Yes | Which blocks are negated |
-| Coil type and attestation | Yes | UNLOCK/UNLOCK_TO/COVENANT, INLINE/AGGREGATE |
+| Coil type and attestation | Yes | UNLOCK/UNLOCK_TO, INLINE only |
 | Output assignments | Yes | Which rung governs which output |
 | Rung count per output | Yes | Number of spending paths |
 | Field values | **No** | Hidden in value_commitment |
@@ -580,7 +580,7 @@ per-output root in UTXO set). Standard soft fork activation boundary.
 - [ ] Spend: invalid Merkle proof rejected
 - [ ] Spend from 1-output TX_MLSC (degenerate tree, 0 proof hashes)
 - [ ] Spend from 10-output TX_MLSC (deep tree)
-- [ ] AGGREGATE attestation with TX_MLSC
+- [ ] Attestation mode enforcement (INLINE only, AGGREGATE/DEFERRED reserved)
 - [ ] Backward compat: spend pre-activation per-output MLSC
 - [ ] DATA_RETURN handling (nValue == 0)
 - [ ] Dust threshold enforcement (nValue >= 546 for non-DATA_RETURN)

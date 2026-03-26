@@ -250,7 +250,7 @@ deprecated slots 0x07/0x08 set to 0xFFFF). Escape bytes: 0x80 = full header (not
 
 ### MLSC
 Merkelized Ladder Script Conditions. The per-output format prior to TX_MLSC. Originally
-`0xDF + 32-byte conditions_root` (33 bytes per output). Superseded by TX_MLSC which
+`0xDF + 32-byte conditions_root` (33 bytes, shared per transaction). Superseded by TX_MLSC which
 uses a shared conditions_root per transaction with 0xDF prefix and 8 bytes per output.
 See TX_MLSC.
 

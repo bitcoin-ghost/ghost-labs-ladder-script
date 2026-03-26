@@ -253,7 +253,7 @@ for each input:
 The `conditions_root` (32 bytes) appears between the inputs and outputs.
 Each output is 8 bytes (nValue only, no scriptPubKey on the wire). On
 deserialization, outputs are inflated to `CTxOut(nValue, 0xDF + conditions_root)`,
-producing the standard 33-byte MLSC scriptPubKey for each output.
+producing the standard 33-byte MLSC commitment for each output.
 
 The creation proof blob follows the per-input witness stacks and is
 validated at block acceptance to confirm the Merkle tree structure.
@@ -288,7 +288,7 @@ deserialization, each output is inflated to a standard `CTxOut`:
 scriptPubKey = 0xDF || conditions_root (32 bytes)
 ```
 
-This produces a 33-byte scriptPubKey. The `conditions_root` is shared
+This produces a 33-byte shared commitment. The `conditions_root` is shared
 across all outputs in the transaction — only ONE root exists per TX_MLSC
 transaction.
 
