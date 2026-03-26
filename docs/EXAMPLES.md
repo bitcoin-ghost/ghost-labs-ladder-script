@@ -192,7 +192,7 @@ Ladder:
     Block 0: CTV (0x0301)
       Conditions fields: [HASH256(template_hash)]
       Witness fields:    (none -- CTV is witness-free)
-  Coil: COVENANT(0x03), INLINE(0x01), SCHNORR(0x01)
+  Coil: UNLOCK(0x01), INLINE(0x01), SCHNORR(0x01)
 ```
 
 ### Evaluation
@@ -461,7 +461,7 @@ Ladder:
       Conditions fields: [NUMERIC(12)]   -- 12 remaining steps
     Block 2: CSV (0x0101)
       Conditions fields: [NUMERIC(4380)] -- ~1 month between steps
-  Coil: COVENANT(0x03), INLINE(0x01), SCHNORR(0x01)
+  Coil: UNLOCK(0x01), INLINE(0x01), SCHNORR(0x01)
 ```
 
 ### Evaluation (count > 0)
