@@ -38,8 +38,10 @@ Spending conditions are structured as a ladder of rungs (OR logic), where each
 rung contains one or more blocks (AND logic), supporting signatures,
 timelocks, hash verifications, covenants, bounded recursion, stateful contract
 primitives (counters, latches, rate limiters), and governance constraints.
-Outputs commit to a Merkle root of conditions via Merkelised Ladder Script
-Conditions (MLSC), revealing only the satisfied spending path. Ladder Script
+TX_MLSC transactions commit to a single shared Merkle root of conditions
+(`conditions_root`) per transaction via Merkelised Ladder Script Conditions
+(MLSC), revealing only the satisfied spending path. Each rung's coil
+declares which output it governs via `output_index`. Ladder Script
 transactions use version 4 (`nVersion = 4`).
 
 ## Motivation
@@ -77,10 +79,10 @@ Ladder Script makes all of these possible as native block types, composable
 with AND/OR logic:
 
 ```
-ladder(or(
+ladder(output(0, or(
     and(sig(@hot_key), csv(144), amount_lock(0, 1000000), rate_limit(1, 10, 6)),
     multisig(2, @cold_a, @cold_b, @cold_c)
-))
+)))
 ```
 
 This UTXO requires a signature AND a 144-block delay AND an amount cap AND
@@ -99,9 +101,9 @@ properties that raw Script does not:
 with enforced size constraints. The `merkle_pub_key` design binds public
 keys into the Merkle leaf hash rather than carrying them in conditions,
 eliminating the 2048-byte PUBKEY field as an embedding channel. PREIMAGE
-fields are capped at 2 per witness. The residual embeddable surface is
-approximately 116 bytes per transaction — down from effectively unlimited
-in raw Script.
+fields are capped at 2 per transaction (`MAX_PREIMAGE_FIELDS_PER_TX`).
+The residual embeddable surface is 112 bytes per transaction (flat) —
+down from effectively unlimited in raw Script.
 
 **Post-quantum readiness.** A 1-byte SCHEME field routes signature
 verification to classical (Schnorr, ECDSA) or post-quantum algorithms
@@ -133,7 +135,7 @@ OP_ENDIF
 **HTLC — After (Ladder Script descriptor):**
 
 ```
-ladder(htlc(@sender, @receiver, <preimage>, 144))
+ladder(output(0, htlc(@sender, @receiver, <preimage>, 144)))
 ```
 
 One typed block. Fixed field layout. Static analysis. Deterministic cost.
@@ -166,7 +168,8 @@ are available to any rung that references them.
 
 The **coil** is per-output metadata attached to each ladder witness:
 the unlock type (UNLOCK or UNLOCK_TO), attestation mode, signature scheme,
-and optional destination address.
+optional destination address, and `output_index` declaring which output
+the rung governs.
 
 ### The merkle_pub_key Design
 
@@ -188,10 +191,17 @@ the conditions side, without any loss of functionality.
 
 ### Merkelised Ladder Script Conditions (MLSC)
 
-An MLSC output commits to the root of a Merkle tree whose leaves are the
-individual rungs, relays, and coil metadata. At spend time, only the
-satisfied rung (and any referenced relays) are revealed; all other spending
-paths remain hidden behind Merkle proof hashes.
+TX_MLSC transactions carry one shared `conditions_root` per transaction
+(not per output). The transaction format uses a PLC model: one ladder
+program with multiple output coils. Each rung's coil includes an
+`output_index` field declaring which output it governs.
+
+The `conditions_root` commits to the root of a Merkle tree whose leaves
+are the individual rungs, relays, and coil metadata. At spend time, only
+the satisfied rung (and any referenced relays) are revealed; all other
+spending paths remain hidden behind Merkle proof hashes. A creation proof
+is included in the witness and validated at block acceptance to bind the
+tree structure to the transaction.
 
 This provides the same privacy benefit as Taproot's script tree, but uses
 sorted interior nodes (eliminating left/right tracking in proofs) and
@@ -215,15 +225,47 @@ on context.
 
 ### Transaction Format
 
-A Ladder Script transaction has `nVersion = 4`. All outputs MUST use the
-MLSC format. All inputs MUST provide a witness stack of exactly 2 elements:
+A Ladder Script transaction has `nVersion = 4`. The flag byte `0x02`
+signals TX_MLSC format (analogous to SegWit's `0x01` flag byte).
+
+#### TX_MLSC Wire Layout
+
+```
+[nVersion: int32]
+[flag: 0x00 0x02]                -- TX_MLSC signal
+[input_count: CompactSize]
+for each input:
+    [prevout: 36 bytes]
+    [scriptSig_len: CompactSize] -- must be 0
+    [nSequence: uint32]
+[conditions_root: 32 bytes]      -- shared MLSC root for all outputs
+[output_count: CompactSize]
+for each output:
+    [nValue: int64]              -- 8 bytes, value only (no scriptPubKey)
+for each input:
+    [witness_count: CompactSize]
+    [witness[0]: LadderWitness]
+    [witness[1]: MLSCProof]
+[creation_proof: bytes]          -- creation proof blob
+[nLockTime: uint32]
+```
+
+The `conditions_root` (32 bytes) appears between the inputs and outputs.
+Each output is 8 bytes (nValue only, no scriptPubKey on the wire). On
+deserialization, outputs are inflated to `CTxOut(nValue, 0xDF + conditions_root)`,
+producing the standard 33-byte MLSC scriptPubKey for each output.
+
+The creation proof blob follows the per-input witness stacks and is
+validated at block acceptance to confirm the Merkle tree structure.
+
+All inputs MUST provide a witness stack of exactly 2 elements:
 
 - `witness[0]`: Serialized `LadderWitness` (the spending proof)
 - `witness[1]`: Serialized `MLSCProof` (revealed conditions and Merkle proof)
 
 Verification proceeds via `VerifyRungTx` in 8 steps:
 
-1. Validate all outputs via `ValidateRungOutputs` (33-byte 0xC2 prefix)
+1. Validate all outputs via `ValidateRungOutputs` (33-byte `0xDF` prefix)
 2. Deserialize the `LadderWitness` from `witness[0]`
 3. Resolve witness references if the witness uses diff encoding
 4. Deserialize the `MLSCProof` from `witness[1]`
@@ -239,21 +281,21 @@ signature) produces a 109-byte `witness[0]` (LadderWitness) and a 9-byte
 
 ### Output Format
 
-Every output in a version 4 transaction MUST use the MLSC format:
+On the wire, TX_MLSC outputs are 8 bytes each (nValue only). On
+deserialization, each output is inflated to a standard `CTxOut`:
 
 ```
-scriptPubKey = 0xC2 || conditions_root (32 bytes)
+scriptPubKey = 0xDF || conditions_root (32 bytes)
 ```
 
-This produces a 33-byte scriptPubKey. Optionally, a DATA_RETURN payload of
-1 to 40 bytes may be appended:
+This produces a 33-byte scriptPubKey. The `conditions_root` is shared
+across all outputs in the transaction — only ONE root exists per TX_MLSC
+transaction.
 
-```
-scriptPubKey = 0xC2 || conditions_root (32 bytes) || data (1-40 bytes)
-```
-
-DATA_RETURN outputs with appended data MUST have zero value (unspendable).
-At most one DATA_RETURN output is permitted per transaction.
+**DATA_RETURN outputs:** An output with `nValue == 0` is a DATA_RETURN
+output. On the wire, it is followed by `[payload_len: CompactSize]
+[payload: bytes]` (max 40 bytes). At most one DATA_RETURN output is
+permitted per transaction.
 
 ### Data Types
 
@@ -538,12 +580,23 @@ The tree is padded to the next power of 2 with empty leaves:
 
 #### Leaf Computation
 
-All leaves use `TaggedHash("LadderLeaf", ...)`:
+All leaves use `TaggedHash("LadderLeaf", structural_template || value_commitment)`:
 
-- **Rung leaf:** `SerializeRungBlocks(rung, CONDITIONS) || pubkey[0] || pubkey[1] || ...`
+- **structural_template:** The block types, inverted flags, and coil data
+  (including `output_index`) for the leaf. This is the structural skeleton
+  of the rung — deterministic from the condition set.
+
+- **value_commitment:** `SHA256(field_values || pubkeys)` — an opaque hash
+  of the field values and public keys bound to the leaf via
+  `merkle_pub_key`. This is a SHA256 output, not attacker-chosen data.
+
+Concretely:
+- **Rung leaf:** `TaggedHash("LadderLeaf", structural_template || value_commitment)`
+  where `structural_template` contains block types + inverted flags + coil
+  (incl. `output_index`), and `value_commitment = SHA256(field_values || pubkey[0] || pubkey[1] || ...)`.
   Pubkeys are appended in positional order via `PubkeyCountForBlock()` (the `merkle_pub_key` commitment).
-- **Relay leaf:** `SerializeRelayBlocks(relay, CONDITIONS) || pubkey[0] || ...`
-- **Coil leaf:** `SerializeCoilData(coil)`
+- **Relay leaf:** Same structure — `TaggedHash("LadderLeaf", structural_template || value_commitment)`.
+- **Coil leaf:** `TaggedHash("LadderLeaf", SerializeCoilData(coil))`.
 
 #### Interior Nodes
 
@@ -674,7 +727,9 @@ invertible. The inverted flag is set via the `0x81` escape byte.
 | SIGNATURE max size              | 50,000  | `types.h` (FieldMaxSize)  |
 | SCRIPT_BODY max size            | 80      | `types.h` (FieldMaxSize)  |
 | DATA max size                   | 40      | `types.h` (FieldMaxSize)  |
-| MIN_RUNG_OUTPUT_VALUE           | 546     | `serialize.h`             |
+| MIN_RUNG_OUTPUT_VALUE           | 546     | `serialize.h` (consensus dust threshold) |
+| MAX_PREIMAGE_FIELDS_PER_TX      | 2       | `serialize.h` (per-transaction, not per-witness) |
+| RUNG_MLSC_PREFIX                | 0xDF    | `serialize.h`             |
 | DATA_RETURN outputs per tx      | 1       | `evaluator.cpp`           |
 | Witness stack elements          | 2       | `evaluator.cpp`           |
 
@@ -686,10 +741,15 @@ language parsed by `ParseDescriptor` and formatted by `FormatDescriptor`.
 #### Grammar
 
 ```
-ladder     = "ladder(" "or(" rung { "," rung } ")" ")"
+ladder     = "ladder(" output_list ")"
+output_list = output { "," output }
+output     = "output(" index "," "or(" rung { "," rung } ")" ")"
 rung       = block | "and(" block { "," block } ")"
 block      = base_block | "!" base_block
 ```
+
+Each `output(index, ...)` wrapper declares which transaction output the
+enclosed rungs govern, matching the coil's `output_index` field.
 
 #### Block Grammar (one example per family)
 
@@ -718,32 +778,37 @@ The complete grammar covering all 61 block types is documented at
 
 **Simple vault with recovery and hot-spend paths:**
 ```
-ladder(or(
+ladder(output(0, or(
     sig(@recovery_key),
     and(sig(@hot_key), csv(144))
-))
+)))
+```
+
+**Multi-output payment (two recipients governed by one program):**
+```
+ladder(output(0, or(sig(@k), csv(144))), output(1, sig(@bob)))
 ```
 
 **HTLC for Lightning / atomic swap:**
 ```
-ladder(or(
+ladder(output(0, or(
     htlc(@alice, @bob, <preimage_hex>, 144)
-))
+)))
 ```
 
 **Rate-limited wallet (max 1 BTC per 6 blocks, 2-of-3 multisig backup):**
 ```
-ladder(or(
+ladder(output(0, or(
     and(sig(@daily_key), rate_limit(1, 100000000, 6)),
     multisig(2, @alice, @bob, @carol)
-))
+)))
 ```
 
 **Legacy P2PKH migration:**
 ```
-ladder(or(
+ladder(output(0, or(
     p2pkh(@old_key)
-))
+)))
 ```
 
 ### Anti-Spam Properties
@@ -791,8 +856,25 @@ of the witness for arbitrary data storage:
    in all blocks that lack an implicit layout, regardless of serialization
    context.
 
-The resulting residual embeddable surface is approximately 116 bytes per
-transaction (see Security Considerations for the full breakdown).
+The resulting residual embeddable surface is 112 bytes per transaction
+(flat, regardless of input/output count):
+
+| Channel                  | Bytes | Notes                                      |
+|--------------------------|-------|--------------------------------------------|
+| DATA_RETURN              | 40    | Intentional data commitment                |
+| PREIMAGE                 | 64    | MAX_PREIMAGE_FIELDS_PER_TX = 2, 32 bytes each |
+| nLockTime + nSequence    | 8     | Standard Bitcoin fields                    |
+| **Total**                | **112** |                                          |
+
+The `conditions_root` is protocol-derived (triple-hashed from validated
+structure) and is not an attacker-chosen embedding channel.
+`value_commitment` values are SHA256 outputs, not freely chosen.
+Structural templates are validated enums, not arbitrary data. No
+contiguous data embedding channel exceeds 64 bytes. Inscriptions are
+structurally impossible. UTXO spam yields zero readable attacker data
+(the scriptPubKey is a protocol-derived hash).
+
+See Security Considerations for additional analysis.
 
 ### Serialization Format
 
@@ -956,7 +1038,7 @@ algorithm agility.
 | Vaults                     | VAULT_LOCK (native)    | Via template chain | No | Native | Via composition |
 | HTLC (native)              | HTLC block             | No             | No | No | Via composition |
 | Post-quantum signatures    | SCHEME byte (6 schemes)| No             | No | No | No |
-| Anti-spam enforcement      | 7 mechanisms, ~116 bytes residual | None (opcodes) | None | None | None |
+| Anti-spam enforcement      | 7 mechanisms, 112 bytes residual | None (opcodes) | None | None | None |
 | Formal specification       | 10 TLA+ specs          | None           | None | None | None |
 | Static analysis            | Full (typed blocks)    | Partial (single opcode) | Partial | Partial | No (arbitrary stack) |
 | Composability              | AND/OR within ladder   | External (multiple outputs) | Sighash flags | Vault-specific | Stack composition |
@@ -966,13 +1048,28 @@ algorithm agility.
 | Recursion (bounded)        | 6 RECURSE_* types      | Via template chain | No | Unvaulting only | Unbounded risk |
 | Transaction-level governance | 7 governance types    | No             | No | No | No |
 
+## Size and Fee Comparison
+
+TX_MLSC's shared `conditions_root` and value-only outputs produce
+significant savings compared to per-output scriptPubKey formats.
+
+| Transaction Type     | Weight Units (WU) | Virtual Bytes (vB) |
+|----------------------|-------------------:|-------------------:|
+| Simple payment (1-in, 2-out) | 647        | 162                |
+| Batch 100 outputs    | 7,867              | ~1,967             |
+
+The simple payment cost assumes a Schnorr SIG spend with standard
+coil metadata. Batch savings come from the shared `conditions_root`:
+each additional output adds only 8 bytes (nValue) rather than 8 + 33
+bytes (nValue + scriptPubKey).
+
 ## Backwards Compatibility
 
 ### Soft Fork Deployment
 
 Version 4 transactions are currently non-standard and invalid under
 consensus rules. Existing nodes treat v4 transactions as anyone-can-spend
-(the `0xC2` prefix is not a recognized script pattern). This satisfies the
+(the `0xDF` prefix is not a recognized script pattern). This satisfies the
 soft fork requirement: old nodes accept blocks containing v4 transactions;
 upgraded nodes enforce the full Ladder Script rules.
 
@@ -991,7 +1088,7 @@ signing workflow.
 
 ### Wallet Compatibility
 
-Outputs with `0xC2` scriptPubKeys are unknown to wallets that have not been
+Outputs with `0xDF` scriptPubKeys are unknown to wallets that have not been
 upgraded. Such wallets will not recognize these outputs as spendable or
 display them in balance calculations. This is the standard behavior for new
 output types in Bitcoin and does not represent a compatibility regression.
@@ -1000,8 +1097,8 @@ output types in Bitcoin and does not represent a compatibility regression.
 
 - **Non-Merkelised conditions (`0xC1` prefix):** Earlier drafts allowed
   conditions to be placed directly in the scriptPubKey without Merkle
-  commitment. This is removed; all outputs must use the MLSC format (`0xC2`
-  prefix + 32-byte Merkle root).
+  commitment. This is removed; all outputs must use the MLSC format
+  (`0xDF` prefix + 32-byte shared Merkle root).
 - **COVENANT coil type (`0x03`):** Only UNLOCK (`0x01`) and UNLOCK_TO
   (`0x02`) are valid coil types.
 - **AGGREGATE (`0x02`) and DEFERRED (`0x03`) attestation modes:** Only
@@ -1058,11 +1155,18 @@ The reference implementation includes:
 
 ### Anti-Spam Surface
 
-Maximum embeddable user-chosen data per transaction: 2 PREIMAGE fields
-(64 bytes) + 1 DATA_RETURN (40 bytes) + NUMERIC manipulation (~8 bytes)
-+ SCHEME byte choices (~4 bytes) = ~116 bytes. All other witness bytes
-are semantically validated (signatures verified against committed keys,
-hashes checked, timelocks verified against chain state).
+Maximum embeddable user-chosen data per transaction: **112 bytes** (flat).
+Breakdown: 2 PREIMAGE fields (64 bytes, `MAX_PREIMAGE_FIELDS_PER_TX = 2`)
++ 1 DATA_RETURN (40 bytes) + nLockTime + nSequence (8 bytes) = 112 bytes.
+
+The `conditions_root` is not an embedding channel — it is protocol-derived
+(triple-hashed from validated structure via the creation proof). All other
+witness bytes are semantically validated (signatures verified against
+committed keys, hashes checked, timelocks verified against chain state).
+`value_commitment` fields are SHA256 outputs. Structural templates are
+validated enums. No contiguous attacker-chosen channel exceeds 64 bytes.
+Inscriptions are structurally impossible. UTXO spam yields zero readable
+attacker data.
 
 ### Recursion Termination
 
@@ -1246,10 +1350,10 @@ $ ghost-cli -signet parseladder \
 
 The MLSC output scriptPubKey for this vault:
 ```
-scriptPubKey = c2 5dc4a59c54401fece8776da41fc68fefc76082c23c6286489882437a84600fb7
+scriptPubKey = df 5dc4a59c54401fece8776da41fc68fefc76082c23c6286489882437a84600fb7
                ^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
                |   conditions_root (32 bytes, internal byte order)
-               0xC2 = MLSC prefix
+               0xDF = MLSC prefix
 ```
 
 ### Vector 3: formatladder roundtrip
