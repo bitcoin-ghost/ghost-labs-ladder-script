@@ -37,7 +37,7 @@ and Merkelized conditions (MLSC). Transactions use version 4 (`RUNG_TX_VERSION =
 | `src/rung/policy.cpp` | Mempool policy checks |
 | `src/rung/adaptor.h/cpp` | Adaptor signature utilities |
 | `src/rung/pq_verify.h/cpp` | Post-quantum signature verification |
-| `src/rung/rpc.cpp` | 14 RPC commands (decoderung, createrung, validateladder, createtxmlsc, signladder, computectvhash, computemutation, generatepqkeypair, pqpubkeycommit, extractadaptorsecret, verifyadaptorpresig, parseladder, formatladder) |
+| `src/rung/rpc.cpp` | 15 RPC commands (decoderung, createrung, validateladder, createtxmlsc, signladder, createrungtx (legacy), signrungtx (legacy), computectvhash, computemutation, generatepqkeypair, pqpubkeycommit, extractadaptorsecret, verifyadaptorpresig, parseladder, formatladder) |
 
 ## Test Coverage
 

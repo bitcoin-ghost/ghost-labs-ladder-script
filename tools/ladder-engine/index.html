@@ -6398,11 +6398,11 @@ function CoilPropertiesPanel({ rungId }) {
               C++ RPC coil settings. These define how the output is unlocked on-chain.
             </div>
             <div className="prop-row">
-              <span className="prop-label" title="Wire coil type --UNLOCK (standard spend), UNLOCK_TO (spend to address + conditions), COVENANT (constrain spending tx)">Coil Type</span>
+              <span className="prop-label" title="Wire coil type --UNLOCK (standard spend), UNLOCK_TO (spend to address + conditions), ">Coil Type</span>
               <select
                 className="prop-select"
                 value={rung.output.wireType || 'UNLOCK'}
-                title="How this output is unlocked on-chain --UNLOCK for standard spends, COVENANT to constrain the spending transaction"
+                title="How this output is unlocked on-chain --UNLOCK for standard spends"
                 onChange={(e) => onChange(rung.id, 'wireType', e.target.value)}
               >
                 {WIRE_COIL_TYPES.map(ct => (

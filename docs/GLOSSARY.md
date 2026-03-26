@@ -418,7 +418,6 @@ optional template_ref, optional conditions_root (MLSC root from UTXO). Key metho
 
 ### RungCoilType
 Enum in `types.h`. Three values: UNLOCK (0x01, standard spend), UNLOCK_TO (0x02, send
-to specific destination in address_hash), COVENANT (0x03, constrains spending tx via
 covenant/recursion blocks).
 
 ### RungDataType

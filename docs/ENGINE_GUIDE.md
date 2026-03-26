@@ -292,7 +292,6 @@ Configured in the output inspector under "Wire Format":
 |---------------|---------|
 | `UNLOCK`      | Standard spend |
 | `UNLOCK_TO`   | Spend to address + conditions |
-| `COVENANT`    | Constrain spending transaction |
 
 ### Attestation types
 

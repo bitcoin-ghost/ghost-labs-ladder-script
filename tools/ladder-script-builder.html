@@ -817,7 +817,7 @@ const CATEGORIES = [
   { id: 'sig',      name: 'SIGNATURE', color: '#00FFB3' },
   { id: 'timelock', name: 'TIMELOCK',  color: '#FFB700' },
   { id: 'hash',     name: 'HASH',      color: '#4488FF' },
-  { id: 'covenant', name: 'COVENANT',  color: '#FF6644' },
+  { id: 'covenant', name: 'UNLOCK',  color: '#FF6644' },
   { id: 'anchor',   name: 'ANCHOR L2', color: '#AA44FF' },
   { id: 'recurse',  name: 'RECURSE',   color: '#FF44AA' },
   { id: 'plc',      name: 'PLC',       color: '#44DDFF' },
@@ -828,7 +828,7 @@ const CATEGORIES = [
 const COIL_DEFS = {
   UNLOCK:    { label: 'UNLOCK',    desc: 'Send to address — standard spend.', hasAddress: true, hasLogic: false },
   UNLOCK_TO: { label: 'UNLOCK_TO', desc: 'Send to address — with additional conditions the recipient must satisfy.', hasAddress: true, hasLogic: true },
-  COVENANT:  { label: 'COVENANT',  desc: 'Constrains the spending transaction structure.', hasAddress: false, hasLogic: true },
+  ,
 };
 const COIL_TYPES = Object.keys(COIL_DEFS);
 
@@ -2092,7 +2092,7 @@ const TEMPLATES = [
       inputs: [{ txid: 'aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb', vout: 0, sequence: 0xfffffffe }],
       outputs: [{ amount: '0.999', rungs: [
         { blocks: [{ type: 'SIG', inverted: false, params: { pubkey: '02a1633cafcc01ebfb6d78e39f687a1f0995c62fc95f51ead10a02ee0be551b5dc' } }] },
-      ], coil: { type: 'COVENANT', address: '', rungs: [
+      ], coil: { type: 'UNLOCK', address: '', rungs: [
         { blocks: [{ type: 'TAGGED_HASH', inverted: false, params: { tag_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', expected: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' } }] },
         { blocks: [{ type: 'SIG', inverted: false, params: { pubkey: '03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a' } }] },
       ]}}],

@@ -199,7 +199,6 @@ The coil determines what happens when a rung is satisfied:
 |------|------|----------|
 | UNLOCK | 0x01 | Standard spend. No destination constraint. |
 | UNLOCK_TO | 0x02 | Spend to the address in `address_hash`. The hash is `SHA256(raw_address)`; raw address never goes on-chain. |
-| COVENANT | 0x03 | Constrains the spending transaction via covenant/recursion blocks (CTV, RECURSE_*, VAULT_LOCK, AMOUNT_LOCK). |
 
 Coil conditions (the `conditions` field in RungCoil) are reserved and must be empty
 (`MAX_COIL_CONDITION_RUNGS = 0`). Covenant semantics are handled by rung-level block types.

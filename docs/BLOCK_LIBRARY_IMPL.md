@@ -32,7 +32,7 @@ Every parameter in every block must be one of the following enumerated types. No
 | `HASH160` | `0x04` | 20B exact | HASH160 | Legacy compatibility |
 | `PREIMAGE` | `0x05` | 1–32B | Raw preimage, max 32 bytes | Hash preimage reveal. Max 2 preimage blocks per witness (policy). |
 | `SIGNATURE` | `0x06` | 1–50,000B | Schnorr=64B, ECDSA/DER≈73B, PQ up to 49,216B | INLINE attestation signatures only |
-| `SPEND_INDEX` | `0x07` | 4B exact | uint32 spend index | AGGREGATE attestation reference |
+| `SPEND_INDEX` | `0x07` | 4B exact | uint32 spend index | Cross-input spend reference |
 | `NUMERIC` | `0x08` | 1–4B | uint32 value | Timelocks, thresholds, counts, rates |
 | `SCHEME` | `0x09` | 1B exact | Enum value from RungScheme | Signature algorithm selector |
 
@@ -680,7 +680,6 @@ The coil declares what happens when all contacts on a rung are satisfied. It is 
 |---|---|---|---|
 | `UNLOCK` | `0x01` | Standard UTXO unlock. Output spendable freely by satisfying witness. | Simple payment, channel cooperative close |
 | `UNLOCK_TO` | `0x02` | Unlock with output address constraint. The coil stores `address_hash` (SHA256 of destination scriptPubKey). Raw address never on-chain. | Forced routing, payment forwarding, sequential stages |
-| `COVENANT` | `0x03` | Output must re-encumber with specified rung set. | Vault propagation, recursive covenant initiation |
 
 ### Attestation Modes
 

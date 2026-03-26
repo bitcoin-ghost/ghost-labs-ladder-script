@@ -146,7 +146,7 @@ per rung:
       block_type:  uint16  (must be known — one of 61 types)
       inverted:    uint8   (0x00 or 0x01, validated per block type)
     coil:
-      coil_type:     uint8 (UNLOCK=0x01, UNLOCK_TO=0x02, COVENANT=0x03)
+      coil_type:     uint8 (UNLOCK=0x01, UNLOCK_TO=0x02)
       attestation:   uint8 (INLINE=0x01; AGGREGATE/DEFERRED reserved)
       scheme:        uint8
       output_index:  uint8 (which output this rung governs — must be < vout_count)
