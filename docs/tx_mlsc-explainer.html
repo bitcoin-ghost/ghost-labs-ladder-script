@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MLSC Transaction Lifecycle</title>
+<title>TX_MLSC Transaction Lifecycle</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -270,19 +270,19 @@ const S = [
 
 {act:0,t:"THE CHALLENGE",s:"How do we commit to this structure without revealing it?",h:`
 <div class="desc">The vault has 2 rungs, 3 blocks, a 33-byte Schnorr pubkey, a 897-byte FALCON512 pubkey, a CSV timelock, and a coil. All of this must be <strong>committed to on-chain</strong> so it can't be changed — but <strong>none of it should be visible</strong> until spent.</div>
-<div class="desc">The answer: <strong>MLSC</strong> (Merkelised Ladder Script Conditions). Every rung becomes a <strong>leaf</strong> in a Merkle tree. The leaves are <strong>SHA-256 digests</strong> of the serialised data + pubkeys. Only the 32-byte <strong>root</strong> goes on-chain.</div>
+<div class="desc">The answer: <strong>TX_MLSC</strong> (Transaction-Level Merkelised Ladder Script Conditions). Every rung becomes a <strong>leaf</strong> in a Merkle tree. The leaves are <strong>SHA-256 digests</strong> of the serialised data + pubkeys. Only the 32-byte <strong>root</strong> goes on-chain.</div>
 <div class="desc">Let's trace every byte through this process.</div>
 `},
 
 // === ACT 1: CREATION ===
 
-{act:1,t:"TRANSACTION SHELL",s:"createtxmlsc · version 4 · MLSC flag",h:`
+{act:1,t:"TRANSACTION SHELL",s:"createtxmlsc · version 4 · TX_MLSC format",h:`
 <div class="desc">The user calls <code>createtxmlsc</code>. The system creates a <code>CMutableTransaction</code> with <strong>version = 4</strong> (RUNG_TX_VERSION). Inputs are outpoints to spend. Outputs are values only (8 bytes each). Rungs specify conditions with output_index. TX_MLSC format uses flag byte 0x02. One shared conditions_root per transaction. Creation proof validated at block acceptance.</div>
 <div class="sv">
 <span class="lbl">Transaction skeleton</span>
 <span class="b s">version</span><span class="bn">= 4 (RUNG_TX_VERSION)</span><br>
 <span class="b s">vin[]</span><span class="bn">input outpoints (txid + vout + sequence)</span><br>
-<span class="b s">vout[]</span><span class="bn">each output: amount + conditions + mlsc:true</span><br>
+<span class="b s">vout[]</span><span class="bn">each output: 8 bytes (value only). Shared conditions_root per tx.</span><br>
 <span class="b s">nLockTime</span><span class="bn">optional, default 0</span>
 </div>
 `},
@@ -703,7 +703,7 @@ all inside SHA-256 leaf digests. <strong>Irrecoverable.</strong>
 <div class="chk ok"><span class="ic">✓</span> scriptPubKey.size() = 33, within [33, 65]</div>
 <div class="chk ok"><span class="ic">✓</span> scriptPubKey[0] = 0xDF (RUNG_MLSC_PREFIX)</div>
 <div class="chk ok"><span class="ic">✓</span> Extract bytes 1-32 → conditions_root (the expected Merkle root)</div>
-<div class="chk ok"><span class="ic">✓</span> witness.stack.size() ≥ 2 (MLSC requires 2 elements)</div>
+<div class="chk ok"><span class="ic">✓</span> witness.stack.size() = 2 (LadderWitness + MLSCProof)</div>
 </div>
 `},
 
