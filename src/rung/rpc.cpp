@@ -3004,20 +3004,13 @@ static RPCHelpMan signladder()
                         // 2. Has coil.output_index matching the output we're spending
                         uint32_t spent_vout = mtx.vin[input_idx].prevout.n;
                         int found_idx = -1;
-                        LogPrintf("TX_MLSC signladder: looking for vc=%s vout=%u in %zu funding rungs\n",
-                                  our_vc.GetHex(), spent_vout, funding_proof.rungs.size());
                         for (size_t i = 0; i < funding_proof.rungs.size(); ++i) {
-                            LogPrintf("  rung %zu: vc=%s output_index=%u blocks=%zu\n",
-                                      i, funding_proof.rungs[i].value_commitment.GetHex(),
-                                      funding_proof.rungs[i].coil.output_index,
-                                      funding_proof.rungs[i].blocks.size());
                             if (funding_proof.rungs[i].value_commitment == our_vc &&
                                 funding_proof.rungs[i].coil.output_index == spent_vout) {
                                 found_idx = static_cast<int>(i);
                                 break;
                             }
                         }
-                        LogPrintf("  found_idx=%d\n", found_idx);
 
                         if (found_idx >= 0) {
                             mlsc_proof.total_rungs = static_cast<uint16_t>(all_leaves.size());

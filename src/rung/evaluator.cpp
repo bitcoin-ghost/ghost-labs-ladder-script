@@ -306,13 +306,13 @@ static std::vector<const RungField*> FindAllFields(const RungBlock& block, RungD
     return result;
 }
 
-/** Helper: read a little-endian numeric value from a NUMERIC field (1-4 bytes). */
+/** Helper: read a little-endian numeric value from a NUMERIC field (1-8 bytes). */
 static int64_t ReadNumeric(const RungField& field)
 {
-    if (field.data.empty() || field.data.size() > 4) return -1;
-    uint32_t val = 0;
+    if (field.data.empty() || field.data.size() > 8) return -1;
+    uint64_t val = 0;
     for (size_t i = 0; i < field.data.size(); ++i) {
-        val |= static_cast<uint32_t>(field.data[i]) << (8 * i);
+        val |= static_cast<uint64_t>(field.data[i]) << (8 * i);
     }
     return static_cast<int64_t>(val);
 }
@@ -644,6 +644,9 @@ EvalResult EvalCSVTimeBlock(const RungBlock& block,
     if (sequence_val < 0) {
         return EvalResult::ERROR;
     }
+
+    // CSV_TIME: enforce time-based relative locktime (BIP 68 type flag)
+    sequence_val |= CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG;
 
     CScriptNum nSequence(sequence_val);
 

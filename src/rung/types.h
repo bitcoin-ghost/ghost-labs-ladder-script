@@ -272,7 +272,7 @@ inline size_t FieldMaxSize(RungDataType type)
     case RungDataType::SCRIPT_BODY:   return 80;
     case RungDataType::SIGNATURE:     return 50000;
     case RungDataType::SPEND_INDEX:   return 4;
-    case RungDataType::NUMERIC:       return 4;
+    case RungDataType::NUMERIC:       return 8;
     case RungDataType::SCHEME:        return 1;
     case RungDataType::DATA:          return 40;  // hash (32) + protocol metadata (8)
     }
@@ -388,7 +388,6 @@ inline bool IsKeyConsumingBlockType(RungBlockType type)
     case RungBlockType::PTLC:
     case RungBlockType::TIMELOCKED_MULTISIG:
     case RungBlockType::KEY_REF_SIG:
-    case RungBlockType::COSIGN:
     case RungBlockType::ADAPTOR_SIG:
     case RungBlockType::MUSIG_THRESHOLD:
     case RungBlockType::P2PK_LEGACY:
@@ -424,20 +423,17 @@ inline bool IsInvertibleBlockType(RungBlockType type)
     case RungBlockType::TAGGED_HASH:
     // Covenant
     case RungBlockType::CTV:
-    case RungBlockType::VAULT_LOCK:
     case RungBlockType::AMOUNT_LOCK:
     // Policy / Governance
     case RungBlockType::WEIGHT_LIMIT:
     case RungBlockType::INPUT_COUNT:
     case RungBlockType::OUTPUT_COUNT:
     case RungBlockType::ACCUMULATOR:  // Inverted ACCUMULATOR = blocklist ("NOT in set")
-    // Anchor
+    // Anchor (non-key-consuming only)
     case RungBlockType::ANCHOR:
-    case RungBlockType::ANCHOR_CHANNEL:
     case RungBlockType::ANCHOR_POOL:
     case RungBlockType::ANCHOR_RESERVE:
     case RungBlockType::ANCHOR_SEAL:
-    case RungBlockType::ANCHOR_ORACLE:
     case RungBlockType::DATA_RETURN:
     // Recursion
     case RungBlockType::RECURSE_SAME:
@@ -446,15 +442,11 @@ inline bool IsInvertibleBlockType(RungBlockType type)
     case RungBlockType::RECURSE_COUNT:
     case RungBlockType::RECURSE_SPLIT:
     case RungBlockType::RECURSE_DECAY:
-    // PLC
+    // PLC (non-key-consuming only)
     case RungBlockType::HYSTERESIS_FEE:
     case RungBlockType::HYSTERESIS_VALUE:
     case RungBlockType::TIMER_CONTINUOUS:
     case RungBlockType::TIMER_OFF_DELAY:
-    case RungBlockType::LATCH_SET:
-    case RungBlockType::LATCH_RESET:
-    case RungBlockType::COUNTER_UP:
-    case RungBlockType::COUNTER_DOWN:
     case RungBlockType::COUNTER_PRESET:
     case RungBlockType::COMPARE:
     case RungBlockType::SEQUENCER:
