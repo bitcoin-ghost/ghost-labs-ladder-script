@@ -932,6 +932,7 @@ std::vector<uint8_t> SerializeCoilData(const RungCoil& coil)
     ss << static_cast<uint8_t>(coil.coil_type);
     ss << static_cast<uint8_t>(coil.attestation);
     ss << static_cast<uint8_t>(coil.scheme);
+    ss << coil.output_index; // Committed in Merkle leaf — binds rung to output
 
     WriteCompactSize(ss, coil.address_hash.size());
     if (!coil.address_hash.empty()) {

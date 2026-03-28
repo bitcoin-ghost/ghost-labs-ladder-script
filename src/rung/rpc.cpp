@@ -2053,9 +2053,10 @@ static RPCHelpMan signrungtx()
                     ladder.relays.push_back(std::move(wit_relay));
                 }
             }
-            // Copy relay_refs from conditions to witness rungs
-            for (size_t r = 0; r < ladder.rungs.size() && r < conditions.rungs.size(); ++r) {
-                ladder.rungs[r].relay_refs = conditions.rungs[r].relay_refs;
+            // Copy relay_refs from the target rung's conditions to the witness rung.
+            // For MLSC spends, ladder has exactly 1 rung (the target).
+            if (!ladder.rungs.empty() && target_rung < conditions.rungs.size()) {
+                ladder.rungs[0].relay_refs = conditions.rungs[target_rung].relay_refs;
             }
         }
 

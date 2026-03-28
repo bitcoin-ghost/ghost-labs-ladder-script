@@ -768,6 +768,33 @@ bool VerifyMLSCProof(const MLSCProof& proof,
                      MLSCVerifiedLeaves* verified_out,
                      const std::vector<std::vector<std::vector<uint8_t>>>& mutation_target_pubkeys)
 {
+    // SHARED mode must be handled by the caller (evaluator) — not this function
+    if (proof.proof_mode == MLSCProofMode::SHARED) {
+        error = "SHARED proof mode must be resolved by the caller";
+        return false;
+    }
+
+    // MERKLE_PATH mode: O(log N) sibling hashes from leaf to root
+    if (proof.proof_mode == MLSCProofMode::MERKLE_PATH) {
+        size_t total_leaves = proof.total_rungs + proof.total_relays + 1;
+        uint256 rung_leaf = ComputeRungLeaf(proof.revealed_rung, rung_pubkeys);
+        std::string path_error;
+        if (!VerifyMerklePath(rung_leaf, proof.proof_hashes, total_leaves, expected_root, path_error)) {
+            error = "MERKLE_PATH verification failed: " + path_error;
+            return false;
+        }
+        if (verified_out) {
+            verified_out->root = expected_root;
+            verified_out->rung_index = proof.rung_index;
+            verified_out->total_rungs = proof.total_rungs;
+            verified_out->total_relays = proof.total_relays;
+            verified_out->leaves.resize(1);
+            verified_out->leaves[0] = rung_leaf;
+        }
+        return true;
+    }
+
+    // FULL_LEAVES mode: all unrevealed leaf hashes provided
     // Total leaves: total_rungs + total_relays + 1 (coil)
     size_t total_leaves = proof.total_rungs + proof.total_relays + 1;
 
